@@ -24,10 +24,12 @@ model User {
   Email       String?
   LineId      String?
   CreatedAt   DateTime @default(now())
-  CreatedBy   String?
+  CreatedBy   Int?
   UpdatedAt   DateTime @updatedAt
-  UpdatedBy   String?
-  // ความสัมพันธ์กับ Role และ Branch จะเพิ่มเมื่อมี model เหล่านั้น
+  UpdatedBy   Int?
+
+  Role        Role     @relation(fields: [RoleId], references: [RoleId])
+  Branch      Branch   @relation(fields: [BranchId], references: [BranchId])
 }
 
 model Branch {
@@ -36,10 +38,16 @@ model Branch {
   BranchAddress String?
   BranchCode    String   @unique
   CreatedAt     DateTime @default(now())
-  CreatedBy     String?
+  CreatedBy     Int?
   UpdatedAt     DateTime @updatedAt
-  UpdatedBy     String?
-  // ความสัมพันธ์กับ User จะเพิ่มเมื่อเชื่อมโยง
+  UpdatedBy     Int?
+
+  CreatedByUser User? @relation("BranchCreatedBy", fields: [CreatedBy], references: [UserId])
+  UpdatedByUser User? @relation("BranchUpdatedBy", fields: [UpdatedBy], references: [UserId])
+
+  Users                User[]
+  WithdrawnRequests    WithdrawnRequest[]
+  Issues               Issue[]
 }
 
 model PurchaseOrderDetail {
@@ -50,19 +58,27 @@ model PurchaseOrderDetail {
   PurchaseOrderPrice    Float
   PurchaseOrderUnit     String
   CreatedAt             DateTime @default(now())
-  CreatedBy             String?
+  CreatedBy             Int?
   UpdatedAt             DateTime @updatedAt
-  UpdatedBy             String?
+  UpdatedBy             Int?
+
+  CreatedByUser         User? @relation("PurchaseOrderDetailCreatedBy", fields: [CreatedBy], references: [UserId])
+  UpdatedByUser         User? @relation("PurchaseOrderDetailUpdatedBy", fields: [UpdatedBy], references: [UserId])
+
+  PurchaseOrder         PurchaseOrder @relation(fields: [PurchaseOrderId], references: [PurchaseOrderId])
+  Material              Material      @relation(fields: [MaterialId], references: [MaterialId])
+
+  ReceiptDetails        ReceiptDetail[]
 
   @@unique([PurchaseOrderId, MaterialId])
-  // ความสัมพันธ์กับ PurchaseOrder และ Material จะเพิ่มเมื่อมี model เหล่านั้น
 }
 
 model Role {
   RoleId    Int    @id @default(autoincrement())
   RoleName  String
   RoleCode  String @unique
-  // ความสัมพันธ์กับ User จะเพิ่มเมื่อเชื่อมโยง
+
+  Users     User[]
 }
 
 model Supplier {
@@ -72,10 +88,14 @@ model Supplier {
   SupplierCode       String @unique
   SupplierTelNumber  String?
   CreatedAt          DateTime @default(now())
-  CreatedBy          String?
+  CreatedBy          Int?
   UpdatedAt          DateTime @updatedAt
-  UpdatedBy          String?
-  // ความสัมพันธ์กับตารางอื่นจะเพิ่มเมื่อเชื่อมโยง
+  UpdatedBy          Int?
+
+  CreatedByUser      User? @relation("SupplierCreatedBy", fields: [CreatedBy], references: [UserId])
+  UpdatedByUser      User? @relation("SupplierUpdatedBy", fields: [UpdatedBy], references: [UserId])
+
+  PurchaseOrders     PurchaseOrder[]
 }
 
 model Material {
@@ -86,10 +106,19 @@ model Material {
   CatagoryId     Int
   MaterialCode   String  @unique
   CreatedAt      DateTime @default(now())
-  CreatedBy      String?
+  CreatedBy      Int?
   UpdatedAt      DateTime @updatedAt
-  UpdatedBy      String?
-  // ความสัมพันธ์กับ Category จะเพิ่มเมื่อเชื่อมโยง
+  UpdatedBy      Int?
+
+  CreatedByUser  User? @relation("MaterialCreatedBy", fields: [CreatedBy], references: [UserId])
+  UpdatedByUser  User? @relation("MaterialUpdatedBy", fields: [UpdatedBy], references: [UserId])
+
+  Catagory       Catagory @relation(fields: [CatagoryId], references: [CatagoryId])
+  Stocks         Stock[]
+  PurchaseOrderDetails PurchaseOrderDetail[]
+  ReceiptDetails ReceiptDetail[]
+  WithdrawnRequestDetails WithdrawnRequestDetail[]
+  IssueDetails   IssueDetail[]
 }
 
 model PurchaseOrder {
@@ -103,10 +132,17 @@ model PurchaseOrder {
   ContactName           String?
   ContactPhoneNumber    String?
   CreatedAt             DateTime @default(now())
-  CreatedBy             String?
+  CreatedBy             Int?
   UpdatedAt             DateTime @updatedAt
-  UpdatedBy             String?
-  // ความสัมพันธ์กับ Supplier จะเพิ่มเมื่อเชื่อมโยง
+  UpdatedBy             Int?
+
+  CreatedByUser         User? @relation("PurchaseOrderCreatedBy", fields: [CreatedBy], references: [UserId])
+  UpdatedByUser         User? @relation("PurchaseOrderUpdatedBy", fields: [UpdatedBy], references: [UserId])
+
+  Supplier              Supplier @relation(fields: [SupplierId], references: [SupplierId])
+  PurchaseOrderDetails  PurchaseOrderDetail[]
+  Receipts              Receipt[]
+  Stocks                Stock[]
 }
 
 model Catagory {
@@ -114,10 +150,14 @@ model Catagory {
   CatagoryName   String
   CatagoryCode   String  @unique
   CreatedAt      DateTime @default(now())
-  CreatedBy      String?
+  CreatedBy      Int?
   UpdatedAt      DateTime @updatedAt
-  UpdatedBy      String?
-  // ความสัมพันธ์กับ Material จะเพิ่มเมื่อเชื่อมโยง
+  UpdatedBy      Int?
+
+  CreatedByUser  User? @relation("CatagoryCreatedBy", fields: [CreatedBy], references: [UserId])
+  UpdatedByUser  User? @relation("CatagoryUpdatedBy", fields: [UpdatedBy], references: [UserId])
+
+  Materials      Material[]
 }
 
 model Stock {
@@ -131,10 +171,16 @@ model Stock {
   Issue           Int?
   Remain          Int?
   CreatedAt       DateTime @default(now())
-  CreatedBy       String?
+  CreatedBy       Int?
   UpdatedAt       DateTime @updatedAt
-  UpdatedBy       String?
-  // ความสัมพันธ์กับ Material, Receipt, PurchaseOrder จะเพิ่มเมื่อเชื่อมโยง
+  UpdatedBy       Int?
+
+  CreatedByUser   User? @relation("StockCreatedBy", fields: [CreatedBy], references: [UserId])
+  UpdatedByUser   User? @relation("StockUpdatedBy", fields: [UpdatedBy], references: [UserId])
+
+  Material        Material @relation(fields: [MaterialId], references: [MaterialId])
+  Receipt         Receipt? @relation(fields: [ReceiptId], references: [ReceiptId])
+  PurchaseOrder   PurchaseOrder? @relation(fields: [PurchaseOrderId], references: [PurchaseOrderId])
 }
 
 model Receipt {
@@ -144,10 +190,16 @@ model Receipt {
   PurchaseOrderId    Int
   ReceiptCode        String  @unique
   CreatedAt          DateTime @default(now())
-  CreatedBy          String?
+  CreatedBy          Int?
   UpdatedAt          DateTime @updatedAt
-  UpdatedBy          String?
-  // ความสัมพันธ์กับ PurchaseOrder จะเพิ่มเมื่อเชื่อมโยง
+  UpdatedBy          Int?
+
+  CreatedByUser      User? @relation("ReceiptCreatedBy", fields: [CreatedBy], references: [UserId])
+  UpdatedByUser      User? @relation("ReceiptUpdatedBy", fields: [UpdatedBy], references: [UserId])
+
+  PurchaseOrder      PurchaseOrder @relation(fields: [PurchaseOrderId], references: [PurchaseOrderId])
+  ReceiptDetails     ReceiptDetail[]
+  Stocks             Stock[]
 }
 
 model WithdrawnRequest {
@@ -157,10 +209,16 @@ model WithdrawnRequest {
   BranchId                  Int
   WithdrawnRequestCode      String  @unique
   CreatedAt                 DateTime @default(now())
-  CreatedBy                 String?
+  CreatedBy                 Int?
   UpdatedAt                 DateTime @updatedAt
-  UpdatedBy                 String?
-  // ความสัมพันธ์กับ Branch จะเพิ่มเมื่อเชื่อมโยง
+  UpdatedBy                 Int?
+
+  CreatedByUser             User? @relation("WithdrawnRequestCreatedBy", fields: [CreatedBy], references: [UserId])
+  UpdatedByUser             User? @relation("WithdrawnRequestUpdatedBy", fields: [UpdatedBy], references: [UserId])
+
+  Branch                    Branch   @relation(fields: [BranchId], references: [BranchId])
+  WithdrawnRequestDetails   WithdrawnRequestDetail[]
+  Issues                    Issue[]
 }
 
 model ReceiptDetail {
@@ -170,12 +228,18 @@ model ReceiptDetail {
   MaterialId             Int
   MaterialQuantity       Int
   CreatedAt              DateTime @default(now())
-  CreatedBy              String?
+  CreatedBy              Int?
   UpdatedAt              DateTime @updatedAt
-  UpdatedBy              String?
+  UpdatedBy              Int?
+
+  CreatedByUser          User? @relation("ReceiptDetailCreatedBy", fields: [CreatedBy], references: [UserId])
+  UpdatedByUser          User? @relation("ReceiptDetailUpdatedBy", fields: [UpdatedBy], references: [UserId])
+
+  Receipt                Receipt   @relation(fields: [ReceiptId], references: [ReceiptId])
+  PurchaseOrderDetail    PurchaseOrderDetail @relation(fields: [PurchaseOrderDetailId], references: [PurchaseOrderDetailId])
+  Material               Material  @relation(fields: [MaterialId], references: [MaterialId])
 
   @@unique([ReceiptId, MaterialId])
-  // ความสัมพันธ์กับ Receipt, PurchaseOrderDetail, Material จะเพิ่มเมื่อเชื่อมโยง
 }
 
 model WithdrawnRequestDetail {
@@ -184,12 +248,17 @@ model WithdrawnRequestDetail {
   MaterialId              Int
   WithdrawnQuantity       Int
   CreatedAt               DateTime @default(now())
-  CreatedBy               String?
+  CreatedBy               Int?
   UpdatedAt               DateTime @updatedAt
-  UpdatedBy               String?
+  UpdatedBy               Int?
+
+  CreatedByUser           User? @relation("WithdrawnRequestDetailCreatedBy", fields: [CreatedBy], references: [UserId])
+  UpdatedByUser           User? @relation("WithdrawnRequestDetailUpdatedBy", fields: [UpdatedBy], references: [UserId])
+
+  WithdrawnRequest        WithdrawnRequest @relation(fields: [RequestId], references: [RequestId])
+  Material                Material         @relation(fields: [MaterialId], references: [MaterialId])
 
   @@unique([RequestId, MaterialId])
-  // ความสัมพันธ์กับ WithdrawnRequest, Material จะเพิ่มเมื่อเชื่อมโยง
 }
 
 model Issue {
@@ -199,22 +268,36 @@ model Issue {
   IssueStatus  String
   IssueDate    DateTime
   CreatedAt    DateTime @default(now())
-  CreatedBy    String?
+  CreatedBy    Int?
   UpdatedAt    DateTime @updatedAt
-  UpdatedBy    String?
-  // ความสัมพันธ์กับ WithdrawnRequest, Branch จะเพิ่มเมื่อเชื่อมโยง
+  UpdatedBy    Int?
+
+  CreatedByUser User? @relation("IssueCreatedBy", fields: [CreatedBy], references: [UserId])
+  UpdatedByUser User? @relation("IssueUpdatedBy", fields: [UpdatedBy], references: [UserId])
+
+  WithdrawnRequest WithdrawnRequest @relation(fields: [RequestId], references: [RequestId])
+  Branch           Branch           @relation(fields: [BranchId], references: [BranchId])
+  IssueDetails     IssueDetail[]
 }
 
 model IssueDetail {
-  IssueDetailId   Int     @id @default(autoincrement())
+  IssueDetailId   Int      @id @default(autoincrement())
   RequestId       Int
   MaterialId      Int
-  Barcode         String  @unique
+  Barcode         String
   IssueQuantity   Int
-  IssueId         Int     @unique
+  IssueId         Int
   CreatedAt       DateTime @default(now())
-  CreatedBy       String?
+  CreatedBy       Int?
   UpdatedAt       DateTime @updatedAt
-  UpdatedBy       String?
-  // ความสัมพันธ์กับ Issue, Material, Stock จะเพิ่มเมื่อเชื่อมโยง
+  UpdatedBy       Int?
+
+  CreatedByUser   User?    @relation("IssueDetailCreatedBy", fields: [CreatedBy], references: [UserId])
+  UpdatedByUser   User?    @relation("IssueDetailUpdatedBy", fields: [UpdatedBy], references: [UserId])
+
+  Issue           Issue    @relation(fields: [IssueId], references: [IssueId])
+  Material        Material @relation(fields: [MaterialId], references: [MaterialId])
+
+  // ✅ Unique เฉพาะเมื่อสามค่านี้ซ้ำกันพร้อมกันเท่านั้น
+  @@unique([IssueId, MaterialId, Barcode])
 }
