@@ -1,0 +1,56 @@
+model PurchaseOrderDetail {
+  PurchaseOrderDetailId Int      @id @default(autoincrement())
+  PurchaseOrderId       Int
+  MaterialId            Int      @unique
+  PurchaseOrderQuantity Int
+  PurchaseOrderPrice    Float
+  PurchaseOrderUnit     String
+  CreatedAt             DateTime @default(now())
+  CreatedBy             String?
+  UpdatedAt             DateTime @updatedAt
+  UpdatedBy             String?
+  // ความสัมพันธ์กับ PurchaseOrder และ Material จะเพิ่มเมื่อมี model เหล่านั้น
+}
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql" // เปลี่ยนเป็น DB ที่ใช้จริง
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  UserId      Int      @id @default(autoincrement())
+  UserName    String   @unique
+  UserPassword String
+  RoleId      Int
+  BranchId    Int
+  TelNumber   String?
+  Email       String?
+  LineId      String?
+  CreatedAt   DateTime @default(now())
+  CreatedBy   String?
+  UpdatedAt   DateTime @updatedAt
+  UpdatedBy   String?
+  // ความสัมพันธ์กับ Role และ Branch จะเพิ่มเมื่อมี model เหล่านั้น
+}
+
+model Branch {
+  BranchId      Int      @id @default(autoincrement())
+  BranchName    String
+  BranchAddress String?
+  BranchCode    String   @unique
+  CreatedAt     DateTime @default(now())
+  CreatedBy     String?
+  UpdatedAt     DateTime @updatedAt
+  UpdatedBy     String?
+  // ความสัมพันธ์กับ User จะเพิ่มเมื่อเชื่อมโยง
+}
