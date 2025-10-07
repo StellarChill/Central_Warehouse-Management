@@ -1,16 +1,3 @@
-model PurchaseOrderDetail {
-  PurchaseOrderDetailId Int      @id @default(autoincrement())
-  PurchaseOrderId       Int
-  MaterialId            Int      @unique
-  PurchaseOrderQuantity Int
-  PurchaseOrderPrice    Float
-  PurchaseOrderUnit     String
-  CreatedAt             DateTime @default(now())
-  CreatedBy             String?
-  UpdatedAt             DateTime @updatedAt
-  UpdatedBy             String?
-  // ความสัมพันธ์กับ PurchaseOrder และ Material จะเพิ่มเมื่อมี model เหล่านั้น
-}
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
@@ -53,4 +40,181 @@ model Branch {
   UpdatedAt     DateTime @updatedAt
   UpdatedBy     String?
   // ความสัมพันธ์กับ User จะเพิ่มเมื่อเชื่อมโยง
+}
+
+model PurchaseOrderDetail {
+  PurchaseOrderDetailId Int      @id @default(autoincrement())
+  PurchaseOrderId       Int
+  MaterialId            Int
+  PurchaseOrderQuantity Int
+  PurchaseOrderPrice    Float
+  PurchaseOrderUnit     String
+  CreatedAt             DateTime @default(now())
+  CreatedBy             String?
+  UpdatedAt             DateTime @updatedAt
+  UpdatedBy             String?
+
+  @@unique([PurchaseOrderId, MaterialId])
+  // ความสัมพันธ์กับ PurchaseOrder และ Material จะเพิ่มเมื่อมี model เหล่านั้น
+}
+
+model Role {
+  RoleId    Int    @id @default(autoincrement())
+  RoleName  String
+  RoleCode  String @unique
+  // ความสัมพันธ์กับ User จะเพิ่มเมื่อเชื่อมโยง
+}
+
+model Supplier {
+  SupplierId         Int    @id @default(autoincrement())
+  SupplierName       String
+  SupplierAddress    String?
+  SupplierCode       String @unique
+  SupplierTelNumber  String?
+  CreatedAt          DateTime @default(now())
+  CreatedBy          String?
+  UpdatedAt          DateTime @updatedAt
+  UpdatedBy          String?
+  // ความสัมพันธ์กับตารางอื่นจะเพิ่มเมื่อเชื่อมโยง
+}
+
+model Material {
+  MaterialId     Int     @id @default(autoincrement())
+  MaterialName   String
+  Unit           String
+  Price          Float
+  CatagoryId     Int
+  MaterialCode   String  @unique
+  CreatedAt      DateTime @default(now())
+  CreatedBy      String?
+  UpdatedAt      DateTime @updatedAt
+  UpdatedBy      String?
+  // ความสัมพันธ์กับ Category จะเพิ่มเมื่อเชื่อมโยง
+}
+
+model PurchaseOrder {
+  PurchaseOrderId        Int     @id @default(autoincrement())
+  DateTime              DateTime
+  TotalPrice            Float
+  SupplierId            Int
+  PurchaseOrderCode     String  @unique
+  PurchaseOrderStatus   String
+  PurchaseOrderAddress  String?
+  ContactName           String?
+  ContactPhoneNumber    String?
+  CreatedAt             DateTime @default(now())
+  CreatedBy             String?
+  UpdatedAt             DateTime @updatedAt
+  UpdatedBy             String?
+  // ความสัมพันธ์กับ Supplier จะเพิ่มเมื่อเชื่อมโยง
+}
+
+model Catagory {
+  CatagoryId     Int     @id @default(autoincrement())
+  CatagoryName   String
+  CatagoryCode   String  @unique
+  CreatedAt      DateTime @default(now())
+  CreatedBy      String?
+  UpdatedAt      DateTime @updatedAt
+  UpdatedBy      String?
+  // ความสัมพันธ์กับ Material จะเพิ่มเมื่อเชื่อมโยง
+}
+
+model Stock {
+  StockId         Int     @id @default(autoincrement())
+  MaterialId      Int
+  Quantity        Int
+  Barcode         String  @unique
+  StockPrice      Float
+  ReceiptId       Int?
+  PurchaseOrderId Int?
+  Issue           Int?
+  Remain          Int?
+  CreatedAt       DateTime @default(now())
+  CreatedBy       String?
+  UpdatedAt       DateTime @updatedAt
+  UpdatedBy       String?
+  // ความสัมพันธ์กับ Material, Receipt, PurchaseOrder จะเพิ่มเมื่อเชื่อมโยง
+}
+
+model Receipt {
+  ReceiptId          Int     @id @default(autoincrement())
+  ReceiptDateTime    DateTime
+  ReceiptTotalPrice  Float
+  PurchaseOrderId    Int
+  ReceiptCode        String  @unique
+  CreatedAt          DateTime @default(now())
+  CreatedBy          String?
+  UpdatedAt          DateTime @updatedAt
+  UpdatedBy          String?
+  // ความสัมพันธ์กับ PurchaseOrder จะเพิ่มเมื่อเชื่อมโยง
+}
+
+model WithdrawnRequest {
+  RequestId                 Int     @id @default(autoincrement())
+  RequestDate               DateTime
+  WithdrawnRequestStatus    String
+  BranchId                  Int
+  WithdrawnRequestCode      String  @unique
+  CreatedAt                 DateTime @default(now())
+  CreatedBy                 String?
+  UpdatedAt                 DateTime @updatedAt
+  UpdatedBy                 String?
+  // ความสัมพันธ์กับ Branch จะเพิ่มเมื่อเชื่อมโยง
+}
+
+model ReceiptDetail {
+  ReceiptDetailId        Int     @id @default(autoincrement())
+  ReceiptId              Int
+  PurchaseOrderDetailId  Int
+  MaterialId             Int
+  MaterialQuantity       Int
+  CreatedAt              DateTime @default(now())
+  CreatedBy              String?
+  UpdatedAt              DateTime @updatedAt
+  UpdatedBy              String?
+
+  @@unique([ReceiptId, MaterialId])
+  // ความสัมพันธ์กับ Receipt, PurchaseOrderDetail, Material จะเพิ่มเมื่อเชื่อมโยง
+}
+
+model WithdrawnRequestDetail {
+  WithdrawnRequestDetailId Int     @id @default(autoincrement())
+  RequestId               Int
+  MaterialId              Int
+  WithdrawnQuantity       Int
+  CreatedAt               DateTime @default(now())
+  CreatedBy               String?
+  UpdatedAt               DateTime @updatedAt
+  UpdatedBy               String?
+
+  @@unique([RequestId, MaterialId])
+  // ความสัมพันธ์กับ WithdrawnRequest, Material จะเพิ่มเมื่อเชื่อมโยง
+}
+
+model Issue {
+  IssueId      Int     @id @default(autoincrement())
+  RequestId    Int    @unique
+  BranchId     Int
+  IssueStatus  String
+  IssueDate    DateTime
+  CreatedAt    DateTime @default(now())
+  CreatedBy    String?
+  UpdatedAt    DateTime @updatedAt
+  UpdatedBy    String?
+  // ความสัมพันธ์กับ WithdrawnRequest, Branch จะเพิ่มเมื่อเชื่อมโยง
+}
+
+model IssueDetail {
+  IssueDetailId   Int     @id @default(autoincrement())
+  RequestId       Int
+  MaterialId      Int
+  Barcode         String  @unique
+  IssueQuantity   Int
+  IssueId         Int     @unique
+  CreatedAt       DateTime @default(now())
+  CreatedBy       String?
+  UpdatedAt       DateTime @updatedAt
+  UpdatedBy       String?
+  // ความสัมพันธ์กับ Issue, Material, Stock จะเพิ่มเมื่อเชื่อมโยง
 }
