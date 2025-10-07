@@ -298,6 +298,5 @@ model IssueDetail {
   Issue           Issue    @relation(fields: [IssueId], references: [IssueId])
   Material        Material @relation(fields: [MaterialId], references: [MaterialId])
 
-  // ✅ Unique เฉพาะเมื่อสามค่านี้ซ้ำกันพร้อมกันเท่านั้น
   @@unique([IssueId, MaterialId, Barcode])
 }
