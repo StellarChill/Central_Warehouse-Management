@@ -28,6 +28,9 @@ model User {
   UpdatedAt   DateTime @updatedAt
   UpdatedBy   Int?
 
+  @@index([UserName])
+  @@index([BranchId])
+
   Role        Role     @relation(fields: [RoleId], references: [RoleId])
   Branch      Branch   @relation(fields: [BranchId], references: [BranchId])
 
@@ -69,6 +72,8 @@ model Branch {
   UpdatedAt     DateTime @updatedAt
   UpdatedBy     Int?
 
+  @@index([BranchName])
+
   CreatedByUser User? @relation("BranchCreatedBy", fields: [CreatedBy], references: [UserId])
   UpdatedByUser User? @relation("BranchUpdatedBy", fields: [UpdatedBy], references: [UserId])
 
@@ -89,6 +94,9 @@ model PurchaseOrderDetail {
   UpdatedAt             DateTime @updatedAt
   UpdatedBy             Int?
 
+  @@index([PurchaseOrderId])
+  @@index([MaterialId])
+
   CreatedByUser         User? @relation("PurchaseOrderDetailCreatedBy", fields: [CreatedBy], references: [UserId])
   UpdatedByUser         User? @relation("PurchaseOrderDetailUpdatedBy", fields: [UpdatedBy], references: [UserId])
 
@@ -105,7 +113,10 @@ model Role {
   RoleName  String
   RoleCode  String @unique
 
+  @@index([RoleName])
+
   Users     User[]
+
 }
 
 model Supplier {
@@ -118,6 +129,9 @@ model Supplier {
   CreatedBy          Int?
   UpdatedAt          DateTime @updatedAt
   UpdatedBy          Int?
+
+  @@index([SupplierName])
+  @@index([SupplierCode])
 
   CreatedByUser      User? @relation("SupplierCreatedBy", fields: [CreatedBy], references: [UserId])
   UpdatedByUser      User? @relation("SupplierUpdatedBy", fields: [UpdatedBy], references: [UserId])
@@ -136,6 +150,9 @@ model Material {
   CreatedBy      Int?
   UpdatedAt      DateTime @updatedAt
   UpdatedBy      Int?
+
+  @@index([MaterialName])
+  @@index([MaterialCode])
 
   CreatedByUser  User? @relation("MaterialCreatedBy", fields: [CreatedBy], references: [UserId])
   UpdatedByUser  User? @relation("MaterialUpdatedBy", fields: [UpdatedBy], references: [UserId])
@@ -163,6 +180,9 @@ model PurchaseOrder {
   UpdatedAt             DateTime @updatedAt
   UpdatedBy             Int?
 
+  @@index([PurchaseOrderCode])
+  @@index([PurchaseOrderStatus])
+
   CreatedByUser         User? @relation("PurchaseOrderCreatedBy", fields: [CreatedBy], references: [UserId])
   UpdatedByUser         User? @relation("PurchaseOrderUpdatedBy", fields: [UpdatedBy], references: [UserId])
 
@@ -180,6 +200,9 @@ model Catagory {
   CreatedBy      Int?
   UpdatedAt      DateTime @updatedAt
   UpdatedBy      Int?
+
+  @@index([CatagoryName])
+  @@index([CatagoryCode])
 
   CreatedByUser  User? @relation("CatagoryCreatedBy", fields: [CreatedBy], references: [UserId])
   UpdatedByUser  User? @relation("CatagoryUpdatedBy", fields: [UpdatedBy], references: [UserId])
@@ -202,6 +225,8 @@ model Stock {
   UpdatedAt       DateTime @updatedAt
   UpdatedBy       Int?
 
+  @@index([Barcode])
+
   CreatedByUser   User? @relation("StockCreatedBy", fields: [CreatedBy], references: [UserId])
   UpdatedByUser   User? @relation("StockUpdatedBy", fields: [UpdatedBy], references: [UserId])
 
@@ -221,6 +246,8 @@ model Receipt {
   UpdatedAt          DateTime @updatedAt
   UpdatedBy          Int?
 
+  @@index([ReceiptCode])
+  
   CreatedByUser      User? @relation("ReceiptCreatedBy", fields: [CreatedBy], references: [UserId])
   UpdatedByUser      User? @relation("ReceiptUpdatedBy", fields: [UpdatedBy], references: [UserId])
 
@@ -240,6 +267,8 @@ model WithdrawnRequest {
   UpdatedAt                 DateTime @updatedAt
   UpdatedBy                 Int?
 
+  @@index([WithdrawnRequestCode])
+
   CreatedByUser             User? @relation("WithdrawnRequestCreatedBy", fields: [CreatedBy], references: [UserId])
   UpdatedByUser             User? @relation("WithdrawnRequestUpdatedBy", fields: [UpdatedBy], references: [UserId])
 
@@ -258,6 +287,9 @@ model ReceiptDetail {
   CreatedBy              Int?
   UpdatedAt              DateTime @updatedAt
   UpdatedBy              Int?
+
+  @@index([ReceiptId])
+  @@index([MaterialId])
 
   CreatedByUser          User? @relation("ReceiptDetailCreatedBy", fields: [CreatedBy], references: [UserId])
   UpdatedByUser          User? @relation("ReceiptDetailUpdatedBy", fields: [UpdatedBy], references: [UserId])
@@ -279,6 +311,9 @@ model WithdrawnRequestDetail {
   UpdatedAt               DateTime @updatedAt
   UpdatedBy               Int?
 
+  @@index([RequestId])
+  @@index([MaterialId])
+
   CreatedByUser           User? @relation("WithdrawnRequestDetailCreatedBy", fields: [CreatedBy], references: [UserId])
   UpdatedByUser           User? @relation("WithdrawnRequestDetailUpdatedBy", fields: [UpdatedBy], references: [UserId])
 
@@ -299,6 +334,9 @@ model Issue {
   UpdatedAt    DateTime @updatedAt
   UpdatedBy    Int?
 
+  @@index([RequestId])
+  @@index([BranchId])
+
   CreatedByUser User? @relation("IssueCreatedBy", fields: [CreatedBy], references: [UserId])
   UpdatedByUser User? @relation("IssueUpdatedBy", fields: [UpdatedBy], references: [UserId])
 
@@ -318,6 +356,9 @@ model IssueDetail {
   CreatedBy       Int?
   UpdatedAt       DateTime @updatedAt
   UpdatedBy       Int?
+
+  @@index([RequestId])
+  @@index([MaterialId])
 
   CreatedByUser   User?    @relation("IssueDetailCreatedBy", fields: [CreatedBy], references: [UserId])
   UpdatedByUser   User?    @relation("IssueDetailUpdatedBy", fields: [UpdatedBy], references: [UserId])
