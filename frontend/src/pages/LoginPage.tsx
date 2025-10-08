@@ -112,7 +112,7 @@ export default function LoginPage() {
               <Button
                 onClick={handleLineLogin}
                 disabled={isConnecting}
-                className="w-full h-12 text-lg bg-amber-600 hover:bg-amber-700 text-white"
+                className="w-full h-12 text-lg"
               >
                 {isConnecting ? (
                   <div className="flex items-center gap-2">

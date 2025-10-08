@@ -73,7 +73,7 @@ export default function SuppliersPage() {
           <h1 className="text-2xl sm:text-3xl font-bold">ผู้จำหน่ายวัตถุดิบ</h1>
           <p className="text-muted-foreground mt-1">เพิ่ม/แก้ไข/ลบ รายชื่อร้านค้าวัตถุดิบที่เราซื้อประจำ </p>
         </div>
-        <Button className="gap-2 w-full sm:w-auto bg-amber-600 hover:bg-amber-700" onClick={startCreate}>
+        <Button className="gap-2 w-full sm:w-auto" onClick={startCreate}>
           <Plus className="h-4 w-4" /> เพิ่มผู้จำหน่าย
         </Button>
       </div>
@@ -127,10 +127,10 @@ export default function SuppliersPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
-                        <Button variant="ghost" size="sm" className="w-full sm:w-auto" onClick={() => startEdit(s)}>
+                        <Button variant="ghost" size="sm" className="w-full sm:w-auto hover:bg-accent" onClick={() => startEdit(s)}>
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" className="w-full sm:w-auto" onClick={() => remove(s.id)}>
+                        <Button variant="ghost" size="sm" className="w-full sm:w-auto text-destructive hover:bg-destructive/10" onClick={() => remove(s.id)}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>

@@ -158,10 +158,10 @@ export default function RequisitionsPage() {
                     <div className="flex items-center justify-center gap-2">
                       {r.status === "PENDING" && (
                         <>
-                          <Button size="sm" variant="outline" onClick={() => approve(r.id)} className="border-amber-200 text-amber-700 hover:bg-amber-50">
+                          <Button size="sm" variant="outline" onClick={() => approve(r.id)}>
                             อนุมัติ
                           </Button>
-                          <Button size="sm" variant="ghost" onClick={() => reject(r.id)}>
+                          <Button size="sm" variant="ghost" onClick={() => reject(r.id)} className="text-destructive hover:bg-destructive/10">
                             ปฏิเสธ
                           </Button>
                         </>

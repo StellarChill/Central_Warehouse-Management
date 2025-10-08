@@ -85,16 +85,16 @@ export function Sidebar({ onClose }: SidebarProps) {
   });
 
   return (
-    <div className="flex flex-col h-full bg-gradient-to-b from-amber-50 to-orange-50 text-secondary-foreground shadow-premium border-r border-amber-200">
-      {/* Header with Premium Theme */}
-      <div className="flex items-center justify-between p-4 sm:p-6 border-b border-amber-200/50 bg-gradient-to-r from-amber-100 to-orange-100">
+    <div className="flex flex-col h-full bg-card text-card-foreground shadow-premium border-r">
+      {/* Header with Fresh Theme */}
+      <div className="flex items-center justify-between p-4 sm:p-6 border-b">
         <div className="flex items-center gap-2 sm:gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-600 to-orange-600 flex items-center justify-center shadow-lg">
-            <Cake className="h-6 w-6 text-white" />
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-lg">
+            <Cake className="h-6 w-6 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="font-bold text-lg text-amber-900">{th.dashboard.title}</h1>
-            <p className="text-xs text-amber-700 hidden sm:block">{th.dashboard.subtitle}</p>
+            <h1 className="font-bold text-lg">{th.dashboard.title}</h1>
+            <p className="text-xs text-muted-foreground hidden sm:block">{th.dashboard.subtitle}</p>
           </div>
         </div>
         
@@ -103,14 +103,14 @@ export function Sidebar({ onClose }: SidebarProps) {
             variant="ghost"
             size="sm"
             onClick={onClose}
-            className="lg:hidden hover:bg-amber-100 text-amber-700"
+            className="lg:hidden hover:bg-accent"
           >
             <X className="h-5 w-5" />
           </Button>
         )}
       </div>
 
-      {/* Navigation with Premium Theme */}
+      {/* Navigation with Fresh Theme */}
       <nav className="flex-1 p-3 sm:p-4 space-y-2 overflow-y-auto">
         {filteredNav.map((item) => {
           const PremiumIcon = item.premiumIcon || item.icon;
@@ -122,27 +122,27 @@ export function Sidebar({ onClose }: SidebarProps) {
               className={({ isActive }) =>
                 cn(
                   "flex items-center gap-3 px-3 py-3 sm:px-4 sm:py-3 rounded-xl text-sm font-medium transition-all duration-200",
-                  "hover:bg-amber-100 hover:text-amber-900 hover:shadow-sm",
+                  "hover:bg-accent hover:text-accent-foreground hover:shadow-sm",
                   isActive
-                    ? "bg-gradient-to-r from-amber-200 to-orange-200 text-amber-900 shadow-sm border border-amber-200"
-                    : "text-amber-800"
+                    ? "bg-primary/10 text-primary shadow-sm border border-primary/20"
+                    : "text-foreground"
                 )
               }
             >
-              <PremiumIcon className="h-5 w-5 flex-shrink-0 text-amber-600" />
+              <PremiumIcon className="h-5 w-5 flex-shrink-0 text-primary" />
               <span className="truncate font-medium">{item.name}</span>
             </NavLink>
           );
         })}
       </nav>
 
-      {/* Premium Footer */}
-      <div className="p-4 border-t border-amber-200/50 bg-gradient-to-r from-amber-50 to-orange-50">
+      {/* Footer */}
+      <div className="p-4 border-t">
         <div className="flex items-center justify-center gap-2 mb-2">
-          <Cookie className="h-4 w-4 text-orange-500" />
-          <span className="text-xs font-medium text-amber-700">Premium Bakery Management</span>
+          <Cookie className="h-4 w-4 text-primary" />
+          <span className="text-xs font-medium">{th.dashboard.title}</span>
         </div>
-        <div className="text-xs text-amber-600 text-center">
+        <div className="text-xs text-muted-foreground text-center">
           เวอร์ชัน 1.0.0
         </div>
       </div>

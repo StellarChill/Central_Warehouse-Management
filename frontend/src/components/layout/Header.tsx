@@ -26,7 +26,7 @@ export function Header({ onMenuClick }: HeaderProps) {
   };
 
   return (
-    <header className="h-16 bg-card/80 backdrop-blur-xl border-b border-amber-200/50 shadow-premium">
+    <header className="h-16 bg-card/80 backdrop-blur-xl border-b border-border/50 shadow-premium">
       <div className="flex items-center justify-between h-full px-4">
         {/* Left section */}
         <div className="flex items-center gap-2 sm:gap-4">
@@ -34,7 +34,7 @@ export function Header({ onMenuClick }: HeaderProps) {
             variant="ghost"
             size="sm"
             onClick={onMenuClick}
-            className="lg:hidden hover:bg-amber-100 text-amber-700"
+            className="lg:hidden hover:bg-accent"
           >
             <Menu className="h-5 w-5" />
           </Button>
@@ -43,7 +43,7 @@ export function Header({ onMenuClick }: HeaderProps) {
         {/* Right section */}
         <div className="flex items-center gap-2 sm:gap-4">
           {/* Notifications */}
-          <Button variant="ghost" size="sm" className="relative hover:bg-amber-100 text-amber-700 p-2">
+          <Button variant="ghost" size="sm" className="relative hover:bg-accent p-2">
             <Bell className="h-5 w-5" />
             <Badge 
               variant="destructive" 
@@ -56,44 +56,44 @@ export function Header({ onMenuClick }: HeaderProps) {
           {/* User menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="flex items-center gap-2 p-2 hover:bg-amber-100 text-amber-700">
+              <Button variant="ghost" className="flex items-center gap-2 p-2 hover:bg-accent">
                 <Avatar className="h-8 w-8">
                   <AvatarImage src={user.avatar} alt={user.name} />
-                  <AvatarFallback className="bg-amber-500 text-white">
+                  <AvatarFallback className="bg-primary text-primary-foreground">
                     {user.name.charAt(0)}
                   </AvatarFallback>
                 </Avatar>
                 <div className="hidden sm:block text-left">
-                  <div className="text-sm font-medium truncate max-w-[120px] text-amber-900">{user.name}</div>
-                  <div className="text-xs text-amber-700 truncate max-w-[120px]">
+                  <div className="text-sm font-medium truncate max-w-[120px]">{user.name}</div>
+                  <div className="text-xs text-muted-foreground truncate max-w-[120px]">
                     {th.roles[user.role]}
                   </div>
                 </div>
               </Button>
             </DropdownMenuTrigger>
             
-            <DropdownMenuContent align="end" className="w-56 border-amber-200 shadow-premium">
+            <DropdownMenuContent align="end" className="w-56 border shadow-premium">
               <DropdownMenuLabel>
                 <div>
-                  <div className="font-medium text-amber-900">{user.name}</div>
-                  <div className="text-sm text-amber-700">
+                  <div className="font-medium">{user.name}</div>
+                  <div className="text-sm text-muted-foreground">
                     {th.roles[user.role]}
                   </div>
                 </div>
               </DropdownMenuLabel>
-              <DropdownMenuSeparator className="bg-amber-200" />
+              <DropdownMenuSeparator />
               
-              <DropdownMenuItem className="cursor-pointer hover:bg-amber-50 text-amber-700">
+              <DropdownMenuItem className="cursor-pointer hover:bg-accent">
                 <User className="mr-2 h-4 w-4" />
                 {th.nav.profile}
               </DropdownMenuItem>
               
-              <DropdownMenuItem className="cursor-pointer hover:bg-amber-50 text-amber-700">
+              <DropdownMenuItem className="cursor-pointer hover:bg-accent">
                 <Bell className="mr-2 h-4 w-4" />
                 {th.notifications.title}
               </DropdownMenuItem>
               
-              <DropdownMenuSeparator className="bg-amber-200" />
+              <DropdownMenuSeparator />
               
               <DropdownMenuItem className="cursor-pointer text-destructive focus:text-destructive hover:bg-destructive/10">
                 {th.nav.logout}

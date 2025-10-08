@@ -53,7 +53,7 @@ export default function BranchRequisitionCreatePage() {
             </div>
           </div>
           <div className="flex justify-end">
-            <Button onClick={addItem} className="w-full sm:w-auto bg-amber-600 hover:bg-amber-700">เพิ่มรายการ</Button>
+            <Button onClick={addItem} className="w-full sm:w-auto">เพิ่มรายการ</Button>
           </div>
 
           <div className="overflow-x-auto">
@@ -78,7 +78,7 @@ export default function BranchRequisitionCreatePage() {
           </div>
 
           <div className="flex justify-end">
-            <Button disabled={items.length === 0} onClick={submit} className="w-full sm:w-auto bg-amber-600 hover:bg-amber-700">ส่งคำขอ</Button>
+            <Button disabled={items.length === 0} onClick={submit} className="w-full sm:w-auto">ส่งคำขอ</Button>
           </div>
         </CardContent>
       </Card>

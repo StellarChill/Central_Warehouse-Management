@@ -185,7 +185,7 @@ export default function ReceivingPage() {
           <CardTitle className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <span>บันทึกรับวัตถุดิบ</span>
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full sm:w-auto">
-              <Button onClick={() => setPoDialogOpen(true)} className="bg-amber-600 hover:bg-amber-700 w-full sm:w-auto">
+              <Button onClick={() => setPoDialogOpen(true)} className="w-full sm:w-auto">
                 เลือกจาก PO
               </Button>
               
@@ -237,7 +237,7 @@ export default function ReceivingPage() {
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <ShoppingCart className="h-5 w-5" />
+              <ShoppingCart className="h-12 w-12 mx-auto mb-4 text-muted" />
               เลือกรายการสินค้าจาก Purchase Order
             </DialogTitle>
           </DialogHeader>
@@ -311,7 +311,7 @@ export default function ReceivingPage() {
                                 <TableCell>
                                   <Checkbox
                                     checked={isSelected}
-                                    onCheckedChange={(checked) => handleItemSelect(item, po.id, checked as boolean)}
+                                    onCheckedChange={(checked) => handleItemSelect(item, po.id, !!checked)}
                                     disabled={remainingQty <= 0}
                                   />
                                 </TableCell>
@@ -324,7 +324,7 @@ export default function ReceivingPage() {
                                 <TableCell className="whitespace-nowrap">{item.orderedQty.toLocaleString()} {item.unit}</TableCell>
                                 <TableCell className="whitespace-nowrap">{item.receivedQty.toLocaleString()} {item.unit}</TableCell>
                                 <TableCell>
-                                  <span className={remainingQty > 0 ? "text-orange-600 font-medium" : "text-green-600"}>
+                                  <span className={remainingQty > 0 ? "text-primary font-medium" : "text-green-600"}>
                                     {remainingQty.toLocaleString()} {item.unit}
                                   </span>
                                 </TableCell>

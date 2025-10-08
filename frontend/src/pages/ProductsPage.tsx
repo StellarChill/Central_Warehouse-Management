@@ -80,19 +80,19 @@ export default function ProductsPage() {
   // Get icon for category
   const getCategoryIcon = (category: string) => {
     switch (category) {
-      case "แป้ง": return <Wheat className="h-5 w-5 text-blue-600" />;
-      case "ไข่": return <Egg className="h-5 w-5 text-teal-600" />;
-      case "นม": return <Milk className="h-5 w-5 text-indigo-500" />;
-      case "เนย": return <div className="w-5 h-5 rounded bg-amber-100 border border-amber-200 flex items-center justify-center">
-        <div className="w-2 h-2 rounded-full bg-amber-400"></div>
+      case "แป้ง": return <Wheat className="h-5 w-5 text-primary" />;
+      case "ไข่": return <Egg className="h-5 w-5 text-primary" />;
+      case "นม": return <Milk className="h-5 w-5 text-primary" />;
+      case "เนย": return <div className="w-5 h-5 rounded bg-primary/10 border border-primary/20 flex items-center justify-center">
+        <div className="w-2 h-2 rounded-full bg-primary/30"></div>
       </div>;
-      case "น้ำตาล": return <Candy className="h-5 w-5 text-pink-400" />;
-      case "ช็อกโกแลต": return <div className="w-5 h-5 rounded bg-amber-800 flex items-center justify-center">
-        <div className="w-3 h-1 bg-amber-600 rounded-full"></div>
+      case "น้ำตาล": return <Candy className="h-5 w-5 text-primary" />;
+      case "ช็อกโกแลต": return <div className="w-5 h-5 rounded bg-primary flex items-center justify-center">
+        <div className="w-3 h-1 bg-primary-foreground rounded-full"></div>
       </div>;
       case "วัตถุเจือปน": return <Package className="h-5 w-5 text-gray-500" />;
-      case "น้ำมัน": return <Droplets className="h-5 w-5 text-yellow-500" />;
-      case "ผลไม้": return <Apple className="h-5 w-5 text-red-500" />;
+      case "น้ำมัน": return <Droplets className="h-5 w-5 text-primary" />;
+      case "ผลไม้": return <Apple className="h-5 w-5 text-primary" />;
       default: return <Package className="h-5 w-5 text-gray-500" />;
     }
   };
@@ -132,24 +132,24 @@ export default function ProductsPage() {
           <h1 className="text-2xl sm:text-3xl font-bold">วัตถุดิบขนมหวาน</h1>
           <p className="text-muted-foreground mt-1">จัดการวัตถุดิบสำหรับทำขนมและของหวาน</p>
         </div>
-        <Button className="gap-2 w-full sm:w-auto bg-amber-600 hover:bg-amber-700" onClick={startCreate}>
+        <Button className="gap-2 w-full sm:w-auto" onClick={startCreate}>
           <Plus className="h-4 w-4" /> เพิ่มวัตถุดิบ
         </Button>
       </div>
 
-      <Card className="shadow-premium border-amber-200">
+      <Card className="shadow-premium">
         <CardHeader>
           <CardTitle className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <span>รายการวัตถุดิบ</span>
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full sm:w-auto">
               <div className="relative w-full sm:w-80">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input className="pl-10 w-full border-amber-200 focus-visible:ring-amber-500" placeholder="ค้นหา SKU/ชื่อวัตถุดิบ" value={q} onChange={(e) => setQ(e.target.value)} />
+                <Input className="pl-10 w-full focus-visible:ring-primary" placeholder="ค้นหา SKU/ชื่อวัตถุดิบ" value={q} onChange={(e) => setQ(e.target.value)} />
               </div>
               <div className="flex items-center gap-2">
                 <Filter className="h-4 w-4 text-muted-foreground" />
                 <select 
-                  className="border border-amber-200 bg-background rounded-md px-3 py-2 text-sm focus-visible:ring-amber-500"
+                  className="border border-input bg-background rounded-md px-3 py-2 text-sm focus-visible:ring-primary"
                   value={categoryFilter}
                   onChange={(e) => setCategoryFilter(e.target.value)}
                 >
@@ -170,23 +170,23 @@ export default function ProductsPage() {
                 <div key={category}>
                   <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                     {getCategoryIcon(category)}
-                    {category} <Badge variant="secondary" className="bg-amber-100 text-amber-800">{items.length}</Badge>
+                    {category} <Badge variant="secondary">{items.length}</Badge>
                   </h2>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     {items.map((p) => (
-                      <Card key={p.id} className="hover:shadow-premium transition-all border-amber-100">
+                      <Card key={p.id} className="hover:shadow-premium transition-all">
                         <CardContent className="p-4">
                           <div className="flex justify-between items-start">
                             <div>
-                              <h3 className="font-medium text-amber-900">{p.name}</h3>
+                              <h3 className="font-medium">{p.name}</h3>
                               <p className="text-sm text-muted-foreground">{p.sku}</p>
                             </div>
-                            <Badge variant="outline" className="border-amber-200 text-amber-700">{p.unit}</Badge>
+                            <Badge variant="outline">{p.unit}</Badge>
                           </div>
                           <div className="mt-3 flex justify-between items-center">
                             <span className="font-semibold text-primary">฿{p.price.toLocaleString()}</span>
                             <div className="flex gap-1">
-                              <Button variant="ghost" size="sm" className="text-amber-600 hover:bg-amber-50 hover:text-amber-800" onClick={() => startEdit(p)}>
+                              <Button variant="ghost" size="sm" className="hover:bg-accent" onClick={() => startEdit(p)}>
                                 <Edit className="h-4 w-4" />
                               </Button>
                               <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10" onClick={() => remove(p.id)}>
@@ -202,60 +202,48 @@ export default function ProductsPage() {
               ))}
             </div>
           ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              ไม่พบวัตถุดิบที่ตรงกับเงื่อนไขการค้นหา
+            <div className="text-center py-12 text-muted-foreground">
+              <Package className="h-12 w-12 mx-auto mb-4 text-muted" />
+              <p>ไม่พบวัตถุดิบ</p>
             </div>
           )}
         </CardContent>
       </Card>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="border-amber-200 shadow-premium">
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editing ? "แก้ไขวัตถุดิบ" : "เพิ่มวัตถุดิบ"}</DialogTitle>
+            <DialogTitle>{editing ? "แก้ไขวัตถุดิบ" : "เพิ่มวัตถุดิบใหม่"}</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="sku">SKU</Label>
-              <Input id="sku" value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} className="border-amber-200 focus-visible:ring-amber-500" />
+              <Label>SKU</Label>
+              <Input value={form.sku} onChange={(e) => setForm({...form, sku: e.target.value})} />
             </div>
             <div>
-              <Label htmlFor="name">ชื่อวัตถุดิบ</Label>
-              <Input id="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="border-amber-200 focus-visible:ring-amber-500" />
+              <Label>ชื่อวัตถุดิบ</Label>
+              <Input value={form.name} onChange={(e) => setForm({...form, name: e.target.value})} />
             </div>
             <div>
-              <Label htmlFor="unit">หน่วย</Label>
-              <select
-                id="unit"
-                className="w-full border border-amber-200 bg-background rounded-md px-3 py-2 focus-visible:ring-amber-500"
-                value={form.unit}
-                onChange={(e) => setForm({ ...form, unit: e.target.value })}
-              >
-                <option value="กิโลกรัม">กิโลกรัม</option>
-                <option value="ลิตร">ลิตร</option>
-                <option value="ฟอง">ฟอง</option>
-                <option value="ขวด">ขวด</option>
-                <option value="ถุง">ถุง</option>
-                <option value="ชิ้น">ชิ้น</option>
-              </select>
+              <Label>หน่วย</Label>
+              <Input value={form.unit} onChange={(e) => setForm({...form, unit: e.target.value})} />
             </div>
             <div>
-              <Label htmlFor="price">ราคา</Label>
-              <Input id="price" type="number" value={form.price} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} className="border-amber-200 focus-visible:ring-amber-500" />
+              <Label>ราคาต่อหน่วย (บาท)</Label>
+              <Input type="number" value={form.price} onChange={(e) => setForm({...form, price: Number(e.target.value)})} />
             </div>
             <div className="md:col-span-2">
-              <Label htmlFor="category">หมวดหมู่</Label>
-              <select
-                id="category"
-                className="w-full border border-amber-200 bg-background rounded-md px-3 py-2 focus-visible:ring-amber-500"
+              <Label>หมวดหมู่</Label>
+              <select 
+                className="w-full border border-input bg-background rounded-md px-3 py-2"
                 value={form.category}
-                onChange={(e) => setForm({ ...form, category: e.target.value })}
+                onChange={(e) => setForm({...form, category: e.target.value})}
               >
                 <option value="แป้ง">แป้ง</option>
+                <option value="น้ำตาล">น้ำตาล</option>
+                <option value="เนย">เนย</option>
                 <option value="ไข่">ไข่</option>
                 <option value="นม">นม</option>
-                <option value="เนย">เนย</option>
-                <option value="น้ำตาล">น้ำตาล</option>
                 <option value="ช็อกโกแลต">ช็อกโกแลต</option>
                 <option value="วัตถุเจือปน">วัตถุเจือปน</option>
                 <option value="น้ำมัน">น้ำมัน</option>
@@ -263,9 +251,9 @@ export default function ProductsPage() {
               </select>
             </div>
           </div>
-          <div className="flex flex-col sm:flex-row justify-end gap-2 mt-4">
-            <Button variant="outline" className="w-full sm:w-auto border-amber-200 text-amber-700 hover:bg-amber-50" onClick={() => setOpen(false)}>ยกเลิก</Button>
-            <Button className="w-full sm:w-auto bg-amber-600 hover:bg-amber-700" onClick={save}>{editing ? "บันทึก" : "เพิ่ม"}</Button>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => setOpen(false)}>ยกเลิก</Button>
+            <Button onClick={save}>บันทึก</Button>
           </div>
         </DialogContent>
       </Dialog>

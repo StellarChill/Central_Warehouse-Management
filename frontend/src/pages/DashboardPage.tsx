@@ -185,7 +185,7 @@ export default function DashboardPage() {
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map((stat, index) => (
-          <Card key={index} className="hover:shadow-premium transition-all border-amber-200">
+          <Card key={index} className="hover:shadow-premium transition-all">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -207,7 +207,7 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Activity */}
-        <Card className="border-amber-200 shadow-premium">
+        <Card className="shadow-premium">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
@@ -217,7 +217,7 @@ export default function DashboardPage() {
           <CardContent>
             <div className="space-y-4">
               {recentActivities.map((activity) => (
-                <div key={activity.id} className="flex items-start gap-3 p-3 rounded-lg bg-amber-50">
+                <div key={activity.id} className="flex items-start gap-3 p-3 rounded-lg bg-muted">
                   <Badge className={`${getStatusColor(activity.status)} shrink-0`} variant="outline">
                     ●
                   </Badge>
@@ -232,7 +232,7 @@ export default function DashboardPage() {
         </Card>
 
         {/* Quick Actions */}
-        <Card className="border-amber-200 shadow-premium">
+        <Card className="shadow-premium">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Plus className="h-5 w-5" />
@@ -245,7 +245,7 @@ export default function DashboardPage() {
                 <Button
                   key={action.id}
                   variant="outline"
-                  className="h-auto p-4 justify-start hover:bg-amber-50 hover:border-amber-200 border-amber-200 shadow-sm"
+                  className="h-auto p-4 justify-start hover:bg-accent shadow-sm"
                   asChild
                 >
                   <a href={action.href}>
@@ -254,8 +254,8 @@ export default function DashboardPage() {
                         <action.icon className={`h-5 w-5 text-${action.color}`} />
                       </div>
                       <div className="text-left">
-                        <div className="font-medium text-sm text-amber-900">{action.title}</div>
-                        <div className="text-xs text-amber-700">
+                        <div className="font-medium text-sm">{action.title}</div>
+                        <div className="text-xs text-muted-foreground">
                           {action.description}
                         </div>
                       </div>
@@ -269,14 +269,14 @@ export default function DashboardPage() {
       </div>
 
       {/* Monthly Summary */}
-      <Card className="border-amber-200 shadow-premium">
+      <Card className="shadow-premium">
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <span className="flex items-center gap-2">
               <BarChart3 className="h-5 w-5" />
               {th.dashboard.stats.monthlyValue}
             </span>
-            <Badge variant="secondary" className="text-lg font-bold bg-amber-100 text-amber-900">
+            <Badge variant="secondary" className="text-lg font-bold">
               ฿2,450,000
             </Badge>
           </CardTitle>
