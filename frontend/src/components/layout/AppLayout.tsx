@@ -24,7 +24,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       {/* Sidebar overlay */}
       {sidebarOpen && (
         <div 
-          className="fixed inset-0 z-40 bg-amber-900/20 backdrop-blur-sm lg:hidden"
+          className="fixed inset-0 z-40 bg-background/20 backdrop-blur-sm lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}

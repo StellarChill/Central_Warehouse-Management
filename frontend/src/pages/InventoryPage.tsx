@@ -86,18 +86,18 @@ export default function InventoryPage() {
   // Get icon for category
   const getCategoryIcon = (category: string) => {
     switch (category) {
-      case "แป้ง": return <Wheat className="h-5 w-5 text-amber-600" />;
-      case "ไข่": return <Egg className="h-5 w-5 text-amber-700" />;
-      case "นม": return <Milk className="h-5 w-5 text-blue-400" />;
-      case "เนย": return <div className="w-5 h-5 rounded bg-amber-100 border border-amber-200 flex items-center justify-center">
-        <div className="w-2 h-2 rounded-full bg-amber-300"></div>
+      case "แป้ง": return <Wheat className="h-5 w-5 text-primary" />;
+      case "ไข่": return <Egg className="h-5 w-5 text-primary" />;
+      case "นม": return <Milk className="h-5 w-5 text-primary" />;
+      case "เนย": return <div className="w-5 h-5 rounded bg-primary/10 border border-primary/20 flex items-center justify-center">
+        <div className="w-2 h-2 rounded-full bg-primary/30"></div>
       </div>;
-      case "น้ำตาล": return <Candy className="h-5 w-5 text-pink-400" />;
-      case "ช็อกโกแลต": return <div className="w-5 h-5 rounded bg-amber-900 flex items-center justify-center">
-        <div className="w-3 h-1 bg-amber-700 rounded-full"></div>
+      case "น้ำตาล": return <Candy className="h-5 w-5 text-primary" />;
+      case "ช็อกโกแลต": return <div className="w-5 h-5 rounded bg-primary flex items-center justify-center">
+        <div className="w-3 h-1 bg-primary-foreground rounded-full"></div>
       </div>;
-      case "น้ำมัน": return <Droplets className="h-5 w-5 text-yellow-500" />;
-      case "ผลไม้": return <Apple className="h-5 w-5 text-red-500" />;
+      case "น้ำมัน": return <Droplets className="h-5 w-5 text-primary" />;
+      case "ผลไม้": return <Apple className="h-5 w-5 text-primary" />;
       default: return <Package className="h-5 w-5 text-gray-500" />;
     }
   };
@@ -173,7 +173,7 @@ export default function InventoryPage() {
                   onChange={(e) => setQuery(e.target.value)}
                 />
               </div>
-              <Button className="gap-2 w-full sm:w-auto bg-amber-600 hover:bg-amber-700" onClick={startCreate}>
+              <Button className="gap-2 w-full sm:w-auto" onClick={startCreate}>
                 <Plus className="h-4 w-4" /> เพิ่มรายการ
               </Button>
             </div>
