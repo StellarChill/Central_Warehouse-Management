@@ -30,6 +30,33 @@ model User {
 
   Role        Role     @relation(fields: [RoleId], references: [RoleId])
   Branch      Branch   @relation(fields: [BranchId], references: [BranchId])
+
+  BranchCreatedBy               Branch[]               @relation("BranchCreatedBy")
+  BranchUpdatedBy               Branch[]               @relation("BranchUpdatedBy")
+  PurchaseOrderDetailCreatedBy  PurchaseOrderDetail[]  @relation("PurchaseOrderDetailCreatedBy")
+  PurchaseOrderDetailUpdatedBy  PurchaseOrderDetail[]  @relation("PurchaseOrderDetailUpdatedBy")
+  SupplierCreatedBy             Supplier[]             @relation("SupplierCreatedBy")
+  SupplierUpdatedBy             Supplier[]             @relation("SupplierUpdatedBy")
+  MaterialCreatedBy             Material[]             @relation("MaterialCreatedBy")
+  MaterialUpdatedBy             Material[]             @relation("MaterialUpdatedBy")
+  PurchaseOrderCreatedBy        PurchaseOrder[]        @relation("PurchaseOrderCreatedBy")
+  PurchaseOrderUpdatedBy        PurchaseOrder[]        @relation("PurchaseOrderUpdatedBy")
+  CatagoryCreatedBy             Catagory[]             @relation("CatagoryCreatedBy")
+  CatagoryUpdatedBy             Catagory[]             @relation("CatagoryUpdatedBy")
+  StockCreatedBy                Stock[]                @relation("StockCreatedBy")
+  StockUpdatedBy                Stock[]                @relation("StockUpdatedBy")
+  ReceiptCreatedBy              Receipt[]              @relation("ReceiptCreatedBy")
+  ReceiptUpdatedBy              Receipt[]              @relation("ReceiptUpdatedBy")
+  WithdrawnRequestCreatedBy     WithdrawnRequest[]     @relation("WithdrawnRequestCreatedBy")
+  WithdrawnRequestUpdatedBy     WithdrawnRequest[]     @relation("WithdrawnRequestUpdatedBy")
+  ReceiptDetailCreatedBy        ReceiptDetail[]        @relation("ReceiptDetailCreatedBy")
+  ReceiptDetailUpdatedBy        ReceiptDetail[]        @relation("ReceiptDetailUpdatedBy")
+  WithdrawnRequestDetailCreatedBy WithdrawnRequestDetail[] @relation("WithdrawnRequestDetailCreatedBy")
+  WithdrawnRequestDetailUpdatedBy WithdrawnRequestDetail[] @relation("WithdrawnRequestDetailUpdatedBy")
+  IssueCreatedBy                Issue[]                @relation("IssueCreatedBy")
+  IssueUpdatedBy                Issue[]                @relation("IssueUpdatedBy")
+  IssueDetailCreatedBy          IssueDetail[]          @relation("IssueDetailCreatedBy")
+  IssueDetailUpdatedBy          IssueDetail[]          @relation("IssueDetailUpdatedBy")
 }
 
 model Branch {
