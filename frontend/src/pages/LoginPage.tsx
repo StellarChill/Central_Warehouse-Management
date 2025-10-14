@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Warehouse, Smartphone, Shield, Users, CheckCircle } from "lucide-react";
-import { th } from "@/i18n/th";
+import { th } from "../i18n/th";
 
 export default function LoginPage() {
   const [isConnecting, setIsConnecting] = useState(false);

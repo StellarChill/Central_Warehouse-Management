@@ -11,12 +11,11 @@ import {
   Settings,
   X,
   Cookie,
-  Cake,
   ChefHat
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { th } from "@/i18n/th";
+import { th } from "../../i18n/th";
 import { useAuth } from "@/context/AuthContext";
 
 interface SidebarProps {
@@ -90,7 +89,8 @@ export function Sidebar({ onClose }: SidebarProps) {
       <div className="flex items-center justify-between p-4 sm:p-6 border-b">
         <div className="flex items-center gap-2 sm:gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-lg">
-            <Cake className="h-6 w-6 text-primary-foreground" />
+          
+             <Warehouse className="h-6 w-6 text-primary-foreground" />
           </div>
           <div>
             <h1 className="font-bold text-lg">{th.dashboard.title}</h1>
@@ -142,9 +142,7 @@ export function Sidebar({ onClose }: SidebarProps) {
           <Cookie className="h-4 w-4 text-primary" />
           <span className="text-xs font-medium">{th.dashboard.title}</span>
         </div>
-        <div className="text-xs text-muted-foreground text-center">
-          เวอร์ชัน 1.0.0
-        </div>
+       
       </div>
     </div>
   );

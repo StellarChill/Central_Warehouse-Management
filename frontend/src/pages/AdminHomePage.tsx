@@ -5,7 +5,6 @@ import { Users, Warehouse, FileText, BarChart3 } from "lucide-react";
 export default function AdminHomePage() {
   const tiles = [
     { title: "ผู้ใช้", desc: "เพิ่ม/อนุมัติ/กำหนดสิทธิ์", href: "/admin/users", icon: Users },
-    { title: "สาขา", desc: "จัดการข้อมูลสาขา", href: "/admin/branches", icon: Warehouse },
     { title: "รายงานรวม", desc: "สรุปทุกสาขา", href: "/admin/reports", icon: BarChart3 },
   ];
 

@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { th } from "@/i18n/th";
+import { th } from "../../i18n/th";
 
 interface HeaderProps {
   onMenuClick: () => void;

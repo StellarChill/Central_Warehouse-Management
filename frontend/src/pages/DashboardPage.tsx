@@ -15,7 +15,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { th } from "@/i18n/th";
+import { th } from "../i18n/th";
 import { useState } from "react";
 
 export default function DashboardPage() {
@@ -269,35 +269,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Monthly Summary */}
-      <Card className="shadow-premium">
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" />
-              {th.dashboard.stats.monthlyValue}
-            </span>
-            <Badge variant="secondary" className="text-lg font-bold">
-              ฿2,450,000
-            </Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="text-center p-4 bg-success/10 rounded-lg border border-success/20">
-              <div className="text-2xl font-bold text-success">124</div>
-              <div className="text-sm text-muted-foreground">ใบสั่งซื้อสำเร็จ</div>
-            </div>
-            <div className="text-center p-4 bg-info/10 rounded-lg border border-info/20">
-              <div className="text-2xl font-bold text-info">89</div>
-              <div className="text-sm text-muted-foreground">ใบรับสินค้า</div>
-            </div>
-            <div className="text-center p-4 bg-warning/10 rounded-lg border border-warning/20">
-              <div className="text-2xl font-bold text-warning">156</div>
-              <div className="text-sm text-muted-foreground">ใบเบิกสินค้า</div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+    
     </div>
   );
 }

@@ -13,7 +13,6 @@ import ReceivingPage from "./pages/ReceivingPage";
 import ProductsPage from "./pages/ProductsPage";
 import BranchRequisitionCreatePage from "./pages/BranchRequisitionCreatePage";
 import AdminUsersPage from "./pages/AdminUsersPage";
-import AdminBranchesPage from "./pages/AdminBranchesPage";
 import AdminReportsPage from "./pages/AdminReportsPage";
 import AdminHomePage from "./pages/AdminHomePage";
 import LoginPage from "./pages/LoginPage";
@@ -44,7 +43,6 @@ const App = () => (
             <Route path="/requisitions" element={<RequisitionsPage />} />
             <Route path="/admin" element={<Guard allow={["ADMIN"]}><AdminHomePage /></Guard>} />
             <Route path="/admin/users" element={<Guard allow={["ADMIN"]}><AdminUsersPage /></Guard>} />
-            <Route path="/admin/branches" element={<Guard allow={["ADMIN"]}><AdminBranchesPage /></Guard>} />
             {/* Removed audit logs route */}
             <Route path="/admin/reports" element={<Guard allow={["ADMIN"]}><AdminReportsPage /></Guard>} />
             </Route>

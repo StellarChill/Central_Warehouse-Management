@@ -76,8 +76,8 @@ export const th = {
 
   // Dashboard
   dashboard: {
-    title: "ระบบจัดการร้านของหวาน",
-    subtitle: "บริหารวัตถุดิบและสาขาขนมหวาน",
+    title: "ระบบจัดการร้านขนม",
+    subtitle: "จัดการร้านขนมครบวงจร",
     stats: {
       totalPOs: "ใบสั่งซื้อทั้งหมด",
       pendingPOs: "รอการอนุมัติ",
