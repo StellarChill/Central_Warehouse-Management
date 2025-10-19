@@ -12,8 +12,10 @@ app.use(express.json()); // เพื่ออ่าน JSON body
 app.use(express.urlencoded({ extended: true })); // เผื่อใช้ form-data
 
 import userRoute from './routes/userRoute';
+import catagoryRoute from './routes/catagoryRoute';
 
 app.use('/api', userRoute);
+app.use('/api/catagory', catagoryRoute);
 
 // เริ่มรันเซิร์ฟเวอร์
 app.listen(PORT, () => {

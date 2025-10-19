@@ -1,0 +1,8 @@
+{
+  "UserName": "newuser",
+  "UserPassword": "pass123",
+  "Email": "newuser@example.com",
+  "TelNumber": "0123456789",
+  "RoleId": 1,
+  "BranchId": 1
+}
