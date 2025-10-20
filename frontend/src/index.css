@@ -223,4 +223,19 @@
   .status-pending {
     @apply bg-muted text-muted-foreground border-border;
   }
+
+  /* Prevent text selection and cursor blinking in tables */
+  table {
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+  }
+  
+  table * {
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+  }
 }

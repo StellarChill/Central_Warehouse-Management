@@ -29,7 +29,7 @@ export default function AdminReportsPage() {
           <CardTitle>ภาพรวมการเคลื่อนไหว</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
+          <Table className="select-none">
             <TableHeader>
               <TableRow>
                 <TableHead>สาขา</TableHead>
@@ -40,14 +40,14 @@ export default function AdminReportsPage() {
             </TableHeader>
             <TableBody>
               {rows.map((r) => (
-                <TableRow key={r.branch}>
+                <TableRow key={r.branch} className="select-none">
                   <TableCell>{r.branch}</TableCell>
                   <TableCell className="text-right thai-number">{r.received.toLocaleString()}</TableCell>
                   <TableCell className="text-right thai-number">{r.issued.toLocaleString()}</TableCell>
                   <TableCell className="text-right thai-number">{r.balance.toLocaleString()}</TableCell>
                 </TableRow>
               ))}
-              <TableRow>
+              <TableRow className="select-none">
                 <TableCell className="font-bold">{total.branch}</TableCell>
                 <TableCell className="text-right font-bold thai-number">{total.received.toLocaleString()}</TableCell>
                 <TableCell className="text-right font-bold thai-number">{total.issued.toLocaleString()}</TableCell>

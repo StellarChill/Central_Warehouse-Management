@@ -138,27 +138,7 @@ export default function InventoryPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card>
-          <CardContent className="p-4 sm:p-6 flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">จำนวนรายการสินค้า</p>
-              <p className="text-xl sm:text-2xl font-bold mt-1">{totalSkus}</p>
-            </div>
-            <Boxes className="h-6 w-6 sm:h-8 w-8 text-primary" />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 sm:p-6 flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">จำนวนคงเหลือรวม</p>
-              <p className="text-xl sm:text-2xl font-bold mt-1">{totalOnHand.toLocaleString()}</p>
-            </div>
-            <Package className="h-6 w-6 sm:h-8 w-8 text-success" />
-          </CardContent>
-        </Card>
-      </div>
-
+     
       <Card>
         <CardHeader>
           <CardTitle className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
