@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useMemo, useState } from "react";
 import { Search, Package } from "lucide-react";
 import { useStock } from "@/context/StockContext";
+import { Link } from "react-router-dom";
 
 type Requisition = {
   id: string;
@@ -73,14 +74,7 @@ export default function RequisitionsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">การเบิกวัตถุดิบ (ตามสาขา)</h1>
-          <p className="text-muted-foreground mt-1">
-            สรุปรายการวัตถุดิบที่แต่ละสาขาขอเบิกจากคลัง   
-          </p>
-        </div>
-      </div>
+      
 
       {/* ✅ เหลือเฉพาะตาราง */}
       <Card>
