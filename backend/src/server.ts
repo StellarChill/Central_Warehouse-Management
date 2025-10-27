@@ -13,9 +13,13 @@ app.use(express.urlencoded({ extended: true })); // เผื่อใช้ for
 
 import userRoute from './routes/userRoute';
 import catagoryRoute from './routes/catagoryRoute';
+import branchRoute from './routes/branchRoute';
+import materialRoute from './routes/materialRoute';
 
 app.use('/api', userRoute);
 app.use('/api/catagory', catagoryRoute);
+app.use('/api/branch', branchRoute);
+app.use('/api/material', materialRoute);
 
 // เริ่มรันเซิร์ฟเวอร์
 app.listen(PORT, () => {
