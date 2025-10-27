@@ -1,0 +1,340 @@
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Warehouse, UserPlus, Eye, EyeOff, AlertCircle, CheckCircle, Smartphone, Shield, Users } from "lucide-react";
+import { th } from "../i18n/th";
+
+interface RegisterFormData {
+  UserName: string;
+  UserPassword: string;
+  confirmPassword: string;
+  RoleId: string; // integer as string for Select
+  BranchId: string; // integer as string for Select
+  TelNumber: string;
+  Email: string;
+  LineId: string;
+}
+
+export default function RegisterPage() {
+  const navigate = useNavigate();
+
+  const [formData, setFormData] = useState<RegisterFormData>({
+    UserName: "",
+    UserPassword: "",
+    confirmPassword: "",
+    RoleId: "",
+    BranchId: "",
+    TelNumber: "",
+    Email: "",
+    LineId: "",
+  });
+
+  const [errors, setErrors] = useState<Partial<Record<keyof RegisterFormData, string>>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [submitMsg, setSubmitMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // TODO: Replace with fetch from API
+  const roles = [
+    { id: "1", label: th.roles.ADMIN },
+    { id: "2", label: th.roles.CENTER },
+    { id: "3", label: th.roles.BRANCH },
+  ];
+  const branches = [
+    { id: "1", name: "สาขากลาง (Center A)" },
+    { id: "2", name: "สาขา B" },
+    { id: "3", name: "สาขา C" },
+  ];
+
+  const features = [
+    {
+      icon: Warehouse,
+      title: "จัดการคลังสินค้า",
+      description: "ติดตามสต็อก การรับ-จ่าย และการเคลื่อนไหวสินค้า",
+    },
+    {
+      icon: Users,
+      title: "ระบบผู้จำหน่าย",
+      description: "จัดการข้อมูลผู้จำหน่าย สร้างใบสั่งซื้อ และติดตามการส่งมอบ",
+    },
+    {
+      icon: Shield,
+      title: "ความปลอดภัยสูง",
+      description: "ลงทะเบียนผ่าน LINE / อีเมล ด้วยความปลอดภัยระดับสูง",
+    },
+  ];
+
+  const benefits = [
+    "สมัครง่าย ใช้เวลาไม่ถึง 1 นาที",
+    "โยงบทบาท ↔ สาขา ได้ตั้งแต่แรก",
+    "เก็บข้อมูลน้อย เท่าที่จำเป็น (PDPA)",
+    "เปลี่ยนบทบาท/สาขาได้ภายหลัง",
+  ];
+
+  const handleChange = (field: keyof RegisterFormData) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData(prev => ({ ...prev, [field]: e.target.value }));
+  };
+
+  const validate = () => {
+    const next: Partial<Record<keyof RegisterFormData, string>> = {};
+
+    if (!formData.UserName || formData.UserName.trim().length < 3) next.UserName = "กรอกชื่อผู้ใช้อย่างน้อย 3 ตัวอักษร";
+
+    if (!formData.Email) next.Email = "กรอกอีเมล";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.Email)) next.Email = "รูปแบบอีเมลไม่ถูกต้อง";
+
+    if (!formData.TelNumber) next.TelNumber = "กรอกเบอร์โทร";
+    else if (!/^\d{9,10}$/.test(formData.TelNumber)) next.TelNumber = "กรอกเป็นตัวเลข 9-10 หลัก";
+
+    if (!formData.UserPassword || formData.UserPassword.length < 6) next.UserPassword = "รหัสผ่านอย่างน้อย 6 ตัวอักษร";
+
+    if (formData.confirmPassword !== formData.UserPassword) next.confirmPassword = "รหัสผ่านยืนยันไม่ตรงกัน";
+
+    if (!formData.RoleId) next.RoleId = "เลือกบทบาท";
+    if (!formData.BranchId) next.BranchId = "เลือกสาขา";
+
+    if (!formData.LineId) next.LineId = "กรอก LINE ID (หรือปล่อยว่างหากสมัครผ่าน LINE)";
+
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitMsg(null);
+
+    if (!validate()) return;
+
+    try {
+      setIsSubmitting(true);
+
+      // Mimic API call
+      await new Promise(res => setTimeout(res, 1200));
+
+      // If success -> show success then navigate
+      setSubmitMsg({ type: "success", text: "สมัครสมาชิกสำเร็จ กำลังพาไปหน้าเข้าสู่ระบบ" });
+      setTimeout(() => navigate("/login"), 900);
+    } catch (err: any) {
+      setSubmitMsg({ type: "error", text: err?.message || "สมัครไม่สำเร็จ ลองใหม่อีกครั้ง" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen gradient-surface flex items-center justify-center p-4">
+      <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+        {/* Left side - Branding & features */}
+        <div className="space-y-8">
+          <div className="text-center lg:text-left">
+            <div className="flex items-center justify-center lg:justify-start gap-3 mb-6">
+              <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center">
+                <Warehouse className="h-7 w-7 text-white" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold">{th.dashboard.title}</h1>
+                <p className="text-muted-foreground">{th.dashboard.subtitle}</p>
+              </div>
+            </div>
+
+            <p className="text-lg text-muted-foreground mb-8">
+              สมัครสมาชิกใหม่เพื่อใช้งานระบบบริหารสต็อก/สาขา
+              <br />
+              รองรับ LINE Login และอีเมล
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            {features.map((f, i) => (
+              <div key={i} className="flex items-start gap-4 p-4 rounded-lg bg-card/50 backdrop-blur-sm">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <f.icon className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold mb-1">{f.title}</h3>
+                  <p className="text-sm text-muted-foreground">{f.description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="hidden lg:block">
+            <h3 className="font-semibold mb-4 flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-success" />
+              ทำไมต้องสมัครกับเรา
+            </h3>
+            <div className="space-y-2">
+              {benefits.map((b, i) => (
+                <div key={i} className="flex items-center gap-3 text-sm">
+                  <CheckCircle className="h-4 w-4 text-success shrink-0" />
+                  <span>{b}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Right side - Register card */}
+        <div className="flex justify-center">
+          <Card className="w-full max-w-md shadow-lg">
+            <CardHeader className="text-center">
+              <CardTitle className="text-2xl flex items-center justify-center gap-2">
+                <UserPlus className="h-6 w-6" /> สมัครสมาชิก
+              </CardTitle>
+              <p className="text-muted-foreground">สร้างบัญชีผู้ใช้ใหม่สำหรับระบบ</p>
+            </CardHeader>
+
+            <CardContent>
+              {submitMsg && (
+                <Alert variant={submitMsg.type === "error" ? "destructive" : "default"} className="mb-4">
+                  <AlertDescription className={submitMsg.type === "error" ? "" : "text-green-600"}>
+                    {submitMsg.text}
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {/* UserName */}
+                <div className="space-y-1">
+                  <Label htmlFor="UserName">ชื่อผู้ใช้</Label>
+                  <Input id="UserName" value={formData.UserName} onChange={handleChange("UserName")} placeholder="เช่น somchai" />
+                  {errors.UserName && <p className="text-xs text-red-500">{errors.UserName}</p>}
+                </div>
+
+                {/* Email */}
+                <div className="space-y-1">
+                  <Label htmlFor="Email">อีเมล</Label>
+                  <Input id="Email" type="email" value={formData.Email} onChange={handleChange("Email")} placeholder="you@example.com" />
+                  {errors.Email && <p className="text-xs text-red-500">{errors.Email}</p>}
+                </div>
+
+                {/* Tel */}
+                <div className="space-y-1">
+                  <Label htmlFor="TelNumber">เบอร์โทร</Label>
+                  <Input id="TelNumber" value={formData.TelNumber} onChange={handleChange("TelNumber")} placeholder="0801234567" />
+                  {errors.TelNumber && <p className="text-xs text-red-500">{errors.TelNumber}</p>}
+                </div>
+
+                {/* Password */}
+                <div className="space-y-1">
+                  <Label htmlFor="UserPassword">รหัสผ่าน</Label>
+                  <div className="relative">
+                    <Input id="UserPassword" type={showPassword ? "text" : "password"} value={formData.UserPassword} onChange={handleChange("UserPassword")} placeholder="อย่างน้อย 6 ตัวอักษร" />
+                    <button type="button" onClick={() => setShowPassword(s => !s)} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground">
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  {errors.UserPassword && <p className="text-xs text-red-500">{errors.UserPassword}</p>}
+                </div>
+
+                {/* Confirm Password */}
+                <div className="space-y-1">
+                  <Label htmlFor="confirmPassword">ยืนยันรหัสผ่าน</Label>
+                  <div className="relative">
+                    <Input id="confirmPassword" type={showConfirm ? "text" : "password"} value={formData.confirmPassword} onChange={handleChange("confirmPassword")} />
+                    <button type="button" onClick={() => setShowConfirm(s => !s)} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground">
+                      {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  {errors.confirmPassword && <p className="text-xs text-red-500">{errors.confirmPassword}</p>}
+                </div>
+
+                {/* Role */}
+                <div className="space-y-1">
+                  <Label>บทบาท</Label>
+                  <Select value={formData.RoleId} onValueChange={(v) => setFormData(p => ({ ...p, RoleId: v }))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="เลือกบทบาท" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {roles.map(r => (
+                        <SelectItem key={r.id} value={r.id}>{r.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {errors.RoleId && <p className="text-xs text-red-500">{errors.RoleId}</p>}
+                </div>
+
+                {/* Branch */}
+                <div className="space-y-1">
+                  <Label>สาขา</Label>
+                  <Select value={formData.BranchId} onValueChange={(v) => setFormData(p => ({ ...p, BranchId: v }))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="เลือกสาขา" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {branches.map(b => (
+                        <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {errors.BranchId && <p className="text-xs text-red-500">{errors.BranchId}</p>}
+                </div>
+
+                {/* LINE ID */}
+                <div className="space-y-1">
+                  <Label htmlFor="LineId">LINE ID (ถ้ามี)</Label>
+                  <Input id="LineId" value={formData.LineId} onChange={handleChange("LineId")} placeholder="ใส่เพื่อเชื่อมบัญชีภายหลัง" />
+                  {errors.LineId && <p className="text-xs text-red-500">{errors.LineId}</p>}
+                </div>
+
+                <Button type="submit" disabled={isSubmitting} className="w-full h-12 text-lg mt-2">
+                  {isSubmitting ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      กำลังสมัครสมาชิก...
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <UserPlus className="h-5 w-5" />
+                      สร้างบัญชีใหม่
+                    </div>
+                  )}
+                </Button>
+
+                <p className="text-center text-sm text-muted-foreground mt-3">
+                  มีบัญชีอยู่แล้ว? <Link to="/login" className="text-primary hover:underline">เข้าสู่ระบบ</Link>
+                </p>
+
+                {/* Demo Notice */}
+                <div className="text-center p-3 bg-warning/10 rounded-lg border border-warning/20 mt-4">
+                  <p className="text-xs text-warning-foreground">
+                    <strong>หมายเหตุ:</strong> นี่เป็นหน้าสาธิต — แทนที่ด้วยการเรียก API จริง (POST /api/auth/register)
+                  </p>
+                </div>
+              </form>
+
+              {/* Security notice */}
+              <div className="mt-6 p-4 bg-info/10 rounded-lg border border-info/20 text-center">
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <Shield className="h-4 w-4 text-info" />
+                  <span className="text-sm font-medium text-info">ปลอดภัยและเชื่อถือได้</span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  เราเก็บเฉพาะข้อมูลที่จำเป็นต่อการสร้างบัญชี และเข้ารหัสรหัสผ่านฝั่งเซิร์ฟเวอร์
+                </p>
+              </div>
+
+              {/* Role badges (legend) */}
+              <div className="mt-4 space-y-2 text-center">
+                <p className="text-xs text-muted-foreground">บทบาทในระบบ:</p>
+                <div className="flex flex-wrap justify-center gap-2">
+                  <Badge variant="outline" className="text-xs">{th.roles.ADMIN}</Badge>
+                  <Badge variant="outline" className="text-xs">{th.roles.CENTER}</Badge>
+                  <Badge variant="outline" className="text-xs">{th.roles.BRANCH}</Badge>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}
