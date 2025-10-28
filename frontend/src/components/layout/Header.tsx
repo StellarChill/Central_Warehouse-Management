@@ -1,4 +1,5 @@
-import { Bell, Menu, User } from "lucide-react";
+import { Bell, Menu, User, LogOut } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -11,19 +12,23 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { th } from "../../i18n/th";
+import { useAuth } from "../../context/AuthContext";
 
 interface HeaderProps {
   onMenuClick: () => void;
 }
 
 export function Header({ onMenuClick }: HeaderProps) {
-  // Mock user data - in real app this would come from auth context
-  const user = {
-    name: "สมชาย ใจดี",
-    role: "CENTER" as const,
-    branch: "คลังสินค้าศูนย์",
-    avatar: "/api/placeholder/32/32"
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate("/login", { replace: true });
   };
+
+  // ถ้าไม่มี user (ไม่ควรเกิดเพราะมี ProtectedRoute แล้ว)
+  if (!user) return null;
 
   return (
     <header className="h-16 bg-card/80 backdrop-blur-xl border-b border-border/50 shadow-premium">
@@ -58,13 +63,12 @@ export function Header({ onMenuClick }: HeaderProps) {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="flex items-center gap-2 p-2 hover:bg-accent">
                 <Avatar className="h-8 w-8">
-                  <AvatarImage src={user.avatar} alt={user.name} />
                   <AvatarFallback className="bg-primary text-primary-foreground">
-                    {user.name.charAt(0)}
+                    {user.UserName.charAt(0).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
                 <div className="hidden sm:block text-left">
-                  <div className="text-sm font-medium truncate max-w-[120px]">{user.name}</div>
+                  <div className="text-sm font-medium truncate max-w-[120px]">{user.UserName}</div>
                   <div className="text-xs text-muted-foreground truncate max-w-[120px]">
                     {th.roles[user.role]}
                   </div>
@@ -75,9 +79,9 @@ export function Header({ onMenuClick }: HeaderProps) {
             <DropdownMenuContent align="end" className="w-56 border shadow-premium">
               <DropdownMenuLabel>
                 <div>
-                  <div className="font-medium">{user.name}</div>
+                  <div className="font-medium">{user.UserName}</div>
                   <div className="text-sm text-muted-foreground">
-                    {th.roles[user.role]}
+                    {th.roles[user.role]} • {user.Email || `สาขา ${user.BranchId}`}
                   </div>
                 </div>
               </DropdownMenuLabel>
@@ -95,7 +99,11 @@ export function Header({ onMenuClick }: HeaderProps) {
               
               <DropdownMenuSeparator />
               
-              <DropdownMenuItem className="cursor-pointer text-destructive focus:text-destructive hover:bg-destructive/10">
+              <DropdownMenuItem 
+                onClick={handleLogout}
+                className="cursor-pointer text-destructive focus:text-destructive hover:bg-destructive/10"
+              >
+                <LogOut className="mr-2 h-4 w-4" />
                 {th.nav.logout}
               </DropdownMenuItem>
             </DropdownMenuContent>

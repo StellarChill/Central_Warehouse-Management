@@ -9,9 +9,10 @@ import {
   Routes,
   Route,
   Navigate,
+  useLocation,
 } from "react-router-dom";
 import { AppLayout } from "./components/layout/AppLayout";
-import { AuthProvider, useAuth } from "./context/AuthContext";
+import { AuthProvider, useAuth, Role } from "./context/AuthContext";
 import { StockProvider } from "./context/StockContext";
 
 // ---- Code-split pages (improves first-load perf) ----
@@ -52,10 +53,21 @@ const App = () => (
       <AuthProvider>
         <StockProvider>
           <BrowserRouter>
-            <Suspense fallback={<div />}>
+            <Suspense fallback={<LoadingScreen />}>
               <Routes>
-                {/* Layout scope */}
-                <Route path="/" element={<AppLayout />}>
+                {/* Public routes */}
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/register" element={<RegisterPage />} />
+
+                {/* Protected routes with layout */}
+                <Route
+                  path="/"
+                  element={
+                    <ProtectedRoute>
+                      <AppLayout />
+                    </ProtectedRoute>
+                  }
+                >
                   {/* Child routes should be relative to render inside AppLayout's <Outlet /> */}
                   <Route index element={<DashboardPage />} />
                   <Route path="suppliers" element={<SuppliersPage />} />
@@ -93,12 +105,8 @@ const App = () => (
                       </Guard>
                     }
                   />
-                  
                 </Route>
 
-                {/* Top-level routes (outside layout) */}
-                <Route path="/login" element={<LoginPage />} />
-                <Route path="register" element={<RegisterPage />} />
                 {/* Catch-all */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
@@ -110,12 +118,39 @@ const App = () => (
   </QueryClientProvider>
 );
 
-// ---- Guard with redirect for unauthenticated users ----
+// ---- Loading screen ----
+function LoadingScreen() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="w-16 h-16 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+    </div>
+  );
+}
+
+// ---- ProtectedRoute: ป้องกันการเข้าถึงถ้ายัง login ไม่ได้ ----
+function ProtectedRoute({ children }: { children: JSX.Element }) {
+  const { user, isLoading } = useAuth();
+  const location = useLocation();
+
+  // ถ้ากำลังโหลดข้อมูล user จาก localStorage ให้แสดง loading
+  if (isLoading) {
+    return <LoadingScreen />;
+  }
+
+  // ถ้ายัง login ไม่ได้ redirect ไปหน้า login พร้อมเก็บ location ที่พยายามเข้า
+  if (!user) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  return children;
+}
+
+// ---- Guard: ป้องกันการเข้าถึงตาม role ----
 function Guard({
   allow,
   children,
 }: {
-  allow: ("ADMIN" | "CENTER" | "BRANCH")[];
+  allow: Role[];
   children: JSX.Element;
 }) {
   const { user } = useAuth();

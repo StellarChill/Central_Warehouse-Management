@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Label } from "@/components/ui/label";
 import { Search, Plus, Edit, Trash2, Wheat, Egg, Milk, Filter, Candy, Apple, Droplets, Package } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { getCategories, type Category } from "@/lib/api";
 
 type Product = {
   id: string;
@@ -21,7 +22,12 @@ export default function ProductsPage() {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
-  const [form, setForm] = useState<Omit<Product, "id">>({ sku: "", name: "", unit: "กิโลกรัม", price: 0, category: "แป้ง" });
+  const [form, setForm] = useState<Omit<Product, "id">>({ sku: "", name: "", unit: "กิโลกรัม", price: 0, category: "" });
+  
+  // โหลดหมวดหมู่จาก API
+  const [apiCategories, setApiCategories] = useState<Category[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
+
   const [products, setProducts] = useState<Product[]>([
     { id: "MAT-001", sku: "FLOUR-WHITE", name: "แป้งสาลีอเนกประสงค์", unit: "กิโลกรัม", price: 45, category: "แป้ง" },
     { id: "MAT-002", sku: "FLOUR-CAKE", name: "แป้งเค้ก", unit: "กิโลกรัม", price: 65, category: "แป้ง" },
@@ -49,11 +55,33 @@ export default function ProductsPage() {
     { id: "MAT-024", sku: "FRUIT-MANGO", name: "มะม่วงแช่แข็ง", unit: "กิโลกรัม", price: 180, category: "ผลไม้" },
   ]);
 
-  // Get unique categories
+  // โหลดหมวดหมู่จาก API เมื่อ component mount
+  useEffect(() => {
+    async function loadCategories() {
+      try {
+        setLoadingCategories(true);
+        const data = await getCategories();
+        setApiCategories(data);
+        // ตั้งค่า default category ในฟอร์มเป็นหมวดหมู่แรก
+        if (data.length > 0 && !form.category) {
+          setForm(prev => ({ ...prev, category: data[0].CatagoryName }));
+        }
+      } catch (error) {
+        console.error("ไม่สามารถโหลดหมวดหมู่:", error);
+      } finally {
+        setLoadingCategories(false);
+      }
+    }
+    loadCategories();
+  }, []);
+
+  // Get unique categories (รวมทั้งจาก products และจาก API)
   const categories = useMemo(() => {
-    const cats = [...new Set(products.map(p => p.category))];
-    return ["all", ...cats];
-  }, [products]);
+    const productsCategories = [...new Set(products.map(p => p.category))];
+    const apiCategoryNames = apiCategories.map(c => c.CatagoryName);
+    const allCategories = [...new Set([...productsCategories, ...apiCategoryNames])];
+    return ["all", ...allCategories];
+  }, [products, apiCategories]);
 
   // Filter products based on search and category
   const filteredProducts = useMemo(() => {
@@ -99,7 +127,8 @@ export default function ProductsPage() {
 
   const startCreate = () => {
     setEditing(null);
-    setForm({ sku: "", name: "", unit: "กิโลกรัม", price: 0, category: "แป้ง" });
+    const defaultCategory = apiCategories.length > 0 ? apiCategories[0].CatagoryName : "";
+    setForm({ sku: "", name: "", unit: "กิโลกรัม", price: 0, category: defaultCategory });
     setOpen(true);
   };
 
@@ -234,21 +263,27 @@ export default function ProductsPage() {
             </div>
             <div className="md:col-span-2">
               <Label>หมวดหมู่</Label>
-              <select 
-                className="w-full border border-input bg-background rounded-md px-3 py-2"
-                value={form.category}
-                onChange={(e) => setForm({...form, category: e.target.value})}
-              >
-                <option value="แป้ง">แป้ง</option>
-                <option value="น้ำตาล">น้ำตาล</option>
-                <option value="เนย">เนย</option>
-                <option value="ไข่">ไข่</option>
-                <option value="นม">นม</option>
-                <option value="ช็อกโกแลต">ช็อกโกแลต</option>
-                <option value="วัตถุเจือปน">วัตถุเจือปน</option>
-                <option value="น้ำมัน">น้ำมัน</option>
-                <option value="ผลไม้">ผลไม้</option>
-              </select>
+              {loadingCategories ? (
+                <div className="w-full border border-input bg-background rounded-md px-3 py-2 text-muted-foreground">
+                  กำลังโหลดหมวดหมู่...
+                </div>
+              ) : apiCategories.length > 0 ? (
+                <select 
+                  className="w-full border border-input bg-background rounded-md px-3 py-2"
+                  value={form.category}
+                  onChange={(e) => setForm({...form, category: e.target.value})}
+                >
+                  {apiCategories.map((cat) => (
+                    <option key={cat.CatagoryId} value={cat.CatagoryName}>
+                      {cat.CatagoryName}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div className="w-full border border-input bg-background rounded-md px-3 py-2 text-muted-foreground">
+                  ยังไม่มีหมวดหมู่ <a href="/categories" className="text-primary underline ml-1">เพิ่มหมวดหมู่</a>
+                </div>
+              )}
             </div>
           </div>
           <div className="flex justify-end gap-2 mt-4">

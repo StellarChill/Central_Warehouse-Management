@@ -4,7 +4,10 @@
   "description": "Backend API for Sai Jai Management System",
   "main": "server.js",
   "scripts": {
-    "dev": "ts-node-dev src/server.ts"
+    "dev": "ts-node-dev src/server.ts",
+    "start": "node dist/server.js",
+    "build": "tsc",
+    "seed": "prisma db seed"
   },
   "keywords": [
     "api",
@@ -14,7 +17,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@prisma/client": "^6.16.3",
+    "@prisma/client": "^6.18.0",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
@@ -24,10 +27,16 @@
     "morgan": "^1.10.0"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.17",
     "@types/express": "^5.0.3",
+    "@types/jsonwebtoken": "^9.0.7",
+    "@types/node": "^22.0.0",
     "nodemon": "^3.0.2",
-    "prisma": "^6.16.3",
-    "ts-node-dev": "^2.0.0"
+    "prisma": "^6.18.0",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.0.0"
   },
   "prisma": {
     "seed": "ts-node ./prisma/seed.ts"
