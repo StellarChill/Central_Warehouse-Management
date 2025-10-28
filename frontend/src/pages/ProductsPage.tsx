@@ -2,108 +2,124 @@ import { useMemo, useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Search, Plus, Edit, Trash2, Wheat, Egg, Milk, Filter, Candy, Apple, Droplets, Package } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Search, Plus, Edit, Trash2, Wheat, Egg, Milk, Filter, Candy, Apple, Droplets, Package, AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { getCategories, type Category } from "@/lib/api";
-
-type Product = {
-  id: string;
-  sku: string;
-  name: string;
-  unit: string;
-  price: number;
-  category: string;
-};
+import { 
+  getCategories, 
+  getMaterials,
+  createMaterial,
+  updateMaterial,
+  deleteMaterial,
+  type Category,
+  type Material 
+} from "@/lib/api";
+import { usePermissions } from "@/hooks/use-permissions";
 
 export default function ProductsPage() {
+  const { canEditProducts, isBranch } = usePermissions();
+  
   const [q, setQ] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState<Product | null>(null);
-  const [form, setForm] = useState<Omit<Product, "id">>({ sku: "", name: "", unit: "กิโลกรัม", price: 0, category: "" });
+  const [editing, setEditing] = useState<Material | null>(null);
   
   // โหลดหมวดหมู่จาก API
   const [apiCategories, setApiCategories] = useState<Category[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(false);
-
-  const [products, setProducts] = useState<Product[]>([
-    { id: "MAT-001", sku: "FLOUR-WHITE", name: "แป้งสาลีอเนกประสงค์", unit: "กิโลกรัม", price: 45, category: "แป้ง" },
-    { id: "MAT-002", sku: "FLOUR-CAKE", name: "แป้งเค้ก", unit: "กิโลกรัม", price: 65, category: "แป้ง" },
-    { id: "MAT-003", sku: "FLOUR-BREAD", name: "แป้งทำขนมปัง", unit: "กิโลกรัม", price: 55, category: "แป้ง" },
-    { id: "MAT-004", sku: "SUGAR-GRAN", name: "น้ำตาลทราย", unit: "กิโลกรัม", price: 40, category: "น้ำตาล" },
-    { id: "MAT-005", sku: "SUGAR-POWDER", name: "น้ำตาลป่น", unit: "กิโลกรัม", price: 50, category: "น้ำตาล" },
-    { id: "MAT-006", sku: "SUGAR-BROWN", name: "น้ำตาลทรายแดง", unit: "กิโลกรัม", price: 42, category: "น้ำตาล" },
-    { id: "MAT-007", sku: "BUTTER-SALT", name: "เนยเค็ม", unit: "กิโลกรัม", price: 180, category: "เนย" },
-    { id: "MAT-008", sku: "BUTTER-UNSALT", name: "เนยจืด", unit: "กิโลกรัม", price: 190, category: "เนย" },
-    { id: "MAT-009", sku: "EGG-WHITE", name: "ไข่ไก่ขาว", unit: "ฟอง", price: 2, category: "ไข่" },
-    { id: "MAT-010", sku: "EGG-BROWN", name: "ไข่ไก่แดง", unit: "ฟอง", price: 3, category: "ไข่" },
-    { id: "MAT-011", sku: "MILK-WHOLE", name: "นมจืดเต็มไขมัน", unit: "ลิตร", price: 65, category: "นม" },
-    { id: "MAT-012", sku: "MILK-SKIM", name: "นมจืดไขมันต่ำ", unit: "ลิตร", price: 55, category: "นม" },
-    { id: "MAT-013", sku: "CREAM-HEAVY", name: "ครีมจืด", unit: "ลิตร", price: 120, category: "นม" },
-    { id: "MAT-014", sku: "CHOC-COCOA", name: "ผงโกโก้", unit: "กิโลกรัม", price: 250, category: "ช็อกโกแลต" },
-    { id: "MAT-015", sku: "CHOC-DARK", name: "ช็อกโกแลตดำ", unit: "กิโลกรัม", price: 300, category: "ช็อกโกแลต" },
-    { id: "MAT-016", sku: "CHOC-WHITE", name: "ช็อกโกแลตขาว", unit: "กิโลกรัม", price: 280, category: "ช็อกโกแลต" },
-    { id: "MAT-017", sku: "BAKING-POWDER", name: "ผงฟู", unit: "ถุง", price: 35, category: "วัตถุเจือปน" },
-    { id: "MAT-018", sku: "BAKING-SODA", name: "โซดาบิคคาร์บอเนต", unit: "ถุง", price: 30, category: "วัตถุเจือปน" },
-    { id: "MAT-019", sku: "VANILLA-EXTRACT", name: "สารสกัดวานิลลา", unit: "ขวด", price: 80, category: "วัตถุเจือปน" },
-    { id: "MAT-020", sku: "SALT", name: "เกลือ", unit: "กิโลกรัม", price: 25, category: "วัตถุเจือปน" },
-    { id: "MAT-021", sku: "OIL-VEG", name: "น้ำมันพืช", unit: "ลิตร", price: 75, category: "น้ำมัน" },
-    { id: "MAT-022", sku: "OIL-COCONUT", name: "น้ำมันมะพร้าว", unit: "ลิตร", price: 90, category: "น้ำมัน" },
-    { id: "MAT-023", sku: "FRUIT-STRAW", name: "สตอเบอร์รี่แช่แข็ง", unit: "กิโลกรัม", price: 200, category: "ผลไม้" },
-    { id: "MAT-024", sku: "FRUIT-MANGO", name: "มะม่วงแช่แข็ง", unit: "กิโลกรัม", price: 180, category: "ผลไม้" },
-  ]);
-
-  // โหลดหมวดหมู่จาก API เมื่อ component mount
+  
+  // โหลด materials จาก API
+  const [materials, setMaterials] = useState<Material[]>([]);
+  const [loadingMaterials, setLoadingMaterials] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Form state
+  const [form, setForm] = useState({
+    MaterialName: "",
+    MaterialCode: "",
+    Unit: "กิโลกรัม",
+    Price: 0,
+    CatagoryId: 0
+  });
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
+  // โหลดข้อมูลเมื่อ component mount
   useEffect(() => {
-    async function loadCategories() {
-      try {
-        setLoadingCategories(true);
-        const data = await getCategories();
-        setApiCategories(data);
-        // ตั้งค่า default category ในฟอร์มเป็นหมวดหมู่แรก
-        if (data.length > 0 && !form.category) {
-          setForm(prev => ({ ...prev, category: data[0].CatagoryName }));
-        }
-      } catch (error) {
-        console.error("ไม่สามารถโหลดหมวดหมู่:", error);
-      } finally {
-        setLoadingCategories(false);
-      }
-    }
-    loadCategories();
+    loadData();
   }, []);
 
-  // Get unique categories (รวมทั้งจาก products และจาก API)
-  const categories = useMemo(() => {
-    const productsCategories = [...new Set(products.map(p => p.category))];
-    const apiCategoryNames = apiCategories.map(c => c.CatagoryName);
-    const allCategories = [...new Set([...productsCategories, ...apiCategoryNames])];
-    return ["all", ...allCategories];
-  }, [products, apiCategories]);
+  async function loadData() {
+    try {
+      setLoadingCategories(true);
+      setLoadingMaterials(true);
+      setError(null);
+      
+      const [categoriesData, materialsData] = await Promise.all([
+        getCategories(),
+        getMaterials()
+      ]);
+      
+      setApiCategories(categoriesData);
+      setMaterials(materialsData);
+      
+      // ตั้งค่า default category
+      if (categoriesData.length > 0 && form.CatagoryId === 0) {
+        setForm(prev => ({ ...prev, CatagoryId: categoriesData[0].CatagoryId }));
+      }
+    } catch (err: any) {
+      setError(err.message || "ไม่สามารถโหลดข้อมูลได้");
+    } finally {
+      setLoadingCategories(false);
+      setLoadingMaterials(false);
+    }
+  }
 
-  // Filter products based on search and category
-  const filteredProducts = useMemo(() => {
+  // Get unique categories
+  const categories = useMemo(() => {
+    const materialCategories = materials
+      .map(m => {
+        const cat = apiCategories.find(c => c.CatagoryId === m.CatagoryId);
+        return cat?.CatagoryName || "";
+      })
+      .filter(Boolean);
+    const uniqueCats = [...new Set(materialCategories)];
+    return ["all", ...uniqueCats];
+  }, [materials, apiCategories]);
+
+  // Get category name from ID
+  function getCategoryName(categoryId: number): string {
+    return apiCategories.find(c => c.CatagoryId === categoryId)?.CatagoryName || "ไม่ระบุ";
+  }
+
+  // Filter materials
+  const filteredMaterials = useMemo(() => {
     const s = q.trim().toLowerCase();
-    return products.filter((p) => {
-      const matchesSearch = !s || [p.sku, p.name].some((v) => v.toLowerCase().includes(s));
-      const matchesCategory = categoryFilter === "all" || p.category === categoryFilter;
+    return materials.filter((m) => {
+      const matchesSearch = !s || 
+        m.MaterialName.toLowerCase().includes(s) || 
+        m.MaterialCode.toLowerCase().includes(s);
+      
+      const categoryName = getCategoryName(m.CatagoryId);
+      const matchesCategory = categoryFilter === "all" || categoryName === categoryFilter;
+      
       return matchesSearch && matchesCategory;
     });
-  }, [q, products, categoryFilter]);
+  }, [q, materials, categoryFilter, apiCategories]);
 
-  // Group products by category
-  const groupedProducts = useMemo(() => {
-    const groups: Record<string, Product[]> = {};
-    filteredProducts.forEach((product) => {
-      if (!groups[product.category]) {
-        groups[product.category] = [];
+  // Group materials by category
+  const groupedMaterials = useMemo(() => {
+    const groups: Record<string, Material[]> = {};
+    filteredMaterials.forEach((material) => {
+      const categoryName = getCategoryName(material.CatagoryId);
+      if (!groups[categoryName]) {
+        groups[categoryName] = [];
       }
-      groups[product.category].push(product);
+      groups[categoryName].push(material);
     });
     return groups;
-  }, [filteredProducts]);
+  }, [filteredMaterials, apiCategories]);
 
   // Get icon for category
   const getCategoryIcon = (category: string) => {
@@ -125,34 +141,87 @@ export default function ProductsPage() {
     }
   };
 
-  const startCreate = () => {
+  // Validate form
+  function validateForm() {
+    const errors: Record<string, string> = {};
+    if (!form.MaterialName.trim()) errors.MaterialName = "กรุณากรอกชื่อวัตถุดิบ";
+    if (!form.MaterialCode.trim()) errors.MaterialCode = "กรุณากรอกรหัสวัตถุดิบ";
+    if (!form.Unit.trim()) errors.Unit = "กรุณากรอกหน่วย";
+    if (form.Price <= 0) errors.Price = "ราคาต้องมากกว่า 0";
+    if (form.CatagoryId === 0) errors.CatagoryId = "กรุณาเลือกหมวดหมู่";
+    
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  }
+
+  // Start create
+  function startCreate() {
     setEditing(null);
-    const defaultCategory = apiCategories.length > 0 ? apiCategories[0].CatagoryName : "";
-    setForm({ sku: "", name: "", unit: "กิโลกรัม", price: 0, category: defaultCategory });
+    const defaultCategoryId = apiCategories.length > 0 ? apiCategories[0].CatagoryId : 0;
+    setForm({
+      MaterialName: "",
+      MaterialCode: "",
+      Unit: "กิโลกรัม",
+      Price: 0,
+      CatagoryId: defaultCategoryId
+    });
+    setFormErrors({});
     setOpen(true);
-  };
+  }
 
-  const startEdit = (p: Product) => {
-    setEditing(p);
-    setForm({ sku: p.sku, name: p.name, unit: p.unit, price: p.price, category: p.category });
+  // Start edit
+  function startEdit(m: Material) {
+    setEditing(m);
+    setForm({
+      MaterialName: m.MaterialName,
+      MaterialCode: m.MaterialCode,
+      Unit: m.Unit,
+      Price: m.Price,
+      CatagoryId: m.CatagoryId
+    });
+    setFormErrors({});
     setOpen(true);
-  };
+  }
 
-  const save = () => {
-    if (editing) {
-      setProducts((prev) => prev.map((p) => (p.id === editing.id ? { ...editing, ...form } as Product : p)));
-    } else {
-      const nextId = `MAT-${(products.length + 1).toString().padStart(3, "0")}`;
-      setProducts((prev) => [...prev, { id: nextId, ...form } as Product]);
+  // Handle save (create or update)
+  async function handleSave() {
+    if (!validateForm()) return;
+
+    setSubmitting(true);
+    try {
+      if (editing) {
+        // Update
+        await updateMaterial(editing.MaterialId, form);
+      } else {
+        // Create
+        await createMaterial(form);
+      }
+      await loadData();
+      setOpen(false);
+      setEditing(null);
+    } catch (err: any) {
+      const errorMessage = err.message || "เกิดข้อผิดพลาด";
+      if (errorMessage.includes("already exists")) {
+        setFormErrors({ ...formErrors, MaterialCode: "รหัสนี้มีในระบบแล้ว" });
+      } else {
+        alert(errorMessage);
+      }
+    } finally {
+      setSubmitting(false);
     }
-    setOpen(false);
-    setEditing(null);
-  };
+  }
 
-  const remove = (id: string) => {
+  // Handle delete
+  async function handleDelete(id: number) {
     if (!confirm("ยืนยันการลบวัตถุดิบ?")) return;
-    setProducts((prev) => prev.filter((p) => p.id !== id));
-  };
+    
+    try {
+      await deleteMaterial(id);
+      await loadData();
+    } catch (err: any) {
+      alert(err.message || "ไม่สามารถลบได้");
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -161,10 +230,30 @@ export default function ProductsPage() {
           <h1 className="text-2xl sm:text-3xl font-bold">วัตถุดิบขนมหวาน</h1>
           <p className="text-muted-foreground mt-1">จัดการวัตถุดิบสำหรับทำขนมและของหวาน</p>
         </div>
-        <Button className="gap-2 w-full sm:w-auto" onClick={startCreate}>
-          <Plus className="h-4 w-4" /> เพิ่มวัตถุดิบ
-        </Button>
+        {canEditProducts && (
+          <Button className="gap-2 w-full sm:w-auto" onClick={startCreate}>
+            <Plus className="h-4 w-4" /> เพิ่มวัตถุดิบ
+          </Button>
+        )}
       </div>
+
+      {/* Permission Alert */}
+      {isBranch && (
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            คุณสามารถดูข้อมูลได้เท่านั้น ไม่สามารถเพิ่ม แก้ไข หรือลบได้
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Error Alert */}
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
       <Card className="shadow-premium">
         <CardHeader>
@@ -193,35 +282,39 @@ export default function ProductsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {Object.keys(groupedProducts).length > 0 ? (
+          {loadingMaterials ? (
+            <div className="text-center py-12 text-muted-foreground">กำลังโหลด...</div>
+          ) : Object.keys(groupedMaterials).length > 0 ? (
             <div className="space-y-8">
-              {Object.entries(groupedProducts).map(([category, items]) => (
+              {Object.entries(groupedMaterials).map(([category, items]) => (
                 <div key={category}>
                   <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                     {getCategoryIcon(category)}
                     {category} <Badge variant="secondary">{items.length}</Badge>
                   </h2>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {items.map((p) => (
-                      <Card key={p.id} className="hover:shadow-premium transition-all">
+                    {items.map((m) => (
+                      <Card key={m.MaterialId} className="hover:shadow-premium transition-all">
                         <CardContent className="p-4">
                           <div className="flex justify-between items-start">
                             <div>
-                              <h3 className="font-medium">{p.name}</h3>
-                              <p className="text-sm text-muted-foreground">{p.sku}</p>
+                              <h3 className="font-medium">{m.MaterialName}</h3>
+                              <p className="text-sm text-muted-foreground">{m.MaterialCode}</p>
                             </div>
-                            <Badge variant="outline">{p.unit}</Badge>
+                            <Badge variant="outline">{m.Unit}</Badge>
                           </div>
                           <div className="mt-3 flex justify-between items-center">
-                            <span className="font-semibold text-primary">฿{p.price.toLocaleString()}</span>
-                            <div className="flex gap-1">
-                              <Button variant="ghost" size="sm" className="hover:bg-accent" onClick={() => startEdit(p)}>
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10" onClick={() => remove(p.id)}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
+                            <span className="font-semibold text-primary">฿{m.Price.toLocaleString()}</span>
+                            {canEditProducts && (
+                              <div className="flex gap-1">
+                                <Button variant="ghost" size="sm" className="hover:bg-accent" onClick={() => startEdit(m)}>
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10" onClick={() => handleDelete(m.MaterialId)}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            )}
                           </div>
                         </CardContent>
                       </Card>
@@ -233,7 +326,7 @@ export default function ProductsPage() {
           ) : (
             <div className="text-center py-12 text-muted-foreground">
               <Package className="h-12 w-12 mx-auto mb-4 text-muted" />
-              <p>ไม่พบวัตถุดิบ</p>
+              <p>{q ? "ไม่พบวัตถุดิบที่ค้นหา" : "ยังไม่มีวัตถุดิบ"}</p>
             </div>
           )}
         </CardContent>
@@ -246,23 +339,53 @@ export default function ProductsPage() {
           </DialogHeader>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label>SKU</Label>
-              <Input value={form.sku} onChange={(e) => setForm({...form, sku: e.target.value})} />
+              <Label>รหัสวัตถุดิบ (SKU) <span className="text-destructive">*</span></Label>
+              <Input 
+                value={form.MaterialCode} 
+                onChange={(e) => setForm({...form, MaterialCode: e.target.value.toUpperCase()})}
+                placeholder="เช่น FLOUR-001"
+              />
+              {formErrors.MaterialCode && (
+                <p className="text-xs text-destructive mt-1">{formErrors.MaterialCode}</p>
+              )}
             </div>
             <div>
-              <Label>ชื่อวัตถุดิบ</Label>
-              <Input value={form.name} onChange={(e) => setForm({...form, name: e.target.value})} />
+              <Label>ชื่อวัตถุดิบ <span className="text-destructive">*</span></Label>
+              <Input 
+                value={form.MaterialName} 
+                onChange={(e) => setForm({...form, MaterialName: e.target.value})}
+                placeholder="เช่น แป้งสาลี"
+              />
+              {formErrors.MaterialName && (
+                <p className="text-xs text-destructive mt-1">{formErrors.MaterialName}</p>
+              )}
             </div>
             <div>
-              <Label>หน่วย</Label>
-              <Input value={form.unit} onChange={(e) => setForm({...form, unit: e.target.value})} />
+              <Label>หน่วย <span className="text-destructive">*</span></Label>
+              <Input 
+                value={form.Unit} 
+                onChange={(e) => setForm({...form, Unit: e.target.value})}
+                placeholder="เช่น กิโลกรัม, ถุง, ขวด"
+              />
+              {formErrors.Unit && (
+                <p className="text-xs text-destructive mt-1">{formErrors.Unit}</p>
+              )}
             </div>
             <div>
-              <Label>ราคาต่อหน่วย (บาท)</Label>
-              <Input type="number" value={form.price} onChange={(e) => setForm({...form, price: Number(e.target.value)})} />
+              <Label>ราคาต่อหน่วย (บาท) <span className="text-destructive">*</span></Label>
+              <Input 
+                type="number" 
+                min="0"
+                step="0.01"
+                value={form.Price} 
+                onChange={(e) => setForm({...form, Price: Number(e.target.value)})}
+              />
+              {formErrors.Price && (
+                <p className="text-xs text-destructive mt-1">{formErrors.Price}</p>
+              )}
             </div>
             <div className="md:col-span-2">
-              <Label>หมวดหมู่</Label>
+              <Label>หมวดหมู่ <span className="text-destructive">*</span></Label>
               {loadingCategories ? (
                 <div className="w-full border border-input bg-background rounded-md px-3 py-2 text-muted-foreground">
                   กำลังโหลดหมวดหมู่...
@@ -270,26 +393,33 @@ export default function ProductsPage() {
               ) : apiCategories.length > 0 ? (
                 <select 
                   className="w-full border border-input bg-background rounded-md px-3 py-2"
-                  value={form.category}
-                  onChange={(e) => setForm({...form, category: e.target.value})}
+                  value={form.CatagoryId}
+                  onChange={(e) => setForm({...form, CatagoryId: Number(e.target.value)})}
                 >
                   {apiCategories.map((cat) => (
-                    <option key={cat.CatagoryId} value={cat.CatagoryName}>
+                    <option key={cat.CatagoryId} value={cat.CatagoryId}>
                       {cat.CatagoryName}
                     </option>
                   ))}
                 </select>
               ) : (
-                <div className="w-full border border-input bg-background rounded-md px-3 py-2 text-muted-foreground">
-                  ยังไม่มีหมวดหมู่ <a href="/categories" className="text-primary underline ml-1">เพิ่มหมวดหมู่</a>
+                <div className="w-full border border-input bg-background rounded-md px-3 py-2 text-destructive">
+                  ยังไม่มีหมวดหมู่ในระบบ กรุณาเพิ่มหมวดหมู่ก่อน
                 </div>
+              )}
+              {formErrors.CatagoryId && (
+                <p className="text-xs text-destructive mt-1">{formErrors.CatagoryId}</p>
               )}
             </div>
           </div>
-          <div className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setOpen(false)}>ยกเลิก</Button>
-            <Button onClick={save}>บันทึก</Button>
-          </div>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setOpen(false)} disabled={submitting}>
+              ยกเลิก
+            </Button>
+            <Button onClick={handleSave} disabled={submitting || apiCategories.length === 0}>
+              {submitting ? "กำลังบันทึก..." : "บันทึก"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

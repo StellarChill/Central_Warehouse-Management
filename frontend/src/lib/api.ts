@@ -90,6 +90,56 @@ export async function apiDelete(endpoint: string) {
 }
 
 // ==========================================
+// Branch API
+// ==========================================
+
+// Helper to get authenticated user
+function getAuthUser() {
+  return getUser();
+}
+
+export type Branch = {
+  BranchId: number;
+  BranchName: string;
+  BranchCode: string;
+  BranchAddress: string | null;
+  CreatedAt: string;
+  UpdatedAt: string;
+  CreatedBy: number;
+  UpdatedBy: number;
+};
+
+export type CreateBranchData = {
+  BranchName: string;
+  BranchCode: string;
+  BranchAddress?: string;
+};
+
+export type UpdateBranchData = Partial<CreateBranchData>;
+
+export async function getBranches(): Promise<Branch[]> {
+  return apiGet('/branch');
+}
+
+export async function getBranch(id: number): Promise<Branch> {
+  return apiGet(`/branch/${id}`);
+}
+
+export async function createBranch(data: CreateBranchData): Promise<Branch> {
+  const user = getAuthUser();
+  return apiPost('/branch', { ...data, CreatedBy: user?.UserId });
+}
+
+export async function updateBranch(id: number, data: UpdateBranchData): Promise<Branch> {
+  const user = getAuthUser();
+  return apiPut(`/branch/${id}`, { ...data, UpdatedBy: user?.UserId });
+}
+
+export async function deleteBranch(id: number): Promise<void> {
+  return apiDelete(`/branch/${id}`);
+}
+
+// ==========================================
 // Category API
 // ==========================================
 
@@ -146,5 +196,73 @@ export async function updateCategory(id: number, data: UpdateCategoryData): Prom
 // ลบ category
 export async function deleteCategory(id: number): Promise<void> {
   return apiDelete(`/catagory/${id}`);
+}
+
+// ==========================================
+// Material API
+// ==========================================
+
+export type Material = {
+  MaterialId: number;
+  MaterialName: string;
+  Unit: string;
+  Price: number;
+  CatagoryId: number;
+  MaterialCode: string;
+  CreatedAt: string;
+  CreatedBy?: number;
+  UpdatedAt: string;
+  UpdatedBy?: number;
+};
+
+export type CreateMaterialData = {
+  MaterialName: string;
+  Unit: string;
+  Price: number;
+  CatagoryId: number;
+  MaterialCode: string;
+  CreatedBy?: number;
+};
+
+export type UpdateMaterialData = {
+  MaterialName?: string;
+  Unit?: string;
+  Price?: number;
+  CatagoryId?: number;
+  MaterialCode?: string;
+  UpdatedBy?: number;
+};
+
+// ดูรายการ materials ทั้งหมด
+export async function getMaterials(): Promise<Material[]> {
+  return apiGet("/material");
+}
+
+// ดู material 1 รายการ
+export async function getMaterial(id: number): Promise<Material> {
+  return apiGet(`/material/${id}`);
+}
+
+// สร้าง material ใหม่
+export async function createMaterial(data: CreateMaterialData): Promise<Material> {
+  const user = getUser();
+  return apiPost("/material", {
+    ...data,
+    CreatedBy: user?.UserId || undefined,
+  });
+}
+
+// แก้ไข material
+export async function updateMaterial(id: number, data: UpdateMaterialData): Promise<Material> {
+  const user = getUser();
+  return apiPut(`/material/${id}`, {
+    ...data,
+    UpdatedBy: user?.UserId || undefined,
+  });
+}
+
+// ลบ material
+export async function deleteMaterial(id: number): Promise<void> {
+  return apiDelete(`/material/${id}`);
 }
 

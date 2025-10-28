@@ -11,7 +11,8 @@ import {
   Settings,
   X,
   Cookie,
-  ChefHat
+  ChefHat,
+  FolderKanban
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -40,6 +41,12 @@ const navigation = [
     href: "/ingredients",
     icon: Package,
     premiumIcon: Cookie,
+  },
+  {
+    name: "จัดการหมวดหมู่",
+    href: "/categories",
+    icon: FolderKanban,
+    premiumIcon: FolderKanban,
   },
   {
     name: th.nav.inventory,

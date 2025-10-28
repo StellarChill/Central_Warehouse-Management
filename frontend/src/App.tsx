@@ -23,10 +23,12 @@ const SuppliersPage = lazy(() => import("./pages/SuppliersPage"));
 const RequisitionsPage = lazy(() => import("./pages/RequisitionsPage"));
 const ReceivingPage = lazy(() => import("./pages/ReceivingPage"));
 const ProductsPage = lazy(() => import("./pages/ProductsPage"));
+const CategoriesManagePage = lazy(() => import("./pages/CategoriesManagePage"));
 const BranchRequisitionCreatePage = lazy(
   () => import("./pages/BranchRequisitionCreatePage")
 );
 const AdminUsersPage = lazy(() => import("./pages/AdminUsersPage"));
+const AdminBranchesPage = lazy(() => import("./pages/AdminBranchesPage"));
 const AdminReportsPage = lazy(() => import("./pages/AdminReportsPage"));
 const AdminHomePage = lazy(() => import("./pages/AdminHomePage"));
 const LoginPage = lazy(() => import("./pages/LoginPage"));
@@ -72,6 +74,7 @@ const App = () => (
                   <Route index element={<DashboardPage />} />
                   <Route path="suppliers" element={<SuppliersPage />} />
                   <Route path="ingredients" element={<ProductsPage />} />
+                  <Route path="categories" element={<CategoriesManagePage />} />
                   <Route path="inventory" element={<InventoryPage />} />
                   <Route path="purchase-orders" element={<PurchaseOrdersPage />} />
                   <Route
@@ -93,6 +96,14 @@ const App = () => (
                     element={
                       <Guard allow={["ADMIN"]}>
                         <AdminUsersPage />
+                      </Guard>
+                    }
+                  />
+                  <Route
+                    path="admin/branches"
+                    element={
+                      <Guard allow={["ADMIN"]}>
+                        <AdminBranchesPage />
                       </Guard>
                     }
                   />
