@@ -9,8 +9,28 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // CORS middleware - อนุญาตให้ frontend เรียก API ได้
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:8080',
+  'https://central-warehouse-management.onrender.com',
+  process.env.FRONTEND_URL,
+].filter(Boolean);
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    // อนุญาต requests ที่ไม่มี origin (Postman, Mobile apps)
+    if (!origin) return callback(null, true);
+    
+    // อนุญาต localhost ทุก port
+    if (origin.includes('localhost')) return callback(null, true);
+    
+    // ตรวจสอบ allowed origins
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    
+    // Block origin อื่นๆ
+    console.warn('🚫 CORS blocked:', origin);
+    callback(new Error('Not allowed by CORS'));
+  },
   credentials: true,
 }));
 
