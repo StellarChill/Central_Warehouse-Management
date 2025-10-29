@@ -6,8 +6,12 @@
   "scripts": {
     "dev": "ts-node-dev src/server.ts",
     "start": "node dist/server.js",
-    "build": "tsc",
-    "seed": "prisma db seed"
+    "build": "npx prisma generate && tsc",
+    "postinstall": "npx prisma generate",
+    "migrate:deploy": "npx prisma migrate deploy",
+    "seed": "prisma db seed",
+    "db:push": "npx prisma db push",
+    "studio": "npx prisma studio"
   },
   "keywords": [
     "api",
