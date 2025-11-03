@@ -71,6 +71,10 @@ import userRoute from './routes/userRoute';
 import catagoryRoute from './routes/catagoryRoute';
 import branchRoute from './routes/branchRoute';
 import materialRoute from './routes/materialRoute';
+import supplierRoute from './routes/supplierRoute';
+import purchaseOrderRoute from './routes/purchaseOrderRoute';
+import receiptRoute from './routes/receiptRoute';
+import stockRoute from './routes/stockRoute';
 
 // Health check endpoint สำหรับ Render
 app.get('/', (req, res) => {
@@ -105,6 +109,10 @@ app.use('/api', userRoute);
 app.use('/api/catagory', catagoryRoute);
 app.use('/api/branch', branchRoute);
 app.use('/api/material', materialRoute);
+app.use('/api/supplier', supplierRoute);
+app.use('/api/po', purchaseOrderRoute);
+app.use('/api/receipt', receiptRoute);
+app.use('/api/stock', stockRoute);
 
 // เริ่มรันเซิร์ฟเวอร์
 app.listen(PORT, async () => {
