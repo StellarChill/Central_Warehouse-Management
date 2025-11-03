@@ -46,5 +46,13 @@ VITE_API_URL="https://your-backend-url.onrender.com/api"
 
 ---
 
+---
+
+## 📋 หลัง Deploy แล้วต้องทำอะไรต่อ?
+
+ดู **POST_DEPLOYMENT_CHECKLIST.md** สำหรับ checklist ขั้นตอนหลังจาก deploy
+
+---
+
 ดูรายละเอียดเต็มใน `DEPLOYMENT_GUIDE.md`
 
