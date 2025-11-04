@@ -9,7 +9,7 @@
     "build": "npx prisma generate && tsc",
     "postinstall": "npx prisma generate",
     "migrate:deploy": "npx prisma migrate deploy",
-    "seed": "prisma db seed",
+    "seed": "node dist/prisma/seed.js",
     "db:push": "npx prisma db push",
     "studio": "npx prisma studio"
   },
@@ -43,6 +43,6 @@
     "typescript": "^5.0.0"
   },
   "prisma": {
-    "seed": "ts-node ./prisma/seed.ts"
+    "seed": "node dist/prisma/seed.js"
   }
 }
