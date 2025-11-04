@@ -160,6 +160,25 @@ export async function createReceipt(req: Request, res: Response) {
       return receipt;
     });
 
+    // After creation, if the PO is fully received, mark it as RECEIVED
+    try {
+      const allPods = await prisma.purchaseOrderDetail.findMany({
+        where: { PurchaseOrderId: created.PurchaseOrderId },
+        select: { MaterialId: true, PurchaseOrderQuantity: true },
+      });
+      const matIds = allPods.map((p) => p.MaterialId);
+      if (matIds.length) {
+        const receivedMap = await getReceivedSumMap(created.PurchaseOrderId, matIds);
+        const allDone = allPods.every((p) => (receivedMap.get(p.MaterialId) ?? 0) >= p.PurchaseOrderQuantity);
+        if (allDone) {
+          await prisma.purchaseOrder.update({
+            where: { PurchaseOrderId: created.PurchaseOrderId },
+            data: { PurchaseOrderStatus: 'RECEIVED' },
+          });
+        }
+      }
+    } catch {}
+
     const result = await prisma.receipt.findUnique({ where: { ReceiptId: created.ReceiptId }, include: includeReceipt });
     if (!result) throw httpError(500, 'Failed to load created receipt');
     return res.status(201).json(flattenReceipt(result));
@@ -239,6 +258,26 @@ export async function updateReceipt(req: Request, res: Response) {
       }
       await tx.receipt.update({ where: { ReceiptId: id }, data: header });
     });
+
+    // After update, re-evaluate PO completion
+    try {
+      const receipt = await prisma.receipt.findUnique({ where: { ReceiptId: id } });
+      if (receipt) {
+        const allPods = await prisma.purchaseOrderDetail.findMany({
+          where: { PurchaseOrderId: receipt.PurchaseOrderId },
+          select: { MaterialId: true, PurchaseOrderQuantity: true },
+        });
+        const matIds = allPods.map((p) => p.MaterialId);
+        if (matIds.length) {
+          const receivedMap = await getReceivedSumMap(receipt.PurchaseOrderId, matIds);
+          const allDone = allPods.every((p) => (receivedMap.get(p.MaterialId) ?? 0) >= p.PurchaseOrderQuantity);
+          await prisma.purchaseOrder.update({
+            where: { PurchaseOrderId: receipt.PurchaseOrderId },
+            data: { PurchaseOrderStatus: allDone ? 'RECEIVED' : 'CONFIRMED' },
+          });
+        }
+      }
+    } catch {}
 
     const result = await prisma.receipt.findUnique({ where: { ReceiptId: id }, include: includeReceipt });
     if (!result) throw httpError(404, 'Not found');

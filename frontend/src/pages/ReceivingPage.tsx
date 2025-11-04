@@ -1,46 +1,44 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { useMemo, useState } from "react";
-import { Search, Building2, Package, ShoppingCart, CheckCircle, Filter } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Search, Building2, Package, ShoppingCart, CheckCircle, Filter, Plus, X } from "lucide-react";
 import { useStock } from "@/context/StockContext";
+import { getReceipts as apiGetReceipts, getPurchaseOrders as apiGetPOs, getPurchaseOrder as apiGetPO, createReceipt as apiCreateReceipt, getMaterials as apiGetMaterials, getReceipt as apiGetReceipt } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 type Receipt = {
   id: string;
-  branch: string;
+  code: string;
   date: string;
-  items: { name: string; qty: number; unit: string }[];
+  poCode?: string;
+  poId?: number;
 };
 
 type PurchaseOrder = {
-  id: string;
+  id: number;
+  code: string;
   supplier: string;
   date: string;
-  status: "PENDING" | "RECEIVED" | "PARTIAL";
-  items: {
-    sku: string;
-    name: string;
-    orderedQty: number;
-    receivedQty: number;
-    unit: string;
-  }[];
+  status: "DRAFT" | "SENT" | "CONFIRMED" | "RECEIVED";
 };
 
 type SelectedItem = {
-  sku: string;
+  materialId: number;
   name: string;
   orderedQty: number;
-  receivedQty: number;
   unit: string;
-  poId: string;
+  poId: number;
 };
 
 export default function ReceivingPage() {
+  const navigate = useNavigate();
   const [q, setQ] = useState("");
   const { products, receive } = useStock();
   const [open, setOpen] = useState(false);
@@ -49,126 +47,186 @@ export default function ReceivingPage() {
   const [poDialogOpen, setPoDialogOpen] = useState(false);
   const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
   const [receivingQuantities, setReceivingQuantities] = useState<Record<string, number>>({});
+  const [receipts, setReceipts] = useState<Receipt[]>([]);
+  const [poList, setPoList] = useState<PurchaseOrder[]>([]);
+  const [poDetails, setPoDetails] = useState<Record<number, { MaterialId: number; PurchaseOrderQuantity: number; PurchaseOrderUnit: string; PurchaseOrderPrice: number; }[]>>({});
+  const [materialMap, setMaterialMap] = useState<Record<number, { name: string; unit: string }>>({});
+  const [receivedByPo, setReceivedByPo] = useState<Record<number, Record<number, number>>>({}); // poId -> materialId -> received qty
+  const { toast } = useToast();
   
   // State for PO filtering
   const [poSearchTerms, setPoSearchTerms] = useState<Record<string, string>>({});
   const [expandedPOs, setExpandedPOs] = useState<Record<string, boolean>>({});
 
-  const receipts: Receipt[] = [
-    { id: "GRN-2024-045", branch: "สาขาลาดพร้าว", date: "2024-03-15", items: [ { name: "น้ำดื่ม 600ml", qty: 80, unit: "ขวด" }, { name: "ข้าวสาร 5kg", qty: 10, unit: "ถุง" } ] },
-    { id: "GRN-2024-046", branch: "สาขาบางนา", date: "2024-03-15", items: [ { name: "นม 1L", qty: 40, unit: "กล่อง" } ] },
-    { id: "GRN-2024-047", branch: "สาขาหาดใหญ่", date: "2024-03-14", items: [ { name: "ผักรวม แพ็ค", qty: 25, unit: "แพ็ค" } ] },
-  ];
-
-  // Mock Purchase Orders data
-  const purchaseOrders: PurchaseOrder[] = [
-    {
-      id: "PO-2024-001",
-      supplier: "บริษัท วัตถุดิบไทย จำกัด",
-      date: "2024-03-10",
-      status: "PENDING",
-      items: [
-        { sku: "WATER-600", name: "น้ำดื่ม 600ml", orderedQty: 100, receivedQty: 0, unit: "ขวด" },
-        { sku: "RICE-5KG", name: "ข้าวสาร 5kg", orderedQty: 20, receivedQty: 0, unit: "ถุง" },
-        { sku: "MILK-1L", name: "นม 1L", orderedQty: 50, receivedQty: 0, unit: "กล่อง" }
-      ]
-    },
-    {
-      id: "PO-2024-002", 
-      supplier: "ห้างหุ้นส่วนจำกัด ผักสด",
-      date: "2024-03-12",
-      status: "PARTIAL",
-      items: [
-        { sku: "VEGGIE-MIX", name: "ผักรวม แพ็ค", orderedQty: 30, receivedQty: 25, unit: "แพ็ค" },
-        { sku: "TOMATO", name: "มะเขือเทศ", orderedQty: 15, receivedQty: 0, unit: "กิโลกรัม" }
-      ]
-    }
-  ];
-
-  const filtered = useMemo(() => {
-    const s = q.trim().toLowerCase();
-    if (!s) return receipts;
-    return receipts.filter((r) => [r.id, r.branch].some((v) => v.toLowerCase().includes(s)));
-  }, [q]);
-
-  const totalByBranch = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const r of receipts) {
-      const sum = r.items.reduce((acc, it) => acc + it.qty, 0);
-      map.set(r.branch, (map.get(r.branch) || 0) + sum);
-    }
-    return Array.from(map.entries()).map(([branch, qty]) => ({ branch, qty }));
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [rrows, orows, mats] = await Promise.all([
+          apiGetReceipts(),
+          apiGetPOs(),
+          apiGetMaterials(),
+        ]);
+        setReceipts(rrows.map(r => ({ id: String(r.ReceiptId), code: r.ReceiptCode, date: r.ReceiptDateTime, poCode: r.PurchaseOrderCode, poId: (r as any).PurchaseOrderId })));
+        setPoList(orows.map(o => ({ id: o.PurchaseOrderId, code: o.PurchaseOrderCode, supplier: o.Supplier?.SupplierName || String(o.SupplierId), date: o.DateTime, status: o.PurchaseOrderStatus })));
+        const m: Record<number, { name: string; unit: string }> = {};
+        mats.forEach(mt => { m[mt.MaterialId] = { name: mt.MaterialName, unit: mt.Unit }; });
+        setMaterialMap(m);
+      } catch (e: any) {
+        toast({ variant: 'destructive', title: 'โหลดข้อมูลไม่สำเร็จ', description: e.message || '' });
+      }
+    };
+    load();
   }, []);
+
+  // Prefetch PO details once dialog opens so items show up immediately
+  useEffect(() => {
+    if (!poDialogOpen || poList.length === 0) return;
+    // Fetch details for POs that are visible in the dialog but not yet loaded
+    const controller = new AbortController();
+    (async () => {
+      try {
+        const toFetch = poList
+          .map((p) => p.id)
+          .filter((id) => !poDetails[id]);
+        await Promise.all(
+          toFetch.map(async (id) => {
+            try {
+              const full = await apiGetPO(id);
+              if (!controller.signal.aborted) {
+                setPoDetails((prev) => ({ ...prev, [id]: full.PurchaseOrderDetails }));
+              }
+            } catch {}
+          })
+        );
+      } catch {}
+    })();
+    return () => controller.abort();
+  }, [poDialogOpen, poList]);
 
   // Helper functions for PO management
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case "PENDING":
-        return <Badge variant="secondary">รอรับ</Badge>;
-      case "PARTIAL":
-        return <Badge variant="outline">รับบางส่วน</Badge>;
+      case "DRAFT":
+        return <Badge variant="secondary">ร่าง</Badge>;
+      case "SENT":
+        return <Badge variant="default">ส่งแล้ว</Badge>;
+      case "CONFIRMED":
+        return <Badge variant="default">ยืนยันแล้ว</Badge>;
       case "RECEIVED":
-        return <Badge variant="default">รับครบแล้ว</Badge>;
+        return <Badge variant="default">รับแล้ว</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
   };
 
-  const handleItemSelect = (item: any, poId: string, checked: boolean) => {
+  const handleItemSelect = (entry: { MaterialId: number; PurchaseOrderQuantity: number; PurchaseOrderUnit: string; }, poId: number, checked: boolean) => {
+    const key = `${poId}-${entry.MaterialId}`;
     if (checked) {
-      const selectedItem: SelectedItem = {
-        sku: item.sku,
-        name: item.name,
-        orderedQty: item.orderedQty,
-        receivedQty: item.receivedQty,
-        unit: item.unit,
-        poId: poId
-      };
-      setSelectedItems(prev => [...prev, selectedItem]);
-      setReceivingQuantities(prev => ({
-        ...prev,
-        [`${poId}-${item.sku}`]: item.orderedQty - item.receivedQty
-      }));
-    } else {
-      setSelectedItems(prev => prev.filter(i => !(i.sku === item.sku && i.poId === poId)));
-      setReceivingQuantities(prev => {
-        const newQuantities = { ...prev };
-        delete newQuantities[`${poId}-${item.sku}`];
-        return newQuantities;
+      // อนุญาตให้เลือกจากหลาย PO ได้
+      setSelectedItems(prev => {
+        const name = materialMap[entry.MaterialId]?.name || `MAT-${entry.MaterialId}`;
+        const unit = materialMap[entry.MaterialId]?.unit || entry.PurchaseOrderUnit;
+        // ป้องกันซ้ำ
+        if (prev.some(i => i.materialId === entry.MaterialId && i.poId === poId)) return prev;
+        return [...prev, { materialId: entry.MaterialId, name, orderedQty: entry.PurchaseOrderQuantity, unit, poId }];
       });
+      setReceivingQuantities(prev => ({ ...prev, [key]: entry.PurchaseOrderQuantity }));
+    } else {
+      setSelectedItems(prev => prev.filter(i => !(i.materialId === entry.MaterialId && i.poId === poId)));
+      setReceivingQuantities(prev => { const n = { ...prev }; delete n[key]; return n; });
     }
   };
 
-  const handleReceiveItems = () => {
-    selectedItems.forEach(item => {
-      const key = `${item.poId}-${item.sku}`;
-      const qty = receivingQuantities[key] || 0;
-      if (qty > 0) {
-        receive(item.sku, qty, `GRN from ${item.poId}`);
-      }
-    });
-    setSelectedItems([]);
-    setReceivingQuantities({});
-    setPoDialogOpen(false);
+  const handleReceiveItems = async () => {
+    if (selectedItems.length === 0) return;
+    // จัดกลุ่มตาม PO เพื่อสร้างใบรับหลายใบในครั้งเดียว
+    const group: Record<number, { MaterialId: number; MaterialQuantity: number }[]> = {};
+    for (const si of selectedItems) {
+      const qty = receivingQuantities[`${si.poId}-${si.materialId}`] || 0;
+      if (qty <= 0) continue;
+      if (!group[si.poId]) group[si.poId] = [];
+      group[si.poId].push({ MaterialId: si.materialId, MaterialQuantity: qty });
+    }
+    const poIds = Object.keys(group).map(Number);
+    if (poIds.length === 0) return;
+
+    const ts = new Date();
+    try {
+      const results = await Promise.all(poIds.map(async (poId) => {
+        const code = `RC-${poList.find(p => p.id === poId)?.code || poId}-${ts.getFullYear()}${String(ts.getMonth()+1).padStart(2,'0')}${String(ts.getDate()).padStart(2,'0')}${String(ts.getHours()).padStart(2,'0')}${String(ts.getMinutes()).padStart(2,'0')}`;
+        return apiCreateReceipt({ PurchaseOrderId: poId, ReceiptCode: code, details: group[poId] });
+      }));
+
+      // แทรกใบรับใหม่ด้านบน
+      setReceipts(prev => [
+        ...results.map(created => ({
+          id: String(created.ReceiptId),
+          code: created.ReceiptCode,
+          date: created.ReceiptDateTime,
+          poCode: created.PurchaseOrderCode,
+        })),
+        ...prev,
+      ]);
+
+      toast({ title: 'บันทึกรับสินค้าแล้ว' });
+      setSelectedItems([]);
+      setReceivingQuantities({});
+      setPoDialogOpen(false);
+      // Refresh receipts & PO list (เพื่อซ่อน PO ที่รับครบแล้ว)
+      (async () => {
+        try {
+          const [rrows, orows] = await Promise.all([apiGetReceipts(), apiGetPOs()]);
+          setReceipts(rrows.map(r => ({ id: String(r.ReceiptId), code: r.ReceiptCode, date: r.ReceiptDateTime, poCode: r.PurchaseOrderCode })));
+          setPoList(orows.map(o => ({ id: o.PurchaseOrderId, code: o.PurchaseOrderCode, supplier: o.Supplier?.SupplierName || String(o.SupplierId), date: o.DateTime, status: o.PurchaseOrderStatus })));
+        } catch {}
+      })();
+      // ไปหน้า Inventory เพื่อแสดงสต็อกที่เพิ่มแล้ว
+      navigate('/inventory');
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'บันทึกไม่สำเร็จ', description: e.message || '' });
+    }
   };
 
   // Filter PO items based on search term
   const getFilteredPOItems = (po: PurchaseOrder) => {
-    const searchTerm = poSearchTerms[po.id]?.toLowerCase() || "";
-    if (!searchTerm) return po.items;
-    
-    return po.items.filter(item => 
-      item.name.toLowerCase().includes(searchTerm) || 
-      item.sku.toLowerCase().includes(searchTerm)
-    );
+    const searchTerm = poSearchTerms[String(po.id)]?.toLowerCase() || "";
+    const items = poDetails[po.id] || [];
+    if (!searchTerm) return items;
+    return items.filter(item => {
+      const mat = materialMap[item.MaterialId];
+      const text = `${mat?.name || ''} ${item.MaterialId}`.toLowerCase();
+      return text.includes(searchTerm);
+    });
   };
 
   // Toggle PO expansion
-  const togglePOExpansion = (poId: string) => {
+  const togglePOExpansion = async (poId: number) => {
     setExpandedPOs(prev => ({
       ...prev,
       [poId]: !prev[poId]
     }));
+    if (!poDetails[poId]) {
+      try {
+        const full = await apiGetPO(poId);
+        setPoDetails(prev => ({ ...prev, [poId]: full.PurchaseOrderDetails }));
+        // compute received sums per material for this PO
+        const relatedReceipts = receipts.filter(r => r.poId === poId);
+        if (relatedReceipts.length > 0) {
+          const detailLists = await Promise.all(relatedReceipts.map(r => apiGetReceipt(Number(r.id))));
+          const sumMap: Record<number, number> = {};
+          for (const rec of detailLists) {
+            for (const d of rec.ReceiptDetails) {
+              sumMap[d.MaterialId] = (sumMap[d.MaterialId] || 0) + Number(d.MaterialQuantity || 0);
+            }
+          }
+          setReceivedByPo(prev => ({ ...prev, [poId]: sumMap }));
+        } else {
+          setReceivedByPo(prev => ({ ...prev, [poId]: {} }));
+        }
+      } catch (e: any) {
+        toast({ variant: 'destructive', title: 'โหลดรายการสินค้าใน PO ไม่สำเร็จ', description: e.message || '' });
+      }
+    }
   };
 
   return (
@@ -186,12 +244,13 @@ export default function ReceivingPage() {
             <span>บันทึกรับวัตถุดิบ</span>
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full sm:w-auto">
               <Button onClick={() => setPoDialogOpen(true)} className="w-full sm:w-auto">
+                <Plus className="h-4 w-4 mr-2" />
                 เลือกจาก PO
               </Button>
               
               <div className="relative w-full sm:w-80">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input className="pl-10 w-full" placeholder="ค้นหา เลขที่/สาขา" value={q} onChange={(e) => setQ(e.target.value)} />
+                <Input className="pl-10 w-full" placeholder="ค้นหา เลขที่ใบรับ/PO" value={q} onChange={(e) => setQ(e.target.value)} />
               </div>
             </div>
           </CardTitle>
@@ -201,29 +260,21 @@ export default function ReceivingPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="whitespace-nowrap">เลขที่</TableHead>
-                  <TableHead className="whitespace-nowrap">สาขา</TableHead>
+                  <TableHead className="whitespace-nowrap">เลขที่ใบรับ</TableHead>
+                  <TableHead className="whitespace-nowrap">เลขที่ PO</TableHead>
                   <TableHead className="whitespace-nowrap">วันที่</TableHead>
-                  <TableHead className="whitespace-nowrap">รายการวัตถุดิบที่รับ</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((r) => (
+                {useMemo(() => {
+                  const s = q.trim().toLowerCase();
+                  const list = s ? receipts.filter(r => `${r.code} ${r.poCode || ''}`.toLowerCase().includes(s)) : receipts;
+                  return list;
+                }, [receipts, q]).map((r) => (
                   <TableRow key={r.id} className="hover:bg-muted/50">
-                    <TableCell className="font-medium whitespace-nowrap">{r.id}</TableCell>
-                    <TableCell className="whitespace-nowrap">{r.branch}</TableCell>
+                    <TableCell className="font-medium whitespace-nowrap">{r.code}</TableCell>
+                    <TableCell className="whitespace-nowrap">{r.poCode || '-'}</TableCell>
                     <TableCell className="whitespace-nowrap">{new Date(r.date).toLocaleDateString("th-TH")}</TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        {r.items.map((i, idx) => (
-                          <div key={idx} className="flex items-center gap-2 text-sm flex-wrap">
-                            <Package className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                            <span className="whitespace-nowrap">{i.name}</span>
-                            <span className="thai-number whitespace-nowrap">× {i.qty.toLocaleString()} {i.unit}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -240,10 +291,13 @@ export default function ReceivingPage() {
               <ShoppingCart className="h-12 w-12 mx-auto mb-4 text-muted" />
               เลือกรายการสินค้าจาก Purchase Order
             </DialogTitle>
+            <DialogDescription>
+              เลือก PO จากนั้นเลือกรายการสินค้าที่ต้องการรับเข้าคลัง
+            </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4">
-            {purchaseOrders.map((po) => {
+            {poList.filter(p => p.status !== 'RECEIVED').map((po) => {
               const filteredItems = getFilteredPOItems(po);
               const isExpanded = expandedPOs[po.id] ?? true;
               const displayItems = isExpanded ? filteredItems : filteredItems.slice(0, 5);
@@ -253,7 +307,7 @@ export default function ReceivingPage() {
                   <CardHeader className="pb-3">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div>
-                        <CardTitle className="text-lg">{po.id}</CardTitle>
+                        <CardTitle className="text-lg">{po.code}</CardTitle>
                         <p className="text-sm text-muted-foreground">{po.supplier}</p>
                         <p className="text-xs text-muted-foreground">วันที่สั่ง: {new Date(po.date).toLocaleDateString("th-TH")}</p>
                       </div>
@@ -266,10 +320,10 @@ export default function ReceivingPage() {
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
                           placeholder="ค้นหาสินค้าใน PO นี้..."
-                          value={poSearchTerms[po.id] || ""}
+                          value={poSearchTerms[String(po.id)] || ""}
                           onChange={(e) => setPoSearchTerms(prev => ({
                             ...prev,
-                            [po.id]: e.target.value
+                            [String(po.id)]: e.target.value
                           }))}
                           className="pl-10"
                         />
@@ -294,55 +348,50 @@ export default function ReceivingPage() {
                           <TableRow>
                             <TableHead className="w-12">เลือก</TableHead>
                             <TableHead className="whitespace-nowrap">สินค้า</TableHead>
-                            <TableHead className="whitespace-nowrap">สั่ง</TableHead>
-                            <TableHead className="whitespace-nowrap">รับแล้ว</TableHead>
-                            <TableHead className="whitespace-nowrap">ค้างรับ</TableHead>
+                            <TableHead className="whitespace-nowrap">จำนวนที่สั่ง</TableHead>
                             <TableHead className="whitespace-nowrap">จำนวนรับ</TableHead>
+                            <TableHead className="whitespace-nowrap">คงเหลือรับ</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {displayItems.map((item) => {
-                            const remainingQty = item.orderedQty - item.receivedQty;
-                            const isSelected = selectedItems.some(si => si.sku === item.sku && si.poId === po.id);
-                            const key = `${po.id}-${item.sku}`;
+                            const isSelected = selectedItems.some(si => si.materialId === item.MaterialId && si.poId === po.id);
+                            const key = `${po.id}-${item.MaterialId}`;
+                            const receivedQty = receivedByPo[po.id]?.[item.MaterialId] || 0;
+                            const remaining = Math.max(0, (item.PurchaseOrderQuantity || 0) - receivedQty);
                             
                             return (
-                              <TableRow key={item.sku}>
+                              <TableRow key={item.MaterialId}>
                                 <TableCell>
                                   <Checkbox
                                     checked={isSelected}
+                                    disabled={remaining <= 0}
                                     onCheckedChange={(checked) => handleItemSelect(item, po.id, !!checked)}
-                                    disabled={remainingQty <= 0}
                                   />
                                 </TableCell>
                                 <TableCell>
                                   <div>
-                                    <div className="font-medium">{item.name}</div>
-                                    <div className="text-sm text-muted-foreground">{item.sku}</div>
+                                    <div className="font-medium">{materialMap[item.MaterialId]?.name || `MAT-${item.MaterialId}`}</div>
+                                    <div className="text-sm text-muted-foreground">ID: {item.MaterialId}</div>
                                   </div>
                                 </TableCell>
-                                <TableCell className="whitespace-nowrap">{item.orderedQty.toLocaleString()} {item.unit}</TableCell>
-                                <TableCell className="whitespace-nowrap">{item.receivedQty.toLocaleString()} {item.unit}</TableCell>
+                                <TableCell className="whitespace-nowrap">{item.PurchaseOrderQuantity.toLocaleString()} {materialMap[item.MaterialId]?.unit || item.PurchaseOrderUnit}</TableCell>
                                 <TableCell>
-                                  <span className={remainingQty > 0 ? "text-primary font-medium" : "text-green-600"}>
-                                    {remainingQty.toLocaleString()} {item.unit}
-                                  </span>
-                                </TableCell>
-                                <TableCell>
-                                  {isSelected && remainingQty > 0 && (
+                                  {isSelected && (
                                     <Input
                                       type="number"
                                       min="1"
-                                      max={remainingQty}
-                                      value={receivingQuantities[key] || remainingQty}
+                                      max={remaining}
+                                      value={receivingQuantities[key] || item.PurchaseOrderQuantity}
                                       onChange={(e) => setReceivingQuantities(prev => ({
                                         ...prev,
-                                        [key]: Number(e.target.value)
+                                        [key]: Math.min(Math.max(1, Number(e.target.value)), remaining)
                                       }))}
                                       className="w-24"
                                     />
                                   )}
                                 </TableCell>
+                                <TableCell className="whitespace-nowrap">{remaining.toLocaleString()} {materialMap[item.MaterialId]?.unit || item.PurchaseOrderUnit}</TableCell>
                               </TableRow>
                             );
                           })}
@@ -386,6 +435,7 @@ export default function ReceivingPage() {
                     setSelectedItems([]);
                     setReceivingQuantities({});
                   }}>
+                    <X className="h-4 w-4 mr-2" />
                     ล้างการเลือก
                   </Button>
                   <Button onClick={handleReceiveItems} className="bg-green-600 hover:bg-green-700 w-full sm:w-auto">
@@ -408,6 +458,9 @@ export default function ReceivingPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>รับวัตถุดิบเข้าคลัง (แบบ Manual)</DialogTitle>
+            <DialogDescription>
+              ระบุ SKU และจำนวนของวัตถุดิบที่ต้องการรับเข้าคลัง
+            </DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>

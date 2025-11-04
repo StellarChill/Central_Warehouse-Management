@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   ShoppingCart,
   Plus,
@@ -37,20 +37,23 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { th } from "../i18n/th";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { getPurchaseOrders as apiGetPOs, getPurchaseOrder as apiGetPO, updatePurchaseOrder as apiUpdatePO, deletePurchaseOrder as apiDeletePO, getSuppliers as apiGetSuppliers, getMaterials as apiGetMaterials, createPurchaseOrder as apiCreatePO, Supplier as ApiSupplier, Material as ApiMaterial } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 type PO = {
+  poId: number;
   id: string;
   supplier: string;
   date: string;
   total: number;
   status: string;
-  requestedBy: string;
+  requestedBy?: string;
   deliveryDate?: string;
-  items: number;
+  items?: number;
 };
 
 type Product = {
@@ -78,157 +81,282 @@ type POItem = {
   total: number;
 };
 
+// Type for the full PO details from API
+type POWithDetails = {
+  PurchaseOrderId: number;
+  SupplierId: number;
+  PurchaseOrderCode: string;
+  PurchaseOrderStatus: string;
+  TotalPrice: number;
+  DateTime: string;
+  CreatedAt: string;
+  UpdatedAt: string;
+  PurchaseOrderDetails: Array<{
+    PurchaseOrderDetailId: number;
+    PurchaseOrderId: number;
+    MaterialId: number;
+    PurchaseOrderQuantity: number;
+    PurchaseOrderPrice: number;
+    PurchaseOrderUnit: string;
+  }>;
+  Supplier?: {
+    SupplierId: number;
+    SupplierName: string;
+    ContactName: string;
+    Phone: string;
+    Email: string;
+    Address: string;
+    Status: string;
+  };
+};
+
 export default function PurchaseOrdersPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [expandedStatus, setExpandedStatus] = useState<Record<string, boolean>>({});
-  const [poList, setPoList] = useState<PO[]>([
-    {
-      id: "PO-2024-001",
-      supplier: "บริษัท ซัพพลาย จำกัด",
-      date: "2024-03-15",
-      total: 125000,
-      status: "SENT",
-      requestedBy: "สมชาย ใจดี",
-      deliveryDate: "2024-03-22",
-      items: 5,
-    },
-    {
-      id: "PO-2024-002",
-      supplier: "บริษัท โกลบอล เทรด",
-      date: "2024-03-14",
-      total: 89500,
-      status: "CONFIRMED",
-      requestedBy: "สุดา รักดี",
-      deliveryDate: "2024-03-21",
-      items: 3,
-    },
-    {
-      id: "PO-2024-003",
-      supplier: "บริษัท เวิลด์คลาส",
-      date: "2024-03-13",
-      total: 245000,
-      status: "RECEIVED",
-      requestedBy: "วิเชียร เก่งมาก",
-      deliveryDate: "2024-03-20",
-      items: 8,
-    },
-    {
-      id: "PO-2024-004",
-      supplier: "บริษัท คุณภาพดี",
-      date: "2024-03-12",
-      total: 67800,
-      status: "DRAFT",
-      requestedBy: "ปิยะ สุขใจ",
-      deliveryDate: "2024-03-19",
-      items: 4,
-    },
-    {
-      id: "PO-2024-005",
-      supplier: "บริษัท เฟิสต์คลาส",
-      date: "2024-03-11",
-      total: 156700,
-      status: "CONFIRMED",
-      requestedBy: "นิรันดร์ ดีมาก",
-      deliveryDate: "2024-03-18",
-      items: 6,
-    },
-    {
-      id: "PO-2024-006",
-      supplier: "บริษัท สตาร์ทอัพ",
-      date: "2024-03-10",
-      total: 98000,
-      status: "SENT",
-      requestedBy: "วรัญญา พานิช",
-      deliveryDate: "2024-03-17",
-      items: 7,
-    },
-    {
-      id: "PO-2024-007",
-      supplier: "บริษัท พรีเมียมฟู้ด",
-      date: "2024-03-09",
-      total: 210500,
-      status: "RECEIVED",
-      requestedBy: "ธนากร รุ่งเรือง",
-      deliveryDate: "2024-03-16",
-      items: 9,
-    },
-    {
-      id: "PO-2024-008",
-      supplier: "บริษัท ฟู๊ดเซอร์วิส",
-      date: "2024-03-08",
-      total: 76500,
-      status: "DRAFT",
-      requestedBy: "อรอุมา ศรีสวัสดิ์",
-      deliveryDate: "2024-03-15",
-      items: 4,
-    },
-  ]);
+  const [poList, setPoList] = useState<PO[]>([]);
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+  const [createOpen, setCreateOpen] = useState(false);
+  const [suppliers, setSuppliers] = useState<ApiSupplier[]>([]);
+  const [materials, setMaterials] = useState<ApiMaterial[]>([]);
+  const [creating, setCreating] = useState(false);
+  const [form, setForm] = useState({
+    SupplierId: 0,
+    PurchaseOrderCode: "",
+    DateTime: "",
+    PurchaseOrderStatus: "DRAFT" as "DRAFT" | "SENT" | "CONFIRMED" | "RECEIVED",
+    details: [] as Array<{ MaterialId: number; PurchaseOrderQuantity: number; PurchaseOrderPrice: number; PurchaseOrderUnit: string }>,
+  });
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingPoId, setEditingPoId] = useState<number | null>(null);
+  // View dialog states
+  const [viewOpen, setViewOpen] = useState(false);
+  const [viewingPo, setViewingPo] = useState<POWithDetails | null>(null);
+  const [viewingPoItems, setViewingPoItems] = useState<ApiMaterial[]>([]);
 
-  // Dialog states
-  const [viewDialogOpen, setViewDialogOpen] = useState(false);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [selectedPO, setSelectedPO] = useState<PO | null>(null);
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      try {
+        const rows = await apiGetPOs();
+        const mapped: PO[] = rows.map((r) => ({
+          poId: r.PurchaseOrderId,
+          id: r.PurchaseOrderCode,
+          supplier: r.Supplier?.SupplierName || String(r.SupplierId),
+          date: r.DateTime,
+          total: r.TotalPrice,
+          status: r.PurchaseOrderStatus,
+        }));
+        setPoList(mapped);
+      } catch (e: any) {
+        toast({ variant: 'destructive', title: 'โหลดใบสั่งซื้อไม่สำเร็จ', description: e.message || '' });
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
 
-  // Mock suppliers data
-  const suppliers: Supplier[] = [
-    { id: "SUP-001", name: "บริษัท ซัพพลาย จำกัด", contact: "คุณดวงใจ", phone: "081-234-5678", email: "contact@supply.co.th", status: "ACTIVE" },
-    { id: "SUP-002", name: "บริษัท โกลบอล เทรด", contact: "คุณธันยา", phone: "082-345-6789", email: "sales@globaltrade.co.th", status: "ACTIVE" },
-    { id: "SUP-003", name: "หจก. คุณภาพดี", contact: "คุณปรีชา", phone: "083-456-7890", email: "info@quality.co.th", status: "INACTIVE" },
-  ];
+  const openCreate = async () => {
+    setCreateOpen(true);
+    try {
+      const [ss, ms] = await Promise.all([apiGetSuppliers(), apiGetMaterials()]);
+      setSuppliers(ss);
+      setMaterials(ms);
+      const now = new Date();
+      const rand = Math.floor(Math.random()*9000)+1000;
+      const code = `PO-${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}-${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}-${rand}`;
+      setForm({ SupplierId: ss[0]?.SupplierId || 0, PurchaseOrderCode: code, DateTime: now.toISOString().slice(0,10), PurchaseOrderStatus: 'DRAFT', details: [] });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'โหลดข้อมูลสำหรับสร้าง PO ไม่สำเร็จ', description: e.message || '' });
+    }
+  };
 
-  // Mock products data
-  const products: Product[] = [
-    { id: "MAT-001", sku: "FLOUR-WHITE", name: "แป้งสาลีอเนกประสงค์", unit: "กิโลกรัม", price: 45, category: "แป้ง" },
-    { id: "MAT-002", sku: "FLOUR-CAKE", name: "แป้งเค้ก", unit: "กิโลกรัม", price: 65, category: "แป้ง" },
-    { id: "MAT-003", sku: "FLOUR-BREAD", name: "แป้งทำขนมปัง", unit: "กิโลกรัม", price: 55, category: "แป้ง" },
-    { id: "MAT-004", sku: "SUGAR-GRAN", name: "น้ำตาลทราย", unit: "กิโลกรัม", price: 40, category: "น้ำตาล" },
-    { id: "MAT-005", sku: "SUGAR-POWDER", name: "น้ำตาลป่น", unit: "กิโลกรัม", price: 50, category: "น้ำตาล" },
-    { id: "MAT-006", sku: "SUGAR-BROWN", name: "น้ำตาลทรายแดง", unit: "กิโลกรัม", price: 42, category: "น้ำตาล" },
-    { id: "MAT-007", sku: "BUTTER-SALT", name: "เนยเค็ม", unit: "กิโลกรัม", price: 180, category: "เนย" },
-    { id: "MAT-008", sku: "BUTTER-UNSALT", name: "เนยจืด", unit: "กิโลกรัม", price: 190, category: "เนย" },
-    { id: "MAT-009", sku: "EGG-WHITE", name: "ไข่ไก่ขาว", unit: "ฟอง", price: 2, category: "ไข่" },
-    { id: "MAT-010", sku: "EGG-BROWN", name: "ไข่ไก่แดง", unit: "ฟอง", price: 3, category: "ไข่" },
-    { id: "MAT-011", sku: "MILK-WHOLE", name: "นมจืดเต็มไขมัน", unit: "ลิตร", price: 65, category: "นม" },
-    { id: "MAT-012", sku: "MILK-SKIM", name: "นมจืดไขมันต่ำ", unit: "ลิตร", price: 55, category: "นม" },
-    { id: "MAT-013", sku: "CREAM-HEAVY", name: "ครีมจืด", unit: "ลิตร", price: 120, category: "นม" },
-    { id: "MAT-014", sku: "CHOC-COCOA", name: "ผงโกโก้", unit: "กิโลกรัม", price: 250, category: "ช็อกโกแลต" },
-    { id: "MAT-015", sku: "CHOC-DARK", name: "ช็อกโกแลตดำ", unit: "กิโลกรัม", price: 300, category: "ช็อกโกแลต" },
-    { id: "MAT-016", sku: "CHOC-WHITE", name: "ช็อกโกแลตขาว", unit: "กิโลกรัม", price: 280, category: "ช็อกโกแลต" },
-    { id: "MAT-017", sku: "BAKING-POWDER", name: "ผงฟู", unit: "ถุง", price: 35, category: "วัตถุเจือปน" },
-    { id: "MAT-018", sku: "BAKING-SODA", name: "โซดาบิคคาร์บอเนต", unit: "ถุง", price: 30, category: "วัตถุเจือปน" },
-    { id: "MAT-019", sku: "VANILLA-EXTRACT", name: "สารสกัดวานิลลา", unit: "ขวด", price: 80, category: "วัตถุเจือปน" },
-    { id: "MAT-020", sku: "SALT", name: "เกลือ", unit: "กิโลกรัม", price: 25, category: "วัตถุเจือปน" },
-    { id: "MAT-021", sku: "OIL-VEG", name: "น้ำมันพืช", unit: "ลิตร", price: 75, category: "น้ำมัน" },
-    { id: "MAT-022", sku: "OIL-COCONUT", name: "น้ำมันมะพร้าว", unit: "ลิตร", price: 90, category: "น้ำมัน" },
-    { id: "MAT-023", sku: "FRUIT-STRAW", name: "สตอเบอร์รี่แช่แข็ง", unit: "กิโลกรัม", price: 200, category: "ผลไม้" },
-    { id: "MAT-024", sku: "FRUIT-MANGO", name: "มะม่วงแช่แข็ง", unit: "กิโลกรัม", price: 180, category: "ผลไม้" },
-  ];
+  const addDetailRow = () => {
+    if (!materials.length) {
+      toast({ variant: 'destructive', title: 'ยังโหลดรายการวัตถุดิบไม่เสร็จ' });
+      return;
+    }
+    setForm(prev => ({
+      ...prev,
+      details: [...prev.details, { MaterialId: materials[0]?.MaterialId || 0, PurchaseOrderQuantity: 1, PurchaseOrderPrice: materials[0]?.Price || 0, PurchaseOrderUnit: materials[0]?.Unit || '' }]
+    }));
+  };
 
-  // Mock PO items data
-  const poItems: Record<string, POItem[]> = {
-    "PO-2024-001": [
-      { product: products[0], quantity: 100, price: 45, total: 4500 },
-      { product: products[3], quantity: 50, price: 40, total: 2000 },
-      { product: products[6], quantity: 80, price: 180, total: 14400 },
-      { product: products[8], quantity: 2000, price: 2, total: 4000 },
-      { product: products[10], quantity: 100, price: 65, total: 6500 },
-    ],
-    "PO-2024-002": [
-      { product: products[1], quantity: 50, price: 65, total: 3250 },
-      { product: products[4], quantity: 30, price: 50, total: 1500 },
-      { product: products[7], quantity: 40, price: 190, total: 7600 },
-    ],
-    "PO-2024-003": [
-      { product: products[2], quantity: 80, price: 55, total: 4400 },
-      { product: products[5], quantity: 60, price: 42, total: 2520 },
-      { product: products[9], quantity: 1500, price: 3, total: 4500 },
-      { product: products[11], quantity: 120, price: 55, total: 6600 },
-      { product: products[13], quantity: 40, price: 250, total: 10000 },
-      { product: products[14], quantity: 30, price: 300, total: 9000 },
-      { product: products[16], quantity: 20, price: 35, total: 700 },
-      { product: products[18], quantity: 15, price: 80, total: 1200 },
-    ],
+  const updateDetail = (idx: number, patch: Partial<{ MaterialId: number; PurchaseOrderQuantity: number; PurchaseOrderPrice: number; PurchaseOrderUnit: string }>) => {
+    setForm(prev => {
+      const details = prev.details.slice();
+      details[idx] = { ...details[idx], ...patch } as any;
+      return { ...prev, details };
+    });
+  };
+
+  const removeDetail = (idx: number) => {
+    setForm(prev => ({ ...prev, details: prev.details.filter((_, i) => i !== idx) }));
+  };
+
+  const totalPrice = useMemo(() => form.details.reduce((sum, d) => sum + (Number(d.PurchaseOrderQuantity)||0) * (Number(d.PurchaseOrderPrice)||0), 0), [form.details]);
+
+  const submitCreate = async () => {
+    if (!form.SupplierId) return toast({ variant: 'destructive', title: 'กรุณาเลือกผู้จำหน่าย' });
+    if (!form.PurchaseOrderCode) return toast({ variant: 'destructive', title: 'กรุณากรอกรหัส PO' });
+    if (form.details.length === 0) return toast({ variant: 'destructive', title: 'กรุณาเพิ่มรายการสินค้าอย่างน้อย 1 รายการ' });
+    // validate details
+    for (const d of form.details) {
+      if (!d.MaterialId || d.MaterialId <= 0) return toast({ variant: 'destructive', title: 'เลือกรายการวัตถุดิบไม่ถูกต้อง' });
+      if (!d.PurchaseOrderQuantity || d.PurchaseOrderQuantity <= 0) return toast({ variant: 'destructive', title: 'จำนวนต้องมากกว่า 0' });
+      if (d.PurchaseOrderPrice === undefined || d.PurchaseOrderPrice === null || Number(d.PurchaseOrderPrice) < 0) return toast({ variant: 'destructive', title: 'ราคาต้องไม่ติดลบ' });
+      if (!d.PurchaseOrderUnit) return toast({ variant: 'destructive', title: 'กรุณาระบุหน่วย' });
+    }
+    setCreating(true);
+    try {
+      await apiCreatePO({
+        SupplierId: form.SupplierId,
+        PurchaseOrderCode: form.PurchaseOrderCode,
+        DateTime: form.DateTime ? new Date(form.DateTime).toISOString() : undefined,
+        PurchaseOrderStatus: form.PurchaseOrderStatus,
+        details: form.details.map(d => ({
+          MaterialId: Number(d.MaterialId),
+          PurchaseOrderQuantity: Number(d.PurchaseOrderQuantity),
+          PurchaseOrderPrice: Number(d.PurchaseOrderPrice),
+          PurchaseOrderUnit: d.PurchaseOrderUnit || (materials.find(m => m.MaterialId === d.MaterialId)?.Unit || '')
+        }))
+      });
+      toast({ title: 'สร้างใบสั่งซื้อสำเร็จ' });
+      setCreateOpen(false);
+      // refresh list
+      setLoading(true);
+      const rows = await apiGetPOs();
+      const mapped: PO[] = rows.map((r) => ({
+        poId: r.PurchaseOrderId,
+        id: r.PurchaseOrderCode,
+        supplier: r.Supplier?.SupplierName || String(r.SupplierId),
+        date: r.DateTime,
+        total: r.TotalPrice,
+        status: r.PurchaseOrderStatus,
+      }));
+      setPoList(mapped);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'สร้างใบสั่งซื้อไม่สำเร็จ', description: e.message || '' });
+    } finally {
+      setCreating(false);
+      setLoading(false);
+    }
+  };
+
+  const openEdit = async (po: PO) => {
+    setEditingPoId(po.poId);
+    setEditOpen(true);
+    try {
+      const [ss, ms, full] = await Promise.all([
+        apiGetSuppliers(),
+        apiGetMaterials(),
+        apiGetPO(po.poId),
+      ]);
+      setSuppliers(ss);
+      setMaterials(ms);
+      setForm({
+        SupplierId: full.SupplierId,
+        PurchaseOrderCode: full.PurchaseOrderCode,
+        DateTime: (full.DateTime ? new Date(full.DateTime).toISOString().slice(0,10) : ""),
+        PurchaseOrderStatus: full.PurchaseOrderStatus as any,
+        details: full.PurchaseOrderDetails.map(d => ({
+          MaterialId: d.MaterialId,
+          PurchaseOrderQuantity: d.PurchaseOrderQuantity,
+          PurchaseOrderPrice: d.PurchaseOrderPrice,
+          PurchaseOrderUnit: d.PurchaseOrderUnit,
+        })),
+      });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'โหลดข้อมูลแก้ไข PO ไม่สำเร็จ', description: e.message || '' });
+    }
+  };
+
+  const submitEdit = async () => {
+    if (!editingPoId) return;
+    if (!form.SupplierId) return toast({ variant: 'destructive', title: 'กรุณาเลือกผู้จำหน่าย' });
+    if (!form.PurchaseOrderCode) return toast({ variant: 'destructive', title: 'กรุณากรอกรหัส PO' });
+    if (form.details.length === 0) return toast({ variant: 'destructive', title: 'กรุณาเพิ่มรายการสินค้าอย่างน้อย 1 รายการ' });
+    for (const d of form.details) {
+      if (!d.MaterialId || d.MaterialId <= 0) return toast({ variant: 'destructive', title: 'เลือกรายการวัตถุดิบไม่ถูกต้อง' });
+      if (!d.PurchaseOrderQuantity || d.PurchaseOrderQuantity <= 0) return toast({ variant: 'destructive', title: 'จำนวนต้องมากกว่า 0' });
+      if (d.PurchaseOrderPrice === undefined || d.PurchaseOrderPrice === null || Number(d.PurchaseOrderPrice) < 0) return toast({ variant: 'destructive', title: 'ราคาต้องไม่ติดลบ' });
+      if (!d.PurchaseOrderUnit) return toast({ variant: 'destructive', title: 'กรุณาระบุหน่วย' });
+    }
+    try {
+      await apiUpdatePO(editingPoId, {
+        SupplierId: form.SupplierId,
+        PurchaseOrderCode: form.PurchaseOrderCode,
+        DateTime: form.DateTime ? new Date(form.DateTime).toISOString() : undefined,
+        PurchaseOrderStatus: form.PurchaseOrderStatus,
+        details: form.details.map(d => ({
+          MaterialId: Number(d.MaterialId),
+          PurchaseOrderQuantity: Number(d.PurchaseOrderQuantity),
+          PurchaseOrderPrice: Number(d.PurchaseOrderPrice),
+          PurchaseOrderUnit: d.PurchaseOrderUnit,
+        })),
+      } as any);
+      toast({ title: 'แก้ไขใบสั่งซื้อสำเร็จ' });
+      setEditOpen(false);
+      setEditingPoId(null);
+      // refresh list
+      setLoading(true);
+      const rows = await apiGetPOs();
+      const mapped: PO[] = rows.map((r) => ({
+        poId: r.PurchaseOrderId,
+        id: r.PurchaseOrderCode,
+        supplier: r.Supplier?.SupplierName || String(r.SupplierId),
+        date: r.DateTime,
+        total: r.TotalPrice,
+        status: r.PurchaseOrderStatus,
+      }));
+      setPoList(mapped);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'แก้ไขใบสั่งซื้อไม่สำเร็จ', description: e.message || '' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (po: PO) => {
+    if (!confirm(`ยืนยันลบ PO ${po.id}?`)) return;
+    try {
+      await apiDeletePO(po.poId);
+      toast({ title: 'ลบใบสั่งซื้อแล้ว' });
+      // refresh list
+      setLoading(true);
+      const rows = await apiGetPOs();
+      const mapped: PO[] = rows.map((r) => ({
+        poId: r.PurchaseOrderId,
+        id: r.PurchaseOrderCode,
+        supplier: r.Supplier?.SupplierName || String(r.SupplierId),
+        date: r.DateTime,
+        total: r.TotalPrice,
+        status: r.PurchaseOrderStatus,
+      }));
+      setPoList(mapped);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'ลบใบสั่งซื้อไม่สำเร็จ', description: e.message || '' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // View PO details
+  const openView = async (po: PO) => {
+    setViewOpen(true);
+    try {
+      const [full, mats] = await Promise.all([
+        apiGetPO(po.poId),
+        apiGetMaterials(),
+      ]);
+      // Type assertion to match our state type
+      setViewingPo(full as POWithDetails);
+      setViewingPoItems(mats);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'โหลดข้อมูล PO ไม่สำเร็จ', description: e.message || '' });
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -261,7 +389,7 @@ export default function PurchaseOrdersPage() {
       const matchesSearch = !searchTerm || 
         po.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
         po.supplier.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        po.requestedBy.toLowerCase().includes(searchTerm.toLowerCase());
+        po.requestedBy?.toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchesStatus = statusFilter === "all" || po.status === statusFilter;
       
@@ -304,7 +432,7 @@ export default function PurchaseOrdersPage() {
           <h1 className="text-2xl sm:text-3xl font-bold">ใบสั่งซื้อ (Purchase Orders)</h1>
           <p className="text-muted-foreground mt-1">จัดการใบสั่งซื้อวัตถุดิบจากผู้จำหน่าย</p>
         </div>
-        <Button className="gap-2 w-full sm:w-auto">
+        <Button className="gap-2 w-full sm:w-auto" onClick={openCreate}>
           <Plus className="h-4 w-4" /> สร้างใบสั่งซื้อ
         </Button>
       </div>
@@ -397,7 +525,9 @@ export default function PurchaseOrdersPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {Object.keys(groupedPOs).length > 0 ? (
+            {loading ? (
+              <div className="text-center py-12 text-muted-foreground">กำลังโหลด...</div>
+            ) : Object.keys(groupedPOs).length > 0 ? (
             <div className="space-y-6">
               {Object.entries(groupedPOs).map(([status, pos]) => {
                 const isExpanded = expandedStatus[status] ?? true;
@@ -449,7 +579,7 @@ export default function PurchaseOrdersPage() {
                                     day: 'numeric'
                                   })}
                                 </TableCell>
-                                <TableCell className="whitespace-nowrap">{po.items}</TableCell>
+                                <TableCell className="whitespace-nowrap">{po.items ?? '-'}</TableCell>
                                 <TableCell className="whitespace-nowrap">฿{po.total.toLocaleString()}</TableCell>
                                 <TableCell className="whitespace-nowrap">{po.requestedBy}</TableCell>
                                 <TableCell className="whitespace-nowrap">
@@ -468,10 +598,7 @@ export default function PurchaseOrdersPage() {
                                       variant="ghost" 
                                       size="sm" 
                                       className="w-full sm:w-auto hover:bg-accent"
-                                      onClick={() => {
-                                        setSelectedPO(po);
-                                        setViewDialogOpen(true);
-                                      }}
+                                      onClick={() => openView(po)}
                                     >
                                       <Eye className="h-4 w-4" />
                                     </Button>
@@ -479,12 +606,18 @@ export default function PurchaseOrdersPage() {
                                       variant="ghost" 
                                       size="sm" 
                                       className="w-full sm:w-auto hover:bg-accent"
-                                      onClick={() => {
-                                        setSelectedPO(po);
-                                        setEditDialogOpen(true);
-                                      }}
+                                      onClick={() => openEdit(po)}
                                     >
                                       <Edit className="h-4 w-4" />
+                                    </Button>
+
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="w-full sm:w-auto text-destructive hover:bg-destructive/10"
+                                      onClick={() => handleDelete(po)}
+                                    >
+                                      <X className="h-4 w-4" />
                                     </Button>
 
                                   </div>
@@ -515,6 +648,320 @@ export default function PurchaseOrdersPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Create PO Dialog */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>สร้างใบสั่งซื้อ</DialogTitle>
+            <DialogDescription>เลือกผู้จำหน่ายและเพิ่มรายการวัตถุดิบให้ครบถ้วนก่อนบันทึก</DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label>ผู้จำหน่าย</Label>
+              <Select value={String(form.SupplierId)} onValueChange={(v) => setForm(prev => ({ ...prev, SupplierId: Number(v) }))}>
+                <SelectTrigger className="w-full"><SelectValue placeholder="เลือกผู้จำหน่าย" /></SelectTrigger>
+                <SelectContent>
+                  {suppliers.map(s => (
+                    <SelectItem key={s.SupplierId} value={String(s.SupplierId)}>{s.SupplierName}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>รหัส PO</Label>
+              <Input value={form.PurchaseOrderCode} onChange={(e) => setForm(prev => ({ ...prev, PurchaseOrderCode: e.target.value }))} />
+            </div>
+            <div>
+              <Label>วันที่</Label>
+              <Input type="date" value={form.DateTime} onChange={(e) => setForm(prev => ({ ...prev, DateTime: e.target.value }))} />
+            </div>
+            <div>
+              <Label>สถานะ</Label>
+              <Select value={form.PurchaseOrderStatus} onValueChange={(v) => setForm(prev => ({ ...prev, PurchaseOrderStatus: v as any }))}>
+                <SelectTrigger className="w-full"><SelectValue placeholder="สถานะ" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="DRAFT">ร่าง</SelectItem>
+                  <SelectItem value="SENT">ส่งแล้ว</SelectItem>
+                  <SelectItem value="CONFIRMED">ยืนยันแล้ว</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="mt-4 border rounded-lg">
+            <div className="flex items-center justify-between p-3">
+              <div className="font-medium">รายการสินค้า</div>
+              <Button size="sm" variant="outline" onClick={addDetailRow} disabled={!materials.length}><Plus className="h-4 w-4 mr-1" />เพิ่มรายการ</Button>
+            </div>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="whitespace-nowrap">วัตถุดิบ</TableHead>
+                    <TableHead className="whitespace-nowrap">จำนวน</TableHead>
+                    <TableHead className="whitespace-nowrap">หน่วย</TableHead>
+                    <TableHead className="whitespace-nowrap">ราคา/หน่วย</TableHead>
+                    <TableHead className="whitespace-nowrap">รวม</TableHead>
+                    <TableHead></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {form.details.map((d, idx) => {
+                    const mat = materials.find(m => m.MaterialId === d.MaterialId) || materials[0];
+                    return (
+                      <TableRow key={idx}>
+                        <TableCell className="min-w-[220px]">
+                          <Select value={String(d.MaterialId)} onValueChange={(v) => {
+                            const m = materials.find(mm => mm.MaterialId === Number(v));
+                            updateDetail(idx, { MaterialId: Number(v), PurchaseOrderPrice: m?.Price || 0, PurchaseOrderUnit: m?.Unit || '' });
+                          }}>
+                            <SelectTrigger className="w-[220px]"><SelectValue placeholder="เลือกวัตถุดิบ" /></SelectTrigger>
+                            <SelectContent>
+                              {materials.map(m => (
+                                <SelectItem key={m.MaterialId} value={String(m.MaterialId)}>{m.MaterialName}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell className="min-w-[120px]">
+                          <Input type="number" min="1" value={d.PurchaseOrderQuantity} onChange={(e) => updateDetail(idx, { PurchaseOrderQuantity: Number(e.target.value) })} />
+                        </TableCell>
+                        <TableCell className="min-w-[120px]">
+                          <Input value={d.PurchaseOrderUnit} onChange={(e) => updateDetail(idx, { PurchaseOrderUnit: e.target.value })} placeholder={mat?.Unit || ''} />
+                        </TableCell>
+                        <TableCell className="min-w-[140px]">
+                          <Input type="number" min="0" value={d.PurchaseOrderPrice} onChange={(e) => updateDetail(idx, { PurchaseOrderPrice: Number(e.target.value) })} />
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap">฿{((Number(d.PurchaseOrderQuantity)||0)*(Number(d.PurchaseOrderPrice)||0)).toLocaleString()}</TableCell>
+                        <TableCell>
+                          <Button variant="ghost" size="sm" onClick={() => removeDetail(idx)}>
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  {form.details.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-muted-foreground">ยังไม่มีรายการสินค้า</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+            <div className="flex items-center justify-end p-3 gap-4">
+              <div className="text-sm text-muted-foreground">รวมทั้งสิ้น</div>
+              <div className="font-semibold">฿{totalPrice.toLocaleString()}</div>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => setCreateOpen(false)}>ยกเลิก</Button>
+            <Button onClick={submitCreate} disabled={creating}>{creating ? 'กำลังบันทึก...' : 'บันทึก'}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit PO Dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>แก้ไขใบสั่งซื้อ</DialogTitle>
+            <DialogDescription>แก้ไขข้อมูลและรายการวัตถุดิบของ PO</DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label>ผู้จำหน่าย</Label>
+              <Select value={String(form.SupplierId)} onValueChange={(v) => setForm(prev => ({ ...prev, SupplierId: Number(v) }))}>
+                <SelectTrigger className="w-full"><SelectValue placeholder="เลือกผู้จำหน่าย" /></SelectTrigger>
+                <SelectContent>
+                  {suppliers.map(s => (
+                    <SelectItem key={s.SupplierId} value={String(s.SupplierId)}>{s.SupplierName}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>รหัส PO</Label>
+              <Input value={form.PurchaseOrderCode} onChange={(e) => setForm(prev => ({ ...prev, PurchaseOrderCode: e.target.value }))} />
+            </div>
+            <div>
+              <Label>วันที่</Label>
+              <Input type="date" value={form.DateTime} onChange={(e) => setForm(prev => ({ ...prev, DateTime: e.target.value }))} />
+            </div>
+            <div>
+              <Label>สถานะ</Label>
+              <Select value={form.PurchaseOrderStatus} onValueChange={(v) => setForm(prev => ({ ...prev, PurchaseOrderStatus: v as any }))}>
+                <SelectTrigger className="w-full"><SelectValue placeholder="สถานะ" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="DRAFT">ร่าง</SelectItem>
+                  <SelectItem value="SENT">ส่งแล้ว</SelectItem>
+                  <SelectItem value="CONFIRMED">ยืนยันแล้ว</SelectItem>
+                  <SelectItem value="RECEIVED">รับแล้ว</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="mt-4 border rounded-lg">
+            <div className="flex items-center justify-between p-3">
+              <div className="font-medium">รายการสินค้า</div>
+              <Button size="sm" variant="outline" onClick={addDetailRow} disabled={!materials.length}><Plus className="h-4 w-4 mr-1" />เพิ่มรายการ</Button>
+            </div>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="whitespace-nowrap">วัตถุดิบ</TableHead>
+                    <TableHead className="whitespace-nowrap">จำนวน</TableHead>
+                    <TableHead className="whitespace-nowrap">หน่วย</TableHead>
+                    <TableHead className="whitespace-nowrap">ราคา/หน่วย</TableHead>
+                    <TableHead className="whitespace-nowrap">รวม</TableHead>
+                    <TableHead></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {form.details.map((d, idx) => {
+                    const mat = materials.find(m => m.MaterialId === d.MaterialId) || materials[0];
+                    return (
+                      <TableRow key={idx}>
+                        <TableCell className="min-w-[220px]">
+                          <Select value={String(d.MaterialId)} onValueChange={(v) => {
+                            const m = materials.find(mm => mm.MaterialId === Number(v));
+                            updateDetail(idx, { MaterialId: Number(v), PurchaseOrderPrice: m?.Price || 0, PurchaseOrderUnit: m?.Unit || '' });
+                          }}>
+                            <SelectTrigger className="w-[220px]"><SelectValue placeholder="เลือกวัตถุดิบ" /></SelectTrigger>
+                            <SelectContent>
+                              {materials.map(m => (
+                                <SelectItem key={m.MaterialId} value={String(m.MaterialId)}>{m.MaterialName}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell className="min-w-[120px]">
+                          <Input type="number" min="1" value={d.PurchaseOrderQuantity} onChange={(e) => updateDetail(idx, { PurchaseOrderQuantity: Number(e.target.value) })} />
+                        </TableCell>
+                        <TableCell className="min-w-[120px]">
+                          <Input value={d.PurchaseOrderUnit} onChange={(e) => updateDetail(idx, { PurchaseOrderUnit: e.target.value })} placeholder={mat?.Unit || ''} />
+                        </TableCell>
+                        <TableCell className="min-w-[140px]">
+                          <Input type="number" min="0" value={d.PurchaseOrderPrice} onChange={(e) => updateDetail(idx, { PurchaseOrderPrice: Number(e.target.value) })} />
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap">฿{((Number(d.PurchaseOrderQuantity)||0)*(Number(d.PurchaseOrderPrice)||0)).toLocaleString()}</TableCell>
+                        <TableCell>
+                          <Button variant="ghost" size="sm" onClick={() => removeDetail(idx)}>
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  {form.details.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-muted-foreground">ยังไม่มีรายการสินค้า</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+            <div className="flex items-center justify-end p-3 gap-4">
+              <div className="text-sm text-muted-foreground">รวมทั้งสิ้น</div>
+              <div className="font-semibold">฿{totalPrice.toLocaleString()}</div>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => setEditOpen(false)}>ยกเลิก</Button>
+            <Button onClick={submitEdit}>บันทึก</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* View PO Dialog */}
+      <Dialog open={viewOpen} onOpenChange={setViewOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>รายละเอียดใบสั่งซื้อ</DialogTitle>
+            <DialogDescription>ข้อมูลใบสั่งซื้อและรายการสินค้า</DialogDescription>
+          </DialogHeader>
+          {viewingPo && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>เลขที่ PO</Label>
+                  <div className="font-medium">{viewingPo.PurchaseOrderCode}</div>
+                </div>
+                <div>
+                  <Label>ผู้จำหน่าย</Label>
+                  <div className="font-medium">{viewingPo.Supplier?.SupplierName || '-'}</div>
+                </div>
+                <div>
+                  <Label>วันที่</Label>
+                  <div className="font-medium">
+                    {new Date(viewingPo.DateTime).toLocaleDateString('th-TH', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })}
+                  </div>
+                </div>
+                <div>
+                  <Label>สถานะ</Label>
+                  <div className="font-medium">{getStatusLabel(viewingPo.PurchaseOrderStatus)}</div>
+                </div>
+                <div>
+                  <Label>ยอดรวม</Label>
+                  <div className="font-medium">฿{viewingPo.TotalPrice.toLocaleString()}</div>
+                </div>
+              </div>
+
+              <div className="border rounded-lg">
+                <div className="p-3 font-medium border-b">รายการสินค้า</div>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="whitespace-nowrap">วัตถุดิบ</TableHead>
+                        <TableHead className="whitespace-nowrap">จำนวน</TableHead>
+                        <TableHead className="whitespace-nowrap">หน่วย</TableHead>
+                        <TableHead className="whitespace-nowrap">ราคา/หน่วย</TableHead>
+                        <TableHead className="whitespace-nowrap">รวม</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {viewingPo.PurchaseOrderDetails.map((d) => {
+                        const mat = viewingPoItems.find(m => m.MaterialId === d.MaterialId);
+                        return (
+                          <TableRow key={d.PurchaseOrderDetailId}>
+                            <TableCell>
+                              <div className="font-medium">{mat?.MaterialName || `MAT-${d.MaterialId}`}</div>
+                              <div className="text-sm text-muted-foreground">ID: {d.MaterialId}</div>
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap">{d.PurchaseOrderQuantity.toLocaleString()}</TableCell>
+                            <TableCell className="whitespace-nowrap">{d.PurchaseOrderUnit}</TableCell>
+                            <TableCell className="whitespace-nowrap">฿{d.PurchaseOrderPrice.toLocaleString()}</TableCell>
+                            <TableCell className="whitespace-nowrap">฿{(d.PurchaseOrderQuantity * d.PurchaseOrderPrice).toLocaleString()}</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                      {viewingPo.PurchaseOrderDetails.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center text-muted-foreground">ไม่มีรายการสินค้า</TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setViewOpen(false)}>ปิด</Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

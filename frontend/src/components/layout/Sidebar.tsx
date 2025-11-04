@@ -31,10 +31,16 @@ const navigation = [
     premiumIcon: ChefHat,
   },
   {
-    name: th.nav.suppliers,
-    href: "/suppliers",
-    icon: Users,
-    premiumIcon: Users,
+    name: th.nav.inventory,
+    href: "/inventory",
+    icon: Warehouse,
+    premiumIcon: Warehouse,
+  },
+  {
+    name: th.nav.receiving,
+    href: "/receiving",
+    icon: Truck,
+    premiumIcon: Truck,
   },
   {
     name: th.nav.products,
@@ -49,22 +55,16 @@ const navigation = [
     premiumIcon: FolderKanban,
   },
   {
-    name: th.nav.inventory,
-    href: "/inventory",
-    icon: Warehouse,
-    premiumIcon: Warehouse,
+    name: th.nav.suppliers,
+    href: "/suppliers",
+    icon: Users,
+    premiumIcon: Users,
   },
   {
     name: th.nav.purchasing,
     href: "/purchase-orders",
     icon: ShoppingCart,
     premiumIcon: ShoppingCart,
-  },
-  {
-    name: th.nav.receiving,
-    href: "/receiving",
-    icon: Truck,
-    premiumIcon: Truck,
   },
   {
     name: th.nav.requisitions,

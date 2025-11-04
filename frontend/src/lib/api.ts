@@ -283,3 +283,208 @@ export async function deleteMaterial(id: number): Promise<void> {
   return apiDelete(`/material/${id}`);
 }
 
+
+// ==========================================
+// Supplier API
+// ==========================================
+
+export type Supplier = {
+  SupplierId: number;
+  SupplierName: string;
+  SupplierAddress?: string | null;
+  SupplierCode: string;
+  SupplierTelNumber?: string | null;
+  CreatedAt: string;
+  UpdatedAt: string;
+  CreatedBy?: number;
+  UpdatedBy?: number;
+};
+
+export type CreateSupplierData = {
+  SupplierName: string;
+  SupplierCode: string;
+  SupplierAddress?: string;
+  SupplierTelNumber?: string;
+};
+
+export type UpdateSupplierData = Partial<CreateSupplierData>;
+
+export async function getSuppliers(): Promise<Supplier[]> {
+  return apiGet('/supplier');
+}
+
+export async function getSupplier(id: number): Promise<Supplier> {
+  return apiGet(`/supplier/${id}`);
+}
+
+export async function createSupplier(data: CreateSupplierData): Promise<Supplier> {
+  const user = getUser();
+  return apiPost('/supplier', { ...data, CreatedBy: user?.UserId || undefined });
+}
+
+export async function updateSupplier(id: number, data: UpdateSupplierData): Promise<Supplier> {
+  const user = getUser();
+  return apiPut(`/supplier/${id}`, { ...data, UpdatedBy: user?.UserId || undefined });
+}
+
+export async function deleteSupplier(id: number): Promise<void> {
+  return apiDelete(`/supplier/${id}`);
+}
+
+// ==========================================
+// Purchase Order API
+// ==========================================
+
+export type PurchaseOrder = {
+  PurchaseOrderId: number;
+  SupplierId: number;
+  PurchaseOrderCode: string;
+  PurchaseOrderStatus: 'DRAFT' | 'SENT' | 'CONFIRMED' | 'RECEIVED';
+  TotalPrice: number;
+  DateTime: string;
+  CreatedAt: string;
+  UpdatedAt: string;
+  Supplier?: { SupplierName: string };
+};
+
+export type PurchaseOrderDetail = {
+  PurchaseOrderDetailId: number;
+  PurchaseOrderId: number;
+  MaterialId: number;
+  PurchaseOrderQuantity: number;
+  PurchaseOrderPrice: number;
+  PurchaseOrderUnit: string;
+};
+
+export type CreatePurchaseOrderData = {
+  SupplierId: number;
+  PurchaseOrderCode: string;
+  PurchaseOrderStatus?: PurchaseOrder['PurchaseOrderStatus'];
+  DateTime?: string;
+  details: Array<{
+    MaterialId: number;
+    PurchaseOrderQuantity: number;
+    PurchaseOrderPrice: number;
+    PurchaseOrderUnit: string;
+  }>;
+};
+
+export type UpdatePurchaseOrderData = Partial<Omit<CreatePurchaseOrderData, 'SupplierId' | 'PurchaseOrderCode'>> & {
+  details?: CreatePurchaseOrderData['details'];
+};
+
+export async function getPurchaseOrders(): Promise<PurchaseOrder[]> {
+  return apiGet('/po');
+}
+
+export async function getPurchaseOrder(id: number): Promise<PurchaseOrder & { PurchaseOrderDetails: PurchaseOrderDetail[] }>{
+  return apiGet(`/po/${id}`);
+}
+
+export async function createPurchaseOrder(data: CreatePurchaseOrderData) {
+  const user = getUser();
+  return apiPost('/po', { ...data, CreatedBy: user?.UserId || undefined });
+}
+
+export async function updatePurchaseOrder(id: number, data: UpdatePurchaseOrderData) {
+  const user = getUser();
+  return apiPut(`/po/${id}`, { ...data, UpdatedBy: user?.UserId || undefined });
+}
+
+export async function updatePurchaseOrderStatus(id: number, status: PurchaseOrder['PurchaseOrderStatus']) {
+  return apiPut(`/po/${id}/status`, { PurchaseOrderStatus: status });
+}
+
+export async function deletePurchaseOrder(id: number) {
+  return apiDelete(`/po/${id}`);
+}
+
+// ==========================================
+// Receipt API
+// ==========================================
+
+export type Receipt = {
+  ReceiptId: number;
+  ReceiptCode: string;
+  ReceiptDateTime: string;
+  ReceiptTotalPrice: number;
+  PurchaseOrderId: number;
+  PurchaseOrderCode?: string;
+  CreatedAt: string;
+  UpdatedAt: string;
+};
+
+export type ReceiptDetail = {
+  ReceiptDetailId: number;
+  ReceiptId: number;
+  PurchaseOrderDetailId: number;
+  MaterialId: number;
+  MaterialQuantity: number;
+};
+
+export type CreateReceiptData = {
+  PurchaseOrderId: number;
+  ReceiptCode: string;
+  ReceiptDateTime?: string;
+  details: Array<{ MaterialId: number; MaterialQuantity: number; }>;
+};
+
+export type UpdateReceiptData = Partial<Omit<CreateReceiptData, 'PurchaseOrderId' | 'ReceiptCode'>> & {
+  details?: Array<{ MaterialId: number; MaterialQuantity: number; }>;
+};
+
+export async function getReceipts(): Promise<Receipt[]> {
+  return apiGet('/receipt');
+}
+
+export async function getReceipt(id: number): Promise<Receipt & { ReceiptDetails: ReceiptDetail[] }> {
+  return apiGet(`/receipt/${id}`);
+}
+
+export async function createReceipt(data: CreateReceiptData) {
+  const user = getUser();
+  return apiPost('/receipt', { ...data, CreatedBy: user?.UserId || undefined });
+}
+
+export async function updateReceipt(id: number, data: UpdateReceiptData) {
+  const user = getUser();
+  return apiPut(`/receipt/${id}`, { ...data, UpdatedBy: user?.UserId || undefined });
+}
+
+export async function deleteReceipt(id: number) {
+  return apiDelete(`/receipt/${id}`);
+}
+
+// ==========================================
+// Stock API
+// ==========================================
+
+export type Stock = {
+  StockId: number;
+  MaterialId: number;
+  MaterialName: string;
+  Unit: string;
+  Quantity: number;
+  Remain: number;
+  StockPrice: number;
+  Barcode: string;
+  ReceiptId: number;
+  PurchaseOrderId: number;
+  CreatedAt: string;
+};
+
+export type StockSummaryRow = {
+  MaterialId: number;
+  MaterialName: string;
+  Unit: string;
+  TotalQuantity: number;
+  TotalRemain: number;
+};
+
+export async function getStocks(): Promise<Stock[]> {
+  return apiGet('/stock');
+}
+
+export async function getStockSummary(): Promise<StockSummaryRow[]> {
+  return apiGet('/stock/summary');
+}

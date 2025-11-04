@@ -16,16 +16,89 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { th } from "../i18n/th";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { getStockSummary as apiGetStockSummary, getPurchaseOrders as apiGetPOs, getSuppliers as apiGetSuppliers, getReceipts as apiGetReceipts } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 export default function DashboardPage() {
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [lowStockCount, setLowStockCount] = useState<number>(0);
+  const [totalPOs, setTotalPOs] = useState<number>(0);
+  const [totalSuppliers, setTotalSuppliers] = useState<number>(0);
+  const { toast } = useToast();
+  const [activities, setActivities] = useState<Array<{ id: string; message: string; time: string; status: 'success' | 'warning' | 'error' | 'info' }>>([]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [summary, pos, sups, receipts] = await Promise.all([
+          apiGetStockSummary(),
+          apiGetPOs(),
+          apiGetSuppliers(),
+          apiGetReceipts(),
+        ]);
+        setLowStockCount(summary.filter((row) => Number(row.TotalRemain) < 5).length);
+        setTotalPOs(pos.length);
+        setTotalSuppliers(sups.length);
+
+        // Build recent activities from latest POs and Receipts
+        const poEvents = pos
+          .slice()
+          .sort((a, b) => new Date(b.DateTime).getTime() - new Date(a.DateTime).getTime())
+          .slice(0, 5)
+          .map((p) => ({
+            id: `po-${p.PurchaseOrderId}`,
+            message: `ใบสั่งซื้อ ${p.PurchaseOrderCode} (${p.PurchaseOrderStatus})`,
+            time: timeAgo(new Date(p.DateTime)),
+            status: (p.PurchaseOrderStatus === 'RECEIVED' ? 'success' : p.PurchaseOrderStatus === 'CONFIRMED' ? 'info' : 'warning') as 'success' | 'info' | 'warning',
+          }));
+        const rcEvents = receipts
+          .slice()
+          .sort((a, b) => new Date(b.ReceiptDateTime).getTime() - new Date(a.ReceiptDateTime).getTime())
+          .slice(0, 5)
+          .map((r) => ({
+            id: `rc-${r.ReceiptId}`,
+            message: `บันทึกใบรับ ${r.ReceiptCode} (${r.PurchaseOrderCode || '-'})`,
+            time: timeAgo(new Date(r.ReceiptDateTime)),
+            status: 'success' as const,
+          }));
+        const merged = [...poEvents, ...rcEvents]
+          .sort((a, b) => fromAgo(a.time) - fromAgo(b.time))
+          .slice(0, 8);
+        setActivities(merged);
+      } catch (e: any) {
+        // keep default when API fails
+        toast({ variant: 'destructive', title: 'โหลดข้อมูลแดชบอร์ดไม่สำเร็จ', description: e?.message || '' });
+      }
+    })();
+  }, []);
+
+  function timeAgo(date: Date) {
+    const diff = Math.max(0, Date.now() - date.getTime());
+    const m = Math.floor(diff / 60000);
+    if (m < 1) return 'เมื่อสักครู่';
+    if (m < 60) return `${m} นาทีที่แล้ว`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h} ชั่วโมงที่แล้ว`;
+    const d = Math.floor(h / 24);
+    return `${d} วันที่แล้ว`;
+  }
+  // for sorting by recency when using timeAgo strings; smaller value means newer
+  function fromAgo(text: string) {
+    if (text === 'เมื่อสักครู่') return 0;
+    const n = Number(text.split(' ')[0]);
+    if (text.includes('นาที')) return n;
+    if (text.includes('ชั่วโมง')) return n * 60;
+    if (text.includes('วัน')) return n * 24 * 60;
+    return Number.MAX_SAFE_INTEGER;
+  }
 
   // Mock data - in real app this would come from API
   const stats = [
     {
       title: th.dashboard.stats.totalPOs,
-      value: "156",
+      value: String(totalPOs),
       icon: ShoppingCart,
       trend: "+12%",
       color: "text-primary",
@@ -33,7 +106,7 @@ export default function DashboardPage() {
     },
     {
       title: th.dashboard.stats.totalSuppliers,
-      value: "42",
+      value: String(totalSuppliers),
       icon: Users,
       trend: "+2%",
       color: "text-info",
@@ -41,7 +114,7 @@ export default function DashboardPage() {
     },
     {
       title: th.dashboard.stats.lowStock,
-      value: "8",
+      value: String(lowStockCount),
       icon: AlertTriangle,
       trend: "-3%",
       color: "text-destructive",
@@ -49,36 +122,7 @@ export default function DashboardPage() {
     },
   ];
 
-  const recentActivities = [
-    {
-      id: 1,
-      type: "po_approved",
-      message: "ใบสั่งซื้อ PO-2024-001 ได้รับอนุมัติแล้ว",
-      time: "5 นาทีที่แล้ว",
-      status: "success",
-    },
-    {
-      id: 2,
-      type: "grn_posted",
-      message: "บันทึกใบรับสินค้า GRN-2024-045 เรียบร้อยแล้ว",
-      time: "15 นาทีที่แล้ว",
-      status: "info",
-    },
-    {
-      id: 3,
-      type: "req_submitted",
-      message: "สาขาลาดพร้าวส่งใบเบิก REQ-2024-089",
-      time: "30 นาทีที่แล้ว",
-      status: "warning",
-    },
-    {
-      id: 4,
-      type: "low_stock",
-      message: "สินค้า \"น้ำดื่ม 600ml\" เหลือน้อย (10 ขวด)",
-      time: "1 ชั่วโมงที่แล้ว",
-      status: "error",
-    },
-  ];
+  // recent activities now come from API (POs and Receipts)
 
   const quickActions = [
     {
@@ -87,7 +131,7 @@ export default function DashboardPage() {
       description: "สร้างใบสั่งซื้อใหม่",
       icon: Plus,
       color: "primary",
-      href: "/purchase-orders/create",
+      href: "/purchase-orders",
     },
     {
       id: "receiveGoods",
@@ -95,7 +139,7 @@ export default function DashboardPage() {
       description: "บันทึกการรับสินค้า",
       icon: Package,
       color: "success",
-      href: "/receiving/create",
+      href: "/receiving",
     },
     {
       id: "createRequisition",
@@ -111,7 +155,7 @@ export default function DashboardPage() {
       description: "ดูรายงานประจำเดือน",
       icon: Eye,
       color: "accent",
-      href: "/reports",
+      href: "/admin/reports",
     },
   ];
 
@@ -216,7 +260,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {recentActivities.map((activity) => (
+              {activities.map((activity) => (
                 <div key={activity.id} className="flex items-start gap-3 p-3 rounded-lg bg-muted">
                   <Badge className={`${getStatusColor(activity.status)} shrink-0`} variant="outline">
                     ●
@@ -248,7 +292,7 @@ export default function DashboardPage() {
                   className="h-auto p-4 justify-start hover:bg-accent shadow-sm"
                   asChild
                 >
-                  <a href={action.href}>
+                  <Link to={action.href}>
                     <div className="flex items-center gap-3">
                       <div className={`p-2 rounded-lg bg-${action.color}/10`}>
                         <action.icon className={`h-5 w-5 text-${action.color}`} />
@@ -260,7 +304,7 @@ export default function DashboardPage() {
                         </div>
                       </div>
                     </div>
-                  </a>
+                  </Link>
                 </Button>
               ))}
             </div>
