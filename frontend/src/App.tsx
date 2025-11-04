@@ -57,19 +57,14 @@ const App = () => (
           <BrowserRouter>
             <Suspense fallback={<LoadingScreen />}>
               <Routes>
+                {/* Redirect /login to / */}
+                <Route path="/login" element={<Navigate to="/" replace />} />
+                
                 {/* Public routes */}
-                <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
 
-                {/* Protected routes with layout */}
-                <Route
-                  path="/"
-                  element={
-                    <ProtectedRoute>
-                      <AppLayout />
-                    </ProtectedRoute>
-                  }
-                >
+                {/* Root route - shows login if not authenticated, dashboard if authenticated */}
+                <Route path="/" element={<RootRoute />}>
                   {/* Child routes should be relative to render inside AppLayout's <Outlet /> */}
                   <Route index element={<DashboardPage />} />
                   <Route path="suppliers" element={<SuppliersPage />} />
@@ -138,6 +133,26 @@ function LoadingScreen() {
   );
 }
 
+// ---- RootRoute: แสดง login ถ้ายังไม่ได้ login, dashboard ถ้า login แล้ว ----
+function RootRoute() {
+  const { user, isLoading } = useAuth();
+
+  // ถ้ากำลังโหลดข้อมูล user จาก localStorage ให้แสดง loading
+  if (isLoading) {
+    return <LoadingScreen />;
+  }
+
+  // ถ้ายัง login ไม่ได้ แสดง login page
+  if (!user) {
+    return <LoginPage />;
+  }
+
+  // ถ้า login แล้ว แสดง AppLayout และ nested routes
+  return (
+    <AppLayout />
+  );
+}
+
 // ---- ProtectedRoute: ป้องกันการเข้าถึงถ้ายัง login ไม่ได้ ----
 function ProtectedRoute({ children }: { children: JSX.Element }) {
   const { user, isLoading } = useAuth();
@@ -148,9 +163,9 @@ function ProtectedRoute({ children }: { children: JSX.Element }) {
     return <LoadingScreen />;
   }
 
-  // ถ้ายัง login ไม่ได้ redirect ไปหน้า login พร้อมเก็บ location ที่พยายามเข้า
+  // ถ้ายัง login ไม่ได้ redirect ไป root (จะแสดง login page)
   if (!user) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    return <Navigate to="/" state={{ from: location }} replace />;
   }
 
   return children;
@@ -166,7 +181,7 @@ function Guard({
 }) {
   const { user } = useAuth();
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/" replace />;
   }
   return allow.includes(user.role) ? children : <NotFound />;
 }

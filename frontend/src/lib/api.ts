@@ -1,6 +1,23 @@
 // API utility functions with authentication
 
-const API_BASE = import.meta.env.VITE_API_URL?.replace(/\/+$/, "") || "/api";
+// ตั้งค่า API base URL
+// ถ้ามี VITE_API_URL ใช้ตามนั้น (ควรมี /api ตอนท้าย)
+// ถ้าไม่มี ใช้ /api สำหรับ development (จะใช้ proxy ใน vite.config.ts)
+const getApiBase = () => {
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (envUrl) {
+    // ลบ trailing slash และตรวจสอบว่า URL มี /api หรือไม่
+    const cleanUrl = envUrl.replace(/\/+$/, "");
+    // ถ้า URL ไม่มี /api ตอนท้าย ให้เพิ่ม /api
+    if (!cleanUrl.endsWith('/api')) {
+      return `${cleanUrl}/api`;
+    }
+    return cleanUrl;
+  }
+  return "/api";
+};
+
+const API_BASE = getApiBase();
 
 // Get token from localStorage
 function getToken(): string | null {

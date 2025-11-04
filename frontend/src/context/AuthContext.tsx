@@ -34,7 +34,22 @@ type RegisterData = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // ถ้าไม่ตั้ง VITE_API_URL จะ fallback ไปใช้ "/api"
-const API_BASE = (import.meta.env.VITE_API_URL?.replace(/\/+$/, "") || "/api");
+// ตั้งค่า API base URL - ถ้ามี VITE_API_URL ใช้ตามนั้น, ถ้าไม่มีใช้ /api
+const getApiBase = () => {
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (envUrl) {
+    // ลบ trailing slash และตรวจสอบว่า URL มี /api หรือไม่
+    const cleanUrl = envUrl.replace(/\/+$/, "");
+    // ถ้า URL ไม่มี /api ตอนท้าย ให้เพิ่ม /api
+    if (!cleanUrl.endsWith('/api')) {
+      return `${cleanUrl}/api`;
+    }
+    return cleanUrl;
+  }
+  return "/api";
+};
+
+const API_BASE = getApiBase();
 
 // แปลง RoleId เป็น Role string
 function getRoleFromRoleId(roleId: number): Role {

@@ -15,12 +15,13 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { login, user } = useAuth();
-  
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // URL จะเป็น / อยู่แล้ว ไม่ต้องแก้ไข
 
   // ถ้า login แล้ว redirect ไปหน้าแรก
   useEffect(() => {
