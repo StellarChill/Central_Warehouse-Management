@@ -235,10 +235,7 @@ export default function DashboardPage() {
                 <div>
                   <p className="text-sm text-muted-foreground">{stat.title}</p>
                   <p className="text-3xl font-bold mt-2">{stat.value}</p>
-                  <div className="flex items-center mt-2">
-                    <TrendingUp className="h-4 w-4 text-success mr-1" />
-                    <span className="text-sm text-success">{stat.trend}</span>
-                  </div>
+                  
                 </div>
                 <div className={`p-3 rounded-lg ${stat.bgColor}`}>
                   <stat.icon className={`h-6 w-6 ${stat.color}`} />

@@ -1,17 +1,18 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Building2, Package, ShoppingCart, CheckCircle, Filter, Plus, X } from "lucide-react";
+import { Search, Building2, Package, ShoppingCart, CheckCircle, Filter, Plus, X, Edit, Trash2 } from "lucide-react";
 import { useStock } from "@/context/StockContext";
-import { getReceipts as apiGetReceipts, getPurchaseOrders as apiGetPOs, getPurchaseOrder as apiGetPO, createReceipt as apiCreateReceipt, getMaterials as apiGetMaterials, getReceipt as apiGetReceipt } from "@/lib/api";
+import { getReceipts as apiGetReceipts, getPurchaseOrders as apiGetPOs, getPurchaseOrder as apiGetPO, createReceipt as apiCreateReceipt, getMaterials as apiGetMaterials, getReceipt as apiGetReceipt, deleteReceipt as apiDeleteReceipt, updateReceipt as apiUpdateReceipt, Receipt as FullReceipt, ReceiptDetail } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 type Receipt = {
   id: string;
@@ -57,16 +58,29 @@ export default function ReceivingPage() {
   // State for PO filtering
   const [poSearchTerms, setPoSearchTerms] = useState<Record<string, string>>({});
   const [expandedPOs, setExpandedPOs] = useState<Record<string, boolean>>({});
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [receiptToDelete, setReceiptToDelete] = useState<Receipt | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [receiptToEdit, setReceiptToEdit] = useState<(FullReceipt & { ReceiptDetails: ReceiptDetail[] }) | null>(null);
+  const [editingQuantities, setEditingQuantities] = useState<Record<number, number>>({});
+
+  const loadReceipts = async () => {
+    try {
+      const rrows = await apiGetReceipts();
+      setReceipts(rrows.map(r => ({ id: String(r.ReceiptId), code: r.ReceiptCode, date: r.ReceiptDateTime, poCode: r.PurchaseOrderCode, poId: (r as any).PurchaseOrderId })));
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'โหลดใบรับไม่สำเร็จ', description: e.message || '' });
+    }
+  };
 
   useEffect(() => {
-    const load = async () => {
+    const loadInitialData = async () => {
       try {
-        const [rrows, orows, mats] = await Promise.all([
-          apiGetReceipts(),
+        const [orows, mats] = await Promise.all([
           apiGetPOs(),
           apiGetMaterials(),
         ]);
-        setReceipts(rrows.map(r => ({ id: String(r.ReceiptId), code: r.ReceiptCode, date: r.ReceiptDateTime, poCode: r.PurchaseOrderCode, poId: (r as any).PurchaseOrderId })));
+        loadReceipts(); // Load receipts
         setPoList(orows.map(o => ({ id: o.PurchaseOrderId, code: o.PurchaseOrderCode, supplier: o.Supplier?.SupplierName || String(o.SupplierId), date: o.DateTime, status: o.PurchaseOrderStatus })));
         const m: Record<number, { name: string; unit: string }> = {};
         mats.forEach(mt => { m[mt.MaterialId] = { name: mt.MaterialName, unit: mt.Unit }; });
@@ -75,7 +89,7 @@ export default function ReceivingPage() {
         toast({ variant: 'destructive', title: 'โหลดข้อมูลไม่สำเร็จ', description: e.message || '' });
       }
     };
-    load();
+    loadInitialData();
   }, []);
 
   // Prefetch PO details once dialog opens so items show up immediately
@@ -103,6 +117,34 @@ export default function ReceivingPage() {
     return () => controller.abort();
   }, [poDialogOpen, poList]);
 
+  // Recalculate received quantities for all visible POs when dialog opens
+  // or when receipts change, so rows are disabled immediately if fully received.
+  useEffect(() => {
+    if (!poDialogOpen || poList.length === 0) return;
+    const controller = new AbortController();
+    (async () => {
+      try {
+        const visiblePoIds = poList.filter(p => p.status !== 'RECEIVED').map(p => p.id);
+        const perPo: Record<number, Record<number, number>> = {};
+        await Promise.all(visiblePoIds.map(async (poId) => {
+          if (controller.signal.aborted) return;
+          const relatedReceipts = receipts.filter(r => r.poId === poId);
+          if (relatedReceipts.length === 0) { perPo[poId] = {}; return; }
+          const detailLists = await Promise.all(relatedReceipts.map(r => apiGetReceipt(Number(r.id))));
+          const sumMap: Record<number, number> = {};
+          for (const rec of detailLists) {
+            for (const d of rec.ReceiptDetails) {
+              sumMap[d.MaterialId] = (sumMap[d.MaterialId] || 0) + Number(d.MaterialQuantity || 0);
+            }
+          }
+          perPo[poId] = sumMap;
+        }));
+        if (!controller.signal.aborted) setReceivedByPo(prev => ({ ...prev, ...perPo }));
+      } catch {}
+    })();
+    return () => controller.abort();
+  }, [poDialogOpen, receipts, poList]);
+
   // Helper functions for PO management
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -119,7 +161,7 @@ export default function ReceivingPage() {
     }
   };
 
-  const handleItemSelect = (entry: { MaterialId: number; PurchaseOrderQuantity: number; PurchaseOrderUnit: string; }, poId: number, checked: boolean) => {
+  const handleItemSelect = (entry: { MaterialId: number; PurchaseOrderQuantity: number; PurchaseOrderUnit: string; }, poId: number, checked: boolean, remaining: number) => {
     const key = `${poId}-${entry.MaterialId}`;
     if (checked) {
       // อนุญาตให้เลือกจากหลาย PO ได้
@@ -127,10 +169,10 @@ export default function ReceivingPage() {
         const name = materialMap[entry.MaterialId]?.name || `MAT-${entry.MaterialId}`;
         const unit = materialMap[entry.MaterialId]?.unit || entry.PurchaseOrderUnit;
         // ป้องกันซ้ำ
-        if (prev.some(i => i.materialId === entry.MaterialId && i.poId === poId)) return prev;
+if (prev.some(i => i.materialId === entry.MaterialId && i.poId === poId)) return prev;
         return [...prev, { materialId: entry.MaterialId, name, orderedQty: entry.PurchaseOrderQuantity, unit, poId }];
       });
-      setReceivingQuantities(prev => ({ ...prev, [key]: entry.PurchaseOrderQuantity }));
+      setReceivingQuantities(prev => ({ ...prev, [key]: Math.max(0, Math.min(remaining, entry.PurchaseOrderQuantity)) }));
     } else {
       setSelectedItems(prev => prev.filter(i => !(i.materialId === entry.MaterialId && i.poId === poId)));
       setReceivingQuantities(prev => { const n = { ...prev }; delete n[key]; return n; });
@@ -139,7 +181,6 @@ export default function ReceivingPage() {
 
   const handleReceiveItems = async () => {
     if (selectedItems.length === 0) return;
-    // จัดกลุ่มตาม PO เพื่อสร้างใบรับหลายใบในครั้งเดียว
     const group: Record<number, { MaterialId: number; MaterialQuantity: number }[]> = {};
     for (const si of selectedItems) {
       const qty = receivingQuantities[`${si.poId}-${si.materialId}`] || 0;
@@ -152,35 +193,27 @@ export default function ReceivingPage() {
 
     const ts = new Date();
     try {
-      const results = await Promise.all(poIds.map(async (poId) => {
-        const code = `RC-${poList.find(p => p.id === poId)?.code || poId}-${ts.getFullYear()}${String(ts.getMonth()+1).padStart(2,'0')}${String(ts.getDate()).padStart(2,'0')}${String(ts.getHours()).padStart(2,'0')}${String(ts.getMinutes()).padStart(2,'0')}`;
+      await Promise.all(poIds.map(async (poId) => {
+        const pad = (n: number) => String(n).padStart(2, '0');
+        const stamp = `${ts.getFullYear()}${pad(ts.getMonth()+1)}${pad(ts.getDate())}${pad(ts.getHours())}${pad(ts.getMinutes())}${pad(ts.getSeconds())}${String(ts.getMilliseconds()).padStart(3,'0')}`;
+        const code = `RC-${poList.find(p => p.id === poId)?.code || poId}-${stamp}`;
         return apiCreateReceipt({ PurchaseOrderId: poId, ReceiptCode: code, details: group[poId] });
       }));
 
-      // แทรกใบรับใหม่ด้านบน
-      setReceipts(prev => [
-        ...results.map(created => ({
-          id: String(created.ReceiptId),
-          code: created.ReceiptCode,
-          date: created.ReceiptDateTime,
-          poCode: created.PurchaseOrderCode,
-        })),
-        ...prev,
-      ]);
+      loadReceipts();
 
       toast({ title: 'บันทึกรับสินค้าแล้ว' });
       setSelectedItems([]);
       setReceivingQuantities({});
       setPoDialogOpen(false);
-      // Refresh receipts & PO list (เพื่อซ่อน PO ที่รับครบแล้ว)
+      
       (async () => {
         try {
-          const [rrows, orows] = await Promise.all([apiGetReceipts(), apiGetPOs()]);
-          setReceipts(rrows.map(r => ({ id: String(r.ReceiptId), code: r.ReceiptCode, date: r.ReceiptDateTime, poCode: r.PurchaseOrderCode })));
+          const orows = await apiGetPOs();
           setPoList(orows.map(o => ({ id: o.PurchaseOrderId, code: o.PurchaseOrderCode, supplier: o.Supplier?.SupplierName || String(o.SupplierId), date: o.DateTime, status: o.PurchaseOrderStatus })));
         } catch {}
       })();
-      // ไปหน้า Inventory เพื่อแสดงสต็อกที่เพิ่มแล้ว
+      
       navigate('/inventory');
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'บันทึกไม่สำเร็จ', description: e.message || '' });
@@ -199,33 +232,88 @@ export default function ReceivingPage() {
     });
   };
 
-  // Toggle PO expansion
   const togglePOExpansion = async (poId: number) => {
     setExpandedPOs(prev => ({
       ...prev,
       [poId]: !prev[poId]
     }));
+
+    // Fetch details only if not present
     if (!poDetails[poId]) {
       try {
         const full = await apiGetPO(poId);
         setPoDetails(prev => ({ ...prev, [poId]: full.PurchaseOrderDetails }));
-        // compute received sums per material for this PO
-        const relatedReceipts = receipts.filter(r => r.poId === poId);
-        if (relatedReceipts.length > 0) {
-          const detailLists = await Promise.all(relatedReceipts.map(r => apiGetReceipt(Number(r.id))));
-          const sumMap: Record<number, number> = {};
-          for (const rec of detailLists) {
-            for (const d of rec.ReceiptDetails) {
-              sumMap[d.MaterialId] = (sumMap[d.MaterialId] || 0) + Number(d.MaterialQuantity || 0);
-            }
-          }
-          setReceivedByPo(prev => ({ ...prev, [poId]: sumMap }));
-        } else {
-          setReceivedByPo(prev => ({ ...prev, [poId]: {} }));
-        }
       } catch (e: any) {
         toast({ variant: 'destructive', title: 'โหลดรายการสินค้าใน PO ไม่สำเร็จ', description: e.message || '' });
+        return; // Stop if we can't get the PO details
       }
+    }
+
+    // Always recalculate received quantities on expand to get the latest data
+    try {
+        const relatedReceipts = receipts.filter(r => r.poId === poId);
+        if (relatedReceipts.length > 0) {
+            // This is an expensive network call, but necessary for correctness with the current backend API.
+            const detailLists = await Promise.all(relatedReceipts.map(r => apiGetReceipt(Number(r.id))));
+            const sumMap: Record<number, number> = {};
+            for (const rec of detailLists) {
+                for (const d of rec.ReceiptDetails) {
+                    sumMap[d.MaterialId] = (sumMap[d.MaterialId] || 0) + Number(d.MaterialQuantity || 0);
+                }
+            }
+            setReceivedByPo(prev => ({ ...prev, [poId]: sumMap }));
+        } else {
+            // If there are no receipts, ensure the map is empty for this PO.
+            setReceivedByPo(prev => ({ ...prev, [poId]: {} }));
+        }
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: 'คำนวณจำนวนที่รับแล้วไม่สำเร็จ', description: e.message || '' });
+    }
+  };
+
+  const handleDeleteReceipt = async () => {
+    if (!receiptToDelete) return;
+    try {
+      await apiDeleteReceipt(Number(receiptToDelete.id));
+      setReceipts(prev => prev.filter(r => r.id !== receiptToDelete.id));
+      toast({ title: 'ลบใบรับสินค้าสำเร็จ' });
+      setDeleteDialogOpen(false);
+      setReceiptToDelete(null);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'ลบใบรับสินค้าไม่สำเร็จ', description: e.message || '' });
+    }
+  };
+
+  const handleOpenEditDialog = async (receipt: Receipt) => {
+    try {
+      const fullReceipt = await apiGetReceipt(Number(receipt.id));
+      setReceiptToEdit(fullReceipt);
+      const quantities: Record<number, number> = {};
+      fullReceipt.ReceiptDetails.forEach(detail => {
+        quantities[detail.MaterialId] = detail.MaterialQuantity;
+      });
+      setEditingQuantities(quantities);
+      setEditDialogOpen(true);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'เปิดหน้าแก้ไขไม่สำเร็จ', description: e.message || '' });
+    }
+  };
+
+  const handleUpdateReceipt = async () => {
+    if (!receiptToEdit) return;
+    const updatedDetails = Object.entries(editingQuantities).map(([materialId, quantity]) => ({
+      MaterialId: Number(materialId),
+      MaterialQuantity: quantity,
+    }));
+
+    try {
+      await apiUpdateReceipt(receiptToEdit.ReceiptId, { details: updatedDetails });
+      toast({ title: 'แก้ไขใบรับสินค้าสำเร็จ' });
+      setEditDialogOpen(false);
+      setReceiptToEdit(null);
+      loadReceipts(); // Refresh the list
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'แก้ไขใบรับสินค้าไม่สำเร็จ', description: e.message || '' });
     }
   };
 
@@ -263,6 +351,7 @@ export default function ReceivingPage() {
                   <TableHead className="whitespace-nowrap">เลขที่ใบรับ</TableHead>
                   <TableHead className="whitespace-nowrap">เลขที่ PO</TableHead>
                   <TableHead className="whitespace-nowrap">วันที่</TableHead>
+                  <TableHead className="whitespace-nowrap text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -275,6 +364,17 @@ export default function ReceivingPage() {
                     <TableCell className="font-medium whitespace-nowrap">{r.code}</TableCell>
                     <TableCell className="whitespace-nowrap">{r.poCode || '-'}</TableCell>
                     <TableCell className="whitespace-nowrap">{new Date(r.date).toLocaleDateString("th-TH")}</TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="icon" onClick={() => handleOpenEditDialog(r)}>
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => {
+                        setReceiptToDelete(r);
+                        setDeleteDialogOpen(true);
+                      }}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -298,9 +398,15 @@ export default function ReceivingPage() {
           
           <div className="space-y-4">
             {poList.filter(p => p.status !== 'RECEIVED').map((po) => {
-              const filteredItems = getFilteredPOItems(po);
+              const itemsInPo = getFilteredPOItems(po);
+              const itemsWithRemaining = itemsInPo.map(item => {
+                  const receivedQty = receivedByPo[po.id]?.[item.MaterialId] || 0;
+                  const remaining = Math.max(0, (item.PurchaseOrderQuantity || 0) - receivedQty);
+                  return { ...item, remaining };
+              });
+
               const isExpanded = expandedPOs[po.id] ?? true;
-              const displayItems = isExpanded ? filteredItems : filteredItems.slice(0, 5);
+              const displayItems = isExpanded ? itemsWithRemaining : itemsWithRemaining.slice(0, 5);
               
               return (
                 <Card key={po.id}>
@@ -328,7 +434,7 @@ export default function ReceivingPage() {
                           className="pl-10"
                         />
                       </div>
-                      {filteredItems.length > 5 && (
+                      {itemsWithRemaining.length > 5 && (
                         <Button 
                           variant="outline" 
                           size="sm"
@@ -336,7 +442,7 @@ export default function ReceivingPage() {
                           className="flex items-center gap-2"
                         >
                           <Filter className="h-4 w-4" />
-                          {isExpanded ? 'แสดงน้อยลง' : `แสดงทั้งหมด (${filteredItems.length})`}
+                          {isExpanded ? 'แสดงน้อยลง' : `แสดงทั้งหมด (${itemsWithRemaining.length})`}
                         </Button>
                       )}
                     </div>
@@ -357,22 +463,23 @@ export default function ReceivingPage() {
                           {displayItems.map((item) => {
                             const isSelected = selectedItems.some(si => si.materialId === item.MaterialId && si.poId === po.id);
                             const key = `${po.id}-${item.MaterialId}`;
-                            const receivedQty = receivedByPo[po.id]?.[item.MaterialId] || 0;
-                            const remaining = Math.max(0, (item.PurchaseOrderQuantity || 0) - receivedQty);
                             
                             return (
-                              <TableRow key={item.MaterialId}>
+                              <TableRow key={item.MaterialId} className={item.remaining <= 0 ? "bg-muted/30 text-muted-foreground" : ""}>
                                 <TableCell>
                                   <Checkbox
                                     checked={isSelected}
-                                    disabled={remaining <= 0}
-                                    onCheckedChange={(checked) => handleItemSelect(item, po.id, !!checked)}
+                                    disabled={item.remaining <= 0}
+                                    onCheckedChange={(checked) => handleItemSelect(item, po.id, !!checked, item.remaining)}
                                   />
                                 </TableCell>
                                 <TableCell>
                                   <div>
                                     <div className="font-medium">{materialMap[item.MaterialId]?.name || `MAT-${item.MaterialId}`}</div>
                                     <div className="text-sm text-muted-foreground">ID: {item.MaterialId}</div>
+                                    {item.remaining <= 0 && (
+                                      <Badge variant="secondary" className="mt-1">รับครบแล้ว</Badge>
+                                    )}
                                   </div>
                                 </TableCell>
                                 <TableCell className="whitespace-nowrap">{item.PurchaseOrderQuantity.toLocaleString()} {materialMap[item.MaterialId]?.unit || item.PurchaseOrderUnit}</TableCell>
@@ -381,22 +488,22 @@ export default function ReceivingPage() {
                                     <Input
                                       type="number"
                                       min="1"
-                                      max={remaining}
-                                      value={receivingQuantities[key] || item.PurchaseOrderQuantity}
+                                      max={item.remaining}
+                                      value={receivingQuantities[key] ?? item.remaining}
                                       onChange={(e) => setReceivingQuantities(prev => ({
                                         ...prev,
-                                        [key]: Math.min(Math.max(1, Number(e.target.value)), remaining)
+                                        [key]: Math.min(Math.max(1, Number(e.target.value)), item.remaining)
                                       }))}
                                       className="w-24"
                                     />
                                   )}
                                 </TableCell>
-                                <TableCell className="whitespace-nowrap">{remaining.toLocaleString()} {materialMap[item.MaterialId]?.unit || item.PurchaseOrderUnit}</TableCell>
+                                <TableCell className="whitespace-nowrap">{item.remaining.toLocaleString()} {materialMap[item.MaterialId]?.unit || item.PurchaseOrderUnit}</TableCell>
                               </TableRow>
                             );
                           })}
                           
-                          {filteredItems.length === 0 && (
+                          {itemsWithRemaining.length === 0 && (
                             <TableRow>
                               <TableCell colSpan={6} className="text-center text-muted-foreground py-4">
                                 ไม่พบสินค้าที่ตรงกับเงื่อนไขการค้นหา
@@ -407,14 +514,14 @@ export default function ReceivingPage() {
                       </Table>
                     </div>
                     
-                    {!isExpanded && filteredItems.length > 5 && (
+                    {!isExpanded && itemsWithRemaining.length > 5 && (
                       <div className="mt-2 text-center">
                         <Button 
                           variant="ghost" 
                           size="sm"
                           onClick={() => togglePOExpansion(po.id)}
                         >
-                          แสดงทั้งหมด ({filteredItems.length} รายการ)
+                          แสดงทั้งหมด ({itemsWithRemaining.length} รายการ)
                         </Button>
                       </div>
                     )}
@@ -453,6 +560,54 @@ export default function ReceivingPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Edit Receipt Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>แก้ไขใบรับสินค้า: {receiptToEdit?.ReceiptCode}</DialogTitle>
+            <DialogDescription>
+              อัปเดตจำนวนสินค้าที่รับเข้าคลังสำหรับใบรับนี้
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto p-1">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>สินค้า</TableHead>
+                  <TableHead className="w-40">จำนวน</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {receiptToEdit?.ReceiptDetails.map(detail => (
+                  <TableRow key={detail.MaterialId}>
+                    <TableCell>
+                      <div className="font-medium">{materialMap[detail.MaterialId]?.name || `MAT-${detail.MaterialId}`}</div>
+                      <div className="text-sm text-muted-foreground">ID: {detail.MaterialId}</div>
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={editingQuantities[detail.MaterialId] || 0}
+                        onChange={(e) => setEditingQuantities(prev => ({
+                          ...prev,
+                          [detail.MaterialId]: Number(e.target.value)
+                        }))}
+                        className="w-full"
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>ยกเลิก</Button>
+            <Button onClick={handleUpdateReceipt}>บันทึกการเปลี่ยนแปลง</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Manual Receiving Dialog */}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
@@ -483,6 +638,22 @@ export default function ReceivingPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ยืนยันการลบ</AlertDialogTitle>
+            <AlertDialogDescription>
+              คุณแน่ใจหรือไม่ว่าต้องการลบใบรับสินค้า <span className="font-bold">{receiptToDelete?.code}</span>? การกระทำนี้ไม่สามารถย้อนกลับได้
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setReceiptToDelete(null)}>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteReceipt}>ยืนยัน</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

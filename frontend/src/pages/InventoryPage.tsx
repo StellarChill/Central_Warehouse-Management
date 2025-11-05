@@ -5,7 +5,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useEffect, useMemo, useState } from "react";
 import { Package, Boxes, Search, Wheat, Egg, Milk, Candy, Apple, Droplets, ChevronDown, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { getStockSummary as apiGetStockSummary, getMaterials as apiGetMaterials, getCategories as apiGetCategories, Material, Category } from "@/lib/api";
+import { getStockSummary as apiGetStockSummary, getMaterials as apiGetMaterials, getCategories as apiGetCategories, getStocks as apiGetStocks, getReceipts as apiGetReceipts, Material, Category, Stock as StockRow, Receipt as ReceiptRow } from "@/lib/api";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 
 type InventoryItem = {
@@ -23,6 +24,10 @@ export default function InventoryPage() {
   const { toast } = useToast();
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [categoriesMap, setCategoriesMap] = useState<Record<number, string>>({});
+  const [batchOpen, setBatchOpen] = useState(false);
+  const [selectedMaterial, setSelectedMaterial] = useState<{ id: number; name: string; unit: string } | null>(null);
+  const [stocks, setStocks] = useState<StockRow[]>([]);
+  const [receiptMap, setReceiptMap] = useState<Record<number, { code: string; date: string }>>({});
 
   useEffect(() => {
     const load = async () => {
@@ -54,6 +59,27 @@ export default function InventoryPage() {
     };
     load();
   }, []);
+
+  // Prefetch stocks and receipts once when opening batch dialog for the first time
+  useEffect(() => {
+    if (!batchOpen) return;
+    (async () => {
+      try {
+        const [allStocks, receipts] = await Promise.all([
+          apiGetStocks(),
+          apiGetReceipts(),
+        ]);
+        setStocks(allStocks);
+        const rmap: Record<number, { code: string; date: string }> = {};
+        receipts.forEach((r: any) => {
+          rmap[r.ReceiptId] = { code: r.ReceiptCode, date: r.ReceiptDateTime };
+        });
+        setReceiptMap(rmap);
+      } catch (e: any) {
+        toast({ variant: 'destructive', title: 'โหลดข้อมูลล็อตไม่สำเร็จ', description: e.message || '' });
+      }
+    })();
+  }, [batchOpen]);
 
   // read-only view
 
@@ -194,7 +220,7 @@ export default function InventoryPage() {
                           </TableHeader>
                           <TableBody>
                             {displayItems.map((i) => (
-                              <TableRow key={i.materialId} className="hover:bg-muted/50">
+                              <TableRow key={i.materialId} className="hover:bg-muted/50 cursor-pointer" onClick={() => { setSelectedMaterial({ id: i.materialId, name: i.name, unit: i.unit }); setBatchOpen(true); }}>
                                 <TableCell className="font-medium whitespace-nowrap">{i.materialId}</TableCell>
                                 <TableCell className="whitespace-nowrap">{i.name}</TableCell>
                                 <TableCell className="whitespace-nowrap">{i.unit}</TableCell>
@@ -232,7 +258,44 @@ export default function InventoryPage() {
         </CardContent>
       </Card>
 
-      {/* read-only; editing dialog removed */}
+      {/* Batch details dialog per material */}
+      <Dialog open={batchOpen} onOpenChange={setBatchOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>ล็อตที่รับเข้า: {selectedMaterial?.name}</DialogTitle>
+            <DialogDescription>
+              แสดงล็อตสต็อกที่รับเข้ามา แยกตามเวลาที่รับเข้า/ใบรับสินค้า
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="whitespace-nowrap">วันที่รับ</TableHead>
+                  <TableHead className="whitespace-nowrap">เลขที่ใบรับ</TableHead>
+                  <TableHead className="whitespace-nowrap">บาร์โค้ดล็อต</TableHead>
+                  <TableHead className="text-right whitespace-nowrap">จำนวน</TableHead>
+                  <TableHead className="text-right whitespace-nowrap">คงเหลือ</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {stocks
+                  .filter(s => selectedMaterial && s.MaterialId === selectedMaterial.id)
+                  .sort((a, b) => new Date(b.CreatedAt).getTime() - new Date(a.CreatedAt).getTime())
+                  .map((s) => (
+                    <TableRow key={`${s.Barcode}-${s.ReceiptId}`}>
+                      <TableCell className="whitespace-nowrap">{new Date(receiptMap[s.ReceiptId]?.date || s.CreatedAt).toLocaleString('th-TH')}</TableCell>
+                      <TableCell className="whitespace-nowrap">{receiptMap[s.ReceiptId]?.code || '-'}</TableCell>
+                      <TableCell className="whitespace-nowrap">{s.Barcode}</TableCell>
+                      <TableCell className="text-right whitespace-nowrap">{Number(s.Quantity).toLocaleString()} {selectedMaterial?.unit}</TableCell>
+                      <TableCell className="text-right whitespace-nowrap">{Number(s.Remain).toLocaleString()} {selectedMaterial?.unit}</TableCell>
+                    </TableRow>
+                  ))}
+              </TableBody>
+            </Table>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

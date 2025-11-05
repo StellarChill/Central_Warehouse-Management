@@ -31,28 +31,22 @@ const navigation = [
     premiumIcon: ChefHat,
   },
   {
-    name: th.nav.inventory,
-    href: "/inventory",
-    icon: Warehouse,
-    premiumIcon: Warehouse,
-  },
-  {
     name: th.nav.receiving,
     href: "/receiving",
     icon: Truck,
     premiumIcon: Truck,
   },
   {
+    name: th.nav.inventory,
+    href: "/inventory",
+    icon: Warehouse,
+    premiumIcon: Warehouse,
+  },
+  {
     name: th.nav.products,
     href: "/ingredients",
     icon: Package,
     premiumIcon: Cookie,
-  },
-  {
-    name: "จัดการหมวดหมู่",
-    href: "/categories",
-    icon: FolderKanban,
-    premiumIcon: FolderKanban,
   },
   {
     name: th.nav.suppliers,
@@ -65,6 +59,12 @@ const navigation = [
     href: "/purchase-orders",
     icon: ShoppingCart,
     premiumIcon: ShoppingCart,
+  },
+  {
+    name: "จัดการหมวดหมู่",
+    href: "/categories",
+    icon: FolderKanban,
+    premiumIcon: FolderKanban,
   },
   {
     name: th.nav.requisitions,

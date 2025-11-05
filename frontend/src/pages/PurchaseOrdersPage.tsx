@@ -43,6 +43,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { getPurchaseOrders as apiGetPOs, getPurchaseOrder as apiGetPO, updatePurchaseOrder as apiUpdatePO, deletePurchaseOrder as apiDeletePO, getSuppliers as apiGetSuppliers, getMaterials as apiGetMaterials, createPurchaseOrder as apiCreatePO, Supplier as ApiSupplier, Material as ApiMaterial } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/AuthContext";
 
 type PO = {
   poId: number;
@@ -117,6 +118,7 @@ export default function PurchaseOrdersPage() {
   const [poList, setPoList] = useState<PO[]>([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
   const [createOpen, setCreateOpen] = useState(false);
   const [suppliers, setSuppliers] = useState<ApiSupplier[]>([]);
   const [materials, setMaterials] = useState<ApiMaterial[]>([]);
@@ -140,13 +142,15 @@ export default function PurchaseOrdersPage() {
       setLoading(true);
       try {
         const rows = await apiGetPOs();
-        const mapped: PO[] = rows.map((r) => ({
+        const mapped: PO[] = rows.map((r: any) => ({
           poId: r.PurchaseOrderId,
           id: r.PurchaseOrderCode,
           supplier: r.Supplier?.SupplierName || String(r.SupplierId),
           date: r.DateTime,
           total: r.TotalPrice,
           status: r.PurchaseOrderStatus,
+          items: r._count?.PurchaseOrderDetails || 0,
+          requestedBy: r.CreatedByUser?.UserName || '-',
         }));
         setPoList(mapped);
       } catch (e: any) {
@@ -211,7 +215,7 @@ export default function PurchaseOrdersPage() {
     }
     setCreating(true);
     try {
-      await apiCreatePO({
+      const newPO = await apiCreatePO({
         SupplierId: form.SupplierId,
         PurchaseOrderCode: form.PurchaseOrderCode,
         DateTime: form.DateTime ? new Date(form.DateTime).toISOString() : undefined,
@@ -225,23 +229,24 @@ export default function PurchaseOrdersPage() {
       });
       toast({ title: 'สร้างใบสั่งซื้อสำเร็จ' });
       setCreateOpen(false);
-      // refresh list
-      setLoading(true);
-      const rows = await apiGetPOs();
-      const mapped: PO[] = rows.map((r) => ({
-        poId: r.PurchaseOrderId,
-        id: r.PurchaseOrderCode,
-        supplier: r.Supplier?.SupplierName || String(r.SupplierId),
-        date: r.DateTime,
-        total: r.TotalPrice,
-        status: r.PurchaseOrderStatus,
-      }));
-      setPoList(mapped);
+
+      // Add the new PO to the list without re-fetching
+      const newMappedPO: PO = {
+        poId: newPO.PurchaseOrderId,
+        id: newPO.PurchaseOrderCode,
+        supplier: newPO.Supplier?.SupplierName || String(newPO.SupplierId),
+        date: newPO.DateTime,
+        total: newPO.TotalPrice,
+        status: newPO.PurchaseOrderStatus,
+        items: newPO._count?.PurchaseOrderDetails || 0,
+        requestedBy: newPO.CreatedByUser?.UserName || '-',
+      };
+      setPoList(prevList => [newMappedPO, ...prevList]);
+
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'สร้างใบสั่งซื้อไม่สำเร็จ', description: e.message || '' });
     } finally {
       setCreating(false);
-      setLoading(false);
     }
   };
 
@@ -359,16 +364,22 @@ export default function PurchaseOrdersPage() {
     }
   };
 
+  const mapDisplayStatus = (status: string) => {
+    if (status === 'DRAFT') return 'PROFESSIONAL';
+    if (status === 'RECEIVED') return 'STOCKED';
+    // SENT / CONFIRMED => Pending Delivery
+    return 'PENDING';
+  };
+
   const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "DRAFT":
+    const display = mapDisplayStatus(status);
+    switch (display) {
+      case "PROFESSIONAL":
         return <Badge variant="secondary" className="bg-gray-100 text-gray-800">ร่าง</Badge>;
-      case "SENT":
-        return <Badge variant="default" className="bg-primary">ส่งแล้ว</Badge>;
-      case "CONFIRMED":
-        return <Badge variant="default" className="bg-success">ยืนยันแล้ว</Badge>;
-      case "RECEIVED":
-        return <Badge variant="default" className="bg-purple-500">รับแล้ว</Badge>;
+      case "PENDING":
+        return <Badge variant="default" className="bg-primary">กำลังสั่งซื้อ</Badge>;
+      case "STOCKED":
+        return <Badge variant="default" className="bg-purple-500">รับของแล้ว</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
@@ -390,20 +401,16 @@ export default function PurchaseOrdersPage() {
         po.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
         po.supplier.toLowerCase().includes(searchTerm.toLowerCase()) ||
         po.requestedBy?.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      const matchesStatus = statusFilter === "all" || po.status === statusFilter;
-      
-      return matchesSearch && matchesStatus;
+      return matchesSearch;
     });
-  }, [poList, searchTerm, statusFilter]);
+  }, [poList, searchTerm]);
 
   const groupedPOs = useMemo(() => {
     const groups: Record<string, PO[]> = {};
     filteredPOs.forEach(po => {
-      if (!groups[po.status]) {
-        groups[po.status] = [];
-      }
-      groups[po.status].push(po);
+      const key = mapDisplayStatus(po.status);
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(po);
     });
     return groups;
   }, [filteredPOs]);
@@ -417,10 +424,9 @@ export default function PurchaseOrdersPage() {
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case "DRAFT": return "ร่าง";
-      case "SENT": return "ส่งแล้ว";
-      case "CONFIRMED": return "ยืนยันแล้ว";
-      case "RECEIVED": return "รับแล้ว";
+      case "PROFESSIONAL": return "ร่าง";
+      case "PENDING": return "กำลังสั่งซื้อ";
+      case "STOCKED": return "รับของแล้ว";
       default: return status;
     }
   };
@@ -437,7 +443,7 @@ export default function PurchaseOrdersPage() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardContent className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
@@ -455,9 +461,9 @@ export default function PurchaseOrdersPage() {
           <CardContent className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">ส่งแล้ว</p>
+                <p className="text-sm text-muted-foreground">กำลังสั่งซื้อ</p>
                 <p className="text-2xl font-bold mt-1">
-                  {poList.filter(po => po.status === "SENT").length}
+                  {poList.filter(po => po.status === "SENT" || po.status === "CONFIRMED").length}
                 </p>
               </div>
               <Send className="h-8 w-8 text-primary" />
@@ -468,20 +474,7 @@ export default function PurchaseOrdersPage() {
           <CardContent className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">ยืนยันแล้ว</p>
-                <p className="text-2xl font-bold mt-1">
-                  {poList.filter(po => po.status === "CONFIRMED").length}
-                </p>
-              </div>
-              <CheckCircle className="h-8 w-8 text-success" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 sm:p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">รับแล้ว</p>
+                <p className="text-sm text-muted-foreground">รับของแล้ว</p>
                 <p className="text-2xl font-bold mt-1">
                   {poList.filter(po => po.status === "RECEIVED").length}
                 </p>
@@ -506,21 +499,7 @@ export default function PurchaseOrdersPage() {
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              <div className="flex items-center gap-2">
-                <Filter className="h-4 w-4 text-muted-foreground" />
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="สถานะ" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">ทุกสถานะ</SelectItem>
-                    <SelectItem value="DRAFT">ร่าง</SelectItem>
-                    <SelectItem value="SENT">ส่งแล้ว</SelectItem>
-                    <SelectItem value="CONFIRMED">ยืนยันแล้ว</SelectItem>
-                    <SelectItem value="RECEIVED">รับแล้ว</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {/* ซ่อนตัวกรองสถานะชั่วคราวตามที่ร้องขอ */}
             </div>
           </CardTitle>
         </CardHeader>
@@ -553,79 +532,71 @@ export default function PurchaseOrdersPage() {
                     
                     {isExpanded && (
                       <div className="overflow-x-auto border-t">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="whitespace-nowrap">เลขที่ PO</TableHead>
-                              <TableHead className="whitespace-nowrap">ผู้จำหน่าย</TableHead>
-                              <TableHead className="whitespace-nowrap">วันที่</TableHead>
-                              <TableHead className="whitespace-nowrap">จำนวนรายการ</TableHead>
-                              <TableHead className="whitespace-nowrap">ยอดรวม</TableHead>
-                              <TableHead className="whitespace-nowrap">ผู้ขอ</TableHead>
-                              <TableHead className="whitespace-nowrap">กำหนดส่ง</TableHead>
-                              <TableHead className="whitespace-nowrap">สถานะ</TableHead>
-                              <TableHead className="text-center whitespace-nowrap">การดำเนินการ</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {displayPOs.map((po) => (
-                              <TableRow key={po.id} className="hover:bg-muted/50">
-                                <TableCell className="font-medium whitespace-nowrap">{po.id}</TableCell>
-                                <TableCell className="whitespace-nowrap">{po.supplier}</TableCell>
-                                <TableCell className="whitespace-nowrap">
-                                  {new Date(po.date).toLocaleDateString('th-TH', {
-                                    year: 'numeric',
-                                    month: 'short',
-                                    day: 'numeric'
-                                  })}
-                                </TableCell>
-                                <TableCell className="whitespace-nowrap">{po.items ?? '-'}</TableCell>
-                                <TableCell className="whitespace-nowrap">฿{po.total.toLocaleString()}</TableCell>
-                                <TableCell className="whitespace-nowrap">{po.requestedBy}</TableCell>
-                                <TableCell className="whitespace-nowrap">
-                                  {po.deliveryDate ? new Date(po.deliveryDate).toLocaleDateString('th-TH', {
-                                    year: 'numeric',
-                                    month: 'short',
-                                    day: 'numeric'
-                                  }) : '-'}
-                                </TableCell>
-                                <TableCell>
-                                  {getStatusBadge(po.status)}
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
-                                    <Button 
-                                      variant="ghost" 
-                                      size="sm" 
-                                      className="w-full sm:w-auto hover:bg-accent"
-                                      onClick={() => openView(po)}
-                                    >
-                                      <Eye className="h-4 w-4" />
-                                    </Button>
-                                    <Button 
-                                      variant="ghost" 
-                                      size="sm" 
-                                      className="w-full sm:w-auto hover:bg-accent"
-                                      onClick={() => openEdit(po)}
-                                    >
-                                      <Edit className="h-4 w-4" />
-                                    </Button>
+                     <Table>
+  <TableHeader>
+    <TableRow>
+      <TableHead className="px-4 whitespace-nowrap">เลขที่ PO</TableHead>
+      <TableHead className="px-4 whitespace-nowrap">ผู้จำหน่าย</TableHead>
+      <TableHead className="px-4 whitespace-nowrap">วันที่</TableHead>
+      <TableHead className="px-4 text-center whitespace-nowrap">จำนวนรายการ</TableHead>
+      <TableHead className="px-4 whitespace-nowrap">ผู้ขอ</TableHead>
+      <TableHead className="px-4 whitespace-nowrap">สถานะ</TableHead>
+      <TableHead className="px-4 text-center whitespace-nowrap">การดำเนินการ</TableHead>
+    </TableRow>
+  </TableHeader>
 
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="w-full sm:w-auto text-destructive hover:bg-destructive/10"
-                                      onClick={() => handleDelete(po)}
-                                    >
-                                      <X className="h-4 w-4" />
-                                    </Button>
+  <TableBody>
+    {displayPOs.map((po) => (
+      <TableRow key={po.id} className="hover:bg-muted/50">
+        <TableCell className="px-4 font-medium whitespace-nowrap">{po.id}</TableCell>
+        <TableCell className="px-4 whitespace-nowrap">{po.supplier}</TableCell>
+        <TableCell className="px-4 whitespace-nowrap">
+          {new Date(po.date).toLocaleDateString('th-TH', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+          })}
+        </TableCell>
+        <TableCell className="px-4 text-center whitespace-nowrap">{po.items ?? '-'}</TableCell>
+        <TableCell className="px-4 whitespace-nowrap">{po.requestedBy ?? '-'}</TableCell>
+        <TableCell className="px-4 whitespace-nowrap">
+          {getStatusBadge(po.status)}
+        </TableCell>
+        <TableCell className="px-4">
+          <div className="flex items-center justify-center gap-2">
+            <Button 
+              variant="ghost" 
+              size="sm"
+              className="hover:bg-accent"
+              onClick={() => openView(po)}
+            >
+              <Eye className="h-4 w-4" />
+            </Button>
 
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="hover:bg-accent"
+              onClick={() => openEdit(po)}
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-destructive hover:bg-destructive/10"
+              onClick={() => handleDelete(po)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </TableCell>
+      </TableRow>
+    ))}
+  </TableBody>
+</Table>
+
                         
                         {!isExpanded && pos.length > 3 && (
                           <div className="p-4 text-center border-t">
@@ -651,7 +622,7 @@ export default function PurchaseOrdersPage() {
 
       {/* Create PO Dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>สร้างใบสั่งซื้อ</DialogTitle>
             <DialogDescription>เลือกผู้จำหน่ายและเพิ่มรายการวัตถุดิบให้ครบถ้วนก่อนบันทึก</DialogDescription>
@@ -676,17 +647,7 @@ export default function PurchaseOrdersPage() {
               <Label>วันที่</Label>
               <Input type="date" value={form.DateTime} onChange={(e) => setForm(prev => ({ ...prev, DateTime: e.target.value }))} />
             </div>
-            <div>
-              <Label>สถานะ</Label>
-              <Select value={form.PurchaseOrderStatus} onValueChange={(v) => setForm(prev => ({ ...prev, PurchaseOrderStatus: v as any }))}>
-                <SelectTrigger className="w-full"><SelectValue placeholder="สถานะ" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="DRAFT">ร่าง</SelectItem>
-                  <SelectItem value="SENT">ส่งแล้ว</SelectItem>
-                  <SelectItem value="CONFIRMED">ยืนยันแล้ว</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {/* ซ่อนฟิลด์สถานะในหน้า Create ตามที่ร้องขอ */}
           </div>
 
           <div className="mt-4 border rounded-lg">
@@ -790,18 +751,7 @@ export default function PurchaseOrdersPage() {
               <Label>วันที่</Label>
               <Input type="date" value={form.DateTime} onChange={(e) => setForm(prev => ({ ...prev, DateTime: e.target.value }))} />
             </div>
-            <div>
-              <Label>สถานะ</Label>
-              <Select value={form.PurchaseOrderStatus} onValueChange={(v) => setForm(prev => ({ ...prev, PurchaseOrderStatus: v as any }))}>
-                <SelectTrigger className="w-full"><SelectValue placeholder="สถานะ" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="DRAFT">ร่าง</SelectItem>
-                  <SelectItem value="SENT">ส่งแล้ว</SelectItem>
-                  <SelectItem value="CONFIRMED">ยืนยันแล้ว</SelectItem>
-                  <SelectItem value="RECEIVED">รับแล้ว</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {/* ซ่อนฟิลด์สถานะในหน้า Edit ตามที่ร้องขอ */}
           </div>
 
           <div className="mt-4 border rounded-lg">

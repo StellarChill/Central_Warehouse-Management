@@ -77,8 +77,13 @@ export async function createPurchaseOrder(req: Request, res: Response) {
     const result = await prisma.purchaseOrder.findUnique({
       where: { PurchaseOrderId: po.PurchaseOrderId },
       include: {
-        Supplier: { select: { SupplierId: true, SupplierName: true } },
-        PurchaseOrderDetails: true,
+        Supplier: { select: { SupplierName: true } },
+        _count: {
+          select: { PurchaseOrderDetails: true },
+        },
+        CreatedByUser: {
+          select: { UserName: true },
+        },
       },
     });
 
@@ -94,7 +99,15 @@ export async function listPurchaseOrders(_req: Request, res: Response) {
   try {
     const pos = await prisma.purchaseOrder.findMany({
       orderBy: { DateTime: 'desc' },
-      include: { Supplier: { select: { SupplierName: true } } },
+      include: { 
+        Supplier: { select: { SupplierName: true } },
+        _count: {
+          select: { PurchaseOrderDetails: true },
+        },
+        CreatedByUser: {
+          select: { UserName: true },
+        },
+      },
     });
     res.json(pos);
   } catch (e) {
