@@ -1,0 +1,1 @@
+export const VITE_LIFF_ID = import.meta.env.VITE_LIFF_ID || 'YOUR_LIFF_ID_HERE';

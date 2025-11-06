@@ -22,7 +22,7 @@ model User {
   BranchId    Int
   TelNumber   String?
   Email       String?
-  LineId      String?
+  LineId      String?  @unique
   CreatedAt   DateTime @default(now())
   CreatedBy   Int?
   UpdatedAt   DateTime @updatedAt

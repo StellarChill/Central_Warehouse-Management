@@ -276,6 +276,18 @@ if (prev.some(i => i.materialId === entry.MaterialId && i.poId === poId)) return
     try {
       await apiDeleteReceipt(Number(receiptToDelete.id));
       setReceipts(prev => prev.filter(r => r.id !== receiptToDelete.id));
+
+      // Optimistically update PO status on the frontend to make it reappear in the list.
+      // This works around a potential backend delay in status updates.
+      if (receiptToDelete.poId) {
+        setPoList(prevPoList => prevPoList.map(po => {
+          if (po.id === receiptToDelete.poId && po.status === 'RECEIVED') {
+            return { ...po, status: 'CONFIRMED' }; // Or another appropriate status
+          }
+          return po;
+        }));
+      }
+
       toast({ title: 'ลบใบรับสินค้าสำเร็จ' });
       setDeleteDialogOpen(false);
       setReceiptToDelete(null);

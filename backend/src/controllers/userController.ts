@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 
 export async function register(req: Request, res: Response) {
 	try {
-		const { UserName, UserPassword, RoleId = 1, BranchId = 1, Email, TelNumber } = req.body;
+		const { UserName, UserPassword, RoleId = 1, BranchId = 1, Email, TelNumber, LineId } = req.body;
 		if (!UserName || !UserPassword) {
 			return res.status(400).json({ error: 'UserName and UserPassword are required' });
 		}
@@ -21,6 +21,7 @@ export async function register(req: Request, res: Response) {
 				BranchId,
 				Email,
 				TelNumber,
+                                LineId,
 			},
 			select: {
 				UserId: true,
