@@ -15,6 +15,10 @@ export async function login(req: Request, res: Response) {
   if (!user) {
     return res.status(401).json({ error: 'Invalid credentials A1' });
   }
+
+  if (user.UserStatus !== 'ACTIVE') {
+    return res.status(403).json({ error: 'Account not approved' });
+  }
   const valid = await bcrypt.compare(UserPassword, user.UserPassword);
   console.log("valid", valid);
   if (!valid) {

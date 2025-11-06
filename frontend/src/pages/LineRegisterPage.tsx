@@ -106,8 +106,8 @@ export default function LineRegisterPage() {
         LineId: formData.LineId.trim(),
       });
 
-      setSubmitMsg({ type: "success", text: "สมัครสมาชิกสำเร็จ! กำลังพาไปหน้าเข้าสู่ระบบ..." });
-      redirectTimerRef.current = window.setTimeout(() => navigate("/login"), 1500);
+      setSubmitMsg({ type: "success", text: "ลงทะเบียนสำเร็จ! โปรดรอการอนุมัติจากผู้ดูแลระบบ" });
+      // redirectTimerRef.current = window.setTimeout(() => navigate("/app"), 1500);
     } catch (err: any) {
       setSubmitMsg({ type: "error", text: err?.message || "สมัครไม่สำเร็จ ลองใหม่อีกครั้ง" });
     } finally {

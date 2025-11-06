@@ -11,7 +11,7 @@ declare global {
 
 const JWT_SECRET = process.env.JWT_SECRET || 'changeme';
 
-export function authenticateToken(req: Request, res: Response, next: NextFunction) {
+export function authMiddleware(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
   if (!token) return res.sendStatus(401);
@@ -20,4 +20,11 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
     req.user = user;
     next();
   });
+}
+
+export function adminMiddleware(req: Request, res: Response, next: NextFunction) {
+  if (req.user?.RoleId !== 1) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  next();
 }
