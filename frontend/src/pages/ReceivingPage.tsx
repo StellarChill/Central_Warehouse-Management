@@ -273,14 +273,38 @@ if (prev.some(i => i.materialId === entry.MaterialId && i.poId === poId)) return
 
   const handleDeleteReceipt = async () => {
     if (!receiptToDelete) return;
+    const deletedPoId = receiptToDelete.poId; // Capture poId
+
     try {
+      // 1. Delete the receipt on the backend
       await apiDeleteReceipt(Number(receiptToDelete.id));
-      setReceipts(prev => prev.filter(r => r.id !== receiptToDelete.id));
       toast({ title: 'ลบใบรับสินค้าสำเร็จ' });
+      
+      // 2. Close the confirmation dialog
       setDeleteDialogOpen(false);
       setReceiptToDelete(null);
+
+      // 3. Reload the receipts list from the server to ensure it's in sync
+      const rrows = await apiGetReceipts();
+      setReceipts(rrows.map(r => ({ id: String(r.ReceiptId), code: r.ReceiptCode, date: r.ReceiptDateTime, poCode: r.PurchaseOrderCode, poId: (r as any).PurchaseOrderId })));
+
+      // 4. Manually update the local PO list as a workaround for a potential backend
+      // issue where the PO status is not updated after a receipt is deleted.
+      setPoList(prevPoList =>
+        prevPoList.map(po => {
+          if (po.id === deletedPoId && po.status === 'RECEIVED') {
+            // We know for a fact this PO is no longer fully received.
+            // Change status to 'CONFIRMED' to make it reappear in the dialog.
+            return { ...po, status: 'CONFIRMED' };
+          }
+          return po;
+        })
+      );
     } catch (e: any) {
-      toast({ variant: 'destructive', title: 'ลบใบรับสินค้าไม่สำเร็จ', description: e.message || '' });
+      toast({ variant: 'destructive', title: 'เกิดข้อผิดพลาด', description: e.message || '' });
+      // Still try to close the dialog on error
+      setDeleteDialogOpen(false);
+      setReceiptToDelete(null);
     }
   };
 
