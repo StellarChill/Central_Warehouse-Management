@@ -18,7 +18,6 @@ model User {
   UserId      Int      @id @default(autoincrement())
   UserName    String   @unique
   UserPassword String
-  UserStatus  String   @default("PENDING") // PENDING, ACTIVE, INACTIVE
   RoleId      Int
   BranchId    Int
   TelNumber   String?

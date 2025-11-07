@@ -57,12 +57,7 @@ export async function lineLogin(req: Request, res: Response) {
     });
 
     if (user) {
-      // 4. ถ้าเจอผู้ใช้ -> ตรวจสอบสถานะ
-      if (user.UserStatus !== 'ACTIVE') {
-        return res.status(403).json({ error: 'Account not approved' });
-      }
-
-      // สร้าง JWT และส่งกลับเพื่อล็อกอิน
+      // 4. ถ้าเจอผู้ใช้ -> สร้าง JWT และส่งกลับเพื่อล็อกอิน
       const token = jwt.sign({ UserId: user.UserId, RoleId: user.RoleId }, JWT_SECRET, { expiresIn: '1d' });
       return res.json({
         token,

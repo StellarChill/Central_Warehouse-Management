@@ -17,21 +17,17 @@ export default function LiffEntryPage() {
           if (lineToken) {
             const result = await lineLogin(lineToken);
             if (result.isNewUser) {
-              navigate("/line-register", { state: { lineProfile: result.lineProfile } });
+              navigate('/line-register', { state: { lineProfile: result.lineProfile } });
             } else {
-              // Existing user, redirect to the main app
-              navigate("/app");
+              // Existing user, redirect to dashboard
+              navigate('/');
             }
           } else {
             setError('ไม่สามารถดึงข้อมูลจาก LINE ได้');
           }
         }
       } catch (err: any) {
-        if (err.message.includes('Account not approved')) {
-          setError('บัญชีของคุณยังไม่ได้รับการอนุมัติ');
-        } else {
-          setError(err?.message || 'LINE Login ไม่สำเร็จ กรุณาลองใหม่');
-        }
+        setError(err?.message || 'LINE Login ไม่สำเร็จ กรุณาลองใหม่');
       }
     };
 

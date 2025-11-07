@@ -1,2 +1,0 @@
--- AlterTable
-ALTER TABLE "User" ADD COLUMN     "UserStatus" TEXT NOT NULL DEFAULT 'PENDING';
