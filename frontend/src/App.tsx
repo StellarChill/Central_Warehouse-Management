@@ -59,16 +59,15 @@ const App = () => (
           <BrowserRouter>
             <Suspense fallback={<LoadingScreen />}>
               <Routes>
-                {/* Redirect /login to / */}
-                <Route path="/login" element={<Navigate to="/" replace />} />
-                
-                {/* Public routes */}
+                {/* LIFF Entry is now the root */}
+                <Route path="/" element={<LiffEntryPage />} />
+
+                {/* Registration routes */}
                 <Route path="/register" element={<RegisterPage />} />
                 <Route path="/line-register" element={<LineRegisterPage />} />
-                <Route path="/liff" element={<LiffEntryPage />} />
 
-                {/* Root route - shows login if not authenticated, dashboard if authenticated */}
-                <Route path="/" element={<RootRoute />}>
+                {/* Main application routes, requires login */}
+                <Route path="/app" element={<RootRoute />}>
                   {/* Child routes should be relative to render inside AppLayout's <Outlet /> */}
                   <Route index element={<DashboardPage />} />
                   <Route path="suppliers" element={<SuppliersPage />} />

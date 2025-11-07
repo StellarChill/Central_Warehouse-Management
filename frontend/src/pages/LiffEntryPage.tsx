@@ -20,7 +20,7 @@ export default function LiffEntryPage() {
               navigate("/line-register", { state: { lineProfile: result.lineProfile } });
             } else {
               // Existing user, redirect to the main app
-              navigate("/");
+              navigate("/app");
             }
           } else {
             setError('ไม่สามารถดึงข้อมูลจาก LINE ได้');

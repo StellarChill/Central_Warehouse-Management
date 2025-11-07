@@ -107,7 +107,7 @@ export default function LineRegisterPage() {
       });
 
       setSubmitMsg({ type: "success", text: "ลงทะเบียนสำเร็จ! โปรดรอการอนุมัติจากผู้ดูแลระบบ" });
-      redirectTimerRef.current = window.setTimeout(() => navigate("/"), 2000);
+      // redirectTimerRef.current = window.setTimeout(() => navigate("/app"), 1500);
     } catch (err: any) {
       setSubmitMsg({ type: "error", text: err?.message || "สมัครไม่สำเร็จ ลองใหม่อีกครั้ง" });
     } finally {
