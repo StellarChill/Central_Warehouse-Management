@@ -33,8 +33,6 @@ const AdminReportsPage = lazy(() => import("./pages/AdminReportsPage"));
 const AdminHomePage = lazy(() => import("./pages/AdminHomePage"));
 const LoginPage = lazy(() => import("./pages/LoginPage"));
 const RegisterPage = lazy(() => import("./pages/RegisterPage"));
-const LineRegisterPage = lazy(() => import("./pages/LineRegisterPage"));
-const LiffEntryPage = lazy(() => import("./pages/LiffEntryPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // ---- React Query sane defaults ----
@@ -64,8 +62,6 @@ const App = () => (
                 
                 {/* Public routes */}
                 <Route path="/register" element={<RegisterPage />} />
-                <Route path="/line-register" element={<LineRegisterPage />} />
-                <Route path="/liff" element={<LiffEntryPage />} />
 
                 {/* Root route - shows login if not authenticated, dashboard if authenticated */}
                 <Route path="/" element={<RootRoute />}>

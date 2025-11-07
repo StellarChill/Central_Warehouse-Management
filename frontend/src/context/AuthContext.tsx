@@ -16,7 +16,6 @@ type AuthContextType = {
   user: User;
   token: string | null;
   login: (username: string, password: string) => Promise<void>;
-  lineLogin: (lineToken: string) => Promise<any>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
@@ -114,39 +113,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(userData);
   };
 
-  const lineLogin = async (lineToken: string) => {
-    const res = await fetch(`${API_BASE}/line-login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ lineToken }),
-    });
-
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.error || `LINE Login failed (HTTP ${res.status})`);
-    }
-
-    const data = await res.json();
-
-    if (data.isNewUser) {
-      return { isNewUser: true, lineProfile: data.lineProfile };
-    }
-
-    const userData = {
-      ...data.user,
-      role: getRoleFromRoleId(data.user.RoleId)
-    };
-
-    localStorage.setItem("auth_token", data.token);
-    localStorage.setItem("auth_user", JSON.stringify(data.user));
-    
-    setToken(data.token);
-    setUser(userData);
-
-    return { isNewUser: false };
-  };
-
   const register = async (registerData: RegisterData) => {
     const res = await fetch(`${API_BASE}/register`, {
       method: "POST",
@@ -177,7 +143,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user,
     token,
     login,
-    lineLogin,
     register,
     logout,
     isLoading,
