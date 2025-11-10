@@ -75,6 +75,8 @@ import supplierRoute from './routes/supplierRoute';
 import purchaseOrderRoute from './routes/purchaseOrderRoute';
 import receiptRoute from './routes/receiptRoute';
 import stockRoute from './routes/stockRoute';
+import withdrawnRequestRoute from './routes/withdrawnRequestRoute';
+import issueRoute from './routes/issueRoute';
 
 // Health check endpoint สำหรับ Render
 app.get('/', (req, res) => {
@@ -113,6 +115,8 @@ app.use('/api/supplier', supplierRoute);
 app.use('/api/po', purchaseOrderRoute);
 app.use('/api/receipt', receiptRoute);
 app.use('/api/stock', stockRoute);
+app.use('/api/request', withdrawnRequestRoute);
+app.use('/api/issue', issueRoute);
 
 // เริ่มรันเซิร์ฟเวอร์
 app.listen(PORT, async () => {

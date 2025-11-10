@@ -109,29 +109,44 @@ function genBarcode(receiptCode: string, materialId: number, idx: number) {
   return `${receiptCode}-${materialId}-${idx}-${stamp}`;
 }
 
+// Generate daily running code: RC-YYYYMMDD-0001
+async function generateReceiptCode() {
+  const pad4 = (n: number) => n.toString().padStart(4, '0');
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const dateStr = `${y}${m}${day}`;
+  const prefix = `RC-${dateStr}-`;
+  const last = await prisma.receipt.findFirst({
+    where: { ReceiptCode: { startsWith: prefix } },
+    orderBy: { ReceiptCode: 'desc' },
+    select: { ReceiptCode: true },
+  });
+  const next = last ? Number(last.ReceiptCode.split('-').pop() || '0') + 1 : 1;
+  return `${prefix}${pad4(next)}`;
+}
+
 // Create Receipt from a PO
 export async function createReceipt(req: Request, res: Response) {
   try {
-    const { PurchaseOrderId, ReceiptCode, ReceiptDateTime, details, CreatedBy } = req.body;
+    const { PurchaseOrderId, ReceiptDateTime, details, CreatedBy } = req.body;
     if (!PurchaseOrderId) throw httpError(400, 'PurchaseOrderId is required');
-    if (!ReceiptCode) throw httpError(400, 'ReceiptCode is required');
 
     const normalized = parseDetails(details);
     const poId = Number(PurchaseOrderId);
 
-    const [dup, po] = await Promise.all([
-      prisma.receipt.findUnique({ where: { ReceiptCode } }),
-      prisma.purchaseOrder.findUnique({ where: { PurchaseOrderId: poId } }),
-    ]);
-    if (dup) throw httpError(409, 'ReceiptCode already exists');
+    const po = await prisma.purchaseOrder.findUnique({ where: { PurchaseOrderId: poId } });
     if (!po) throw httpError(400, 'PurchaseOrder not found');
 
     const { map, total } = await enforceNotExceed(poId, normalized);
     const rdt = ReceiptDateTime ? new Date(ReceiptDateTime) : new Date();
 
+    // Generate running code (retry once on collision)
+    let code = await generateReceiptCode();
     const created = await prisma.$transaction(async (tx) => {
       const receipt = await tx.receipt.create({
-        data: { PurchaseOrderId: poId, ReceiptCode, ReceiptDateTime: rdt, ReceiptTotalPrice: total, CreatedBy },
+        data: { PurchaseOrderId: poId, ReceiptCode: code, ReceiptDateTime: rdt, ReceiptTotalPrice: total, CreatedBy },
       });
       await tx.receiptDetail.createMany({
         data: normalized.map(d => ({
@@ -148,7 +163,7 @@ export async function createReceipt(req: Request, res: Response) {
         data: normalized.map((d, i) => ({
           MaterialId: d.MaterialId,
           Quantity: d.MaterialQuantity,
-          Barcode: genBarcode(ReceiptCode, d.MaterialId, i + 1),
+          Barcode: genBarcode(code, d.MaterialId, i + 1),
           StockPrice: map.get(d.MaterialId)!.price,
           ReceiptId: receipt.ReceiptId,
           PurchaseOrderId: poId,
