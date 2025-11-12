@@ -28,8 +28,24 @@ export function Header({ onMenuClick, hideMenu }: HeaderProps) {
     navigate("/login", { replace: true });
   };
 
-  // ถ้าไม่มี user (ไม่ควรเกิดเพราะมี ProtectedRoute แล้ว)
-  if (!user) return null;
+  // ถ้าไม่มี user ให้ลองอ่าน fallback จาก localStorage (กรณี LIFF เขียนค่าโดยตรง)
+  let displayUser = user;
+  if (!displayUser) {
+    try {
+      const raw = localStorage.getItem('auth_user');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        displayUser = {
+          ...parsed,
+          role: parsed && typeof parsed.RoleId === 'number' ? (parsed.RoleId === 1 ? 'ADMIN' : parsed.RoleId === 2 ? 'CENTER' : 'BRANCH') : 'BRANCH',
+        } as any;
+      }
+    } catch (e) {
+      // ignore parse errors
+    }
+  }
+
+  if (!displayUser) return null;
 
   return (
     <header className="h-16 bg-card/80 backdrop-blur-xl border-b border-border/50 shadow-premium">
@@ -58,15 +74,15 @@ export function Header({ onMenuClick, hideMenu }: HeaderProps) {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="flex items-center gap-2 p-2 hover:bg-accent">
                 <Avatar className="h-8 w-8">
-                  <AvatarFallback className="bg-primary text-primary-foreground">
-                    {user.UserName.charAt(0).toUpperCase()}
-                  </AvatarFallback>
+                    <AvatarFallback className="bg-primary text-primary-foreground">
+                      {displayUser.UserName?.charAt(0).toUpperCase()}
+                    </AvatarFallback>
                 </Avatar>
                 <div className="hidden sm:block text-left">
-                  <div className="text-sm font-medium truncate max-w-[120px]">{user.UserName}</div>
-                  <div className="text-xs text-muted-foreground truncate max-w-[120px]">
-                    {th.roles[user.role]}
-                  </div>
+                    <div className="text-sm font-medium truncate max-w-[120px]">{displayUser.UserName}</div>
+                    <div className="text-xs text-muted-foreground truncate max-w-[120px]">
+                      {th.roles[displayUser.role as any]}
+                    </div>
                 </div>
               </Button>
             </DropdownMenuTrigger>
@@ -74,9 +90,9 @@ export function Header({ onMenuClick, hideMenu }: HeaderProps) {
             <DropdownMenuContent align="end" className="w-56 border shadow-premium">
               <DropdownMenuLabel>
                 <div>
-                  <div className="font-medium">{user.UserName}</div>
+                  <div className="font-medium">{displayUser.UserName}</div>
                   <div className="text-sm text-muted-foreground">
-                    {th.roles[user.role]} • {user.Email || `สาขา ${user.BranchId}`}
+                    {th.roles[displayUser.role as any]} • {displayUser.Email || `สาขา ${displayUser.BranchId}`}
                   </div>
                 </div>
               </DropdownMenuLabel>

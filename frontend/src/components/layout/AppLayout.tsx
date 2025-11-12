@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useAuth } from "../../context/AuthContext";
 import { Outlet } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
@@ -12,16 +13,18 @@ export function AppLayout({ children }: AppLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [hideSidebar, setHideSidebar] = useState(false);
 
+  const { user } = useAuth();
+
+  // Re-evaluate liff-only mode whenever auth user changes (so login via LIFF updates layout immediately)
   useEffect(() => {
     try {
       const liffOnly = localStorage.getItem('liff_only');
       setHideSidebar(!!liffOnly);
-      // if liff-only mode, force close any open sidebar
       if (liffOnly) setSidebarOpen(false);
     } catch (e) {
       setHideSidebar(false);
     }
-  }, []);
+  }, [user]);
 
   return (
     <div className="flex h-screen bg-gradient-surface font-prompt">
