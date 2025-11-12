@@ -29,20 +29,34 @@ function validateDetails(details: any[]) {
   }));
 }
 
+// สร้างโค้ดรันนิ่งรายวัน: PO-YYYYMMDD-0001
+async function generatePurchaseOrderCode() {
+  const pad4 = (n: number) => n.toString().padStart(4, '0');
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const dateStr = `${y}${m}${day}`;
+  const prefix = `PO-${dateStr}-`;
+  const last = await prisma.purchaseOrder.findFirst({
+    where: { PurchaseOrderCode: { startsWith: prefix } },
+    orderBy: { PurchaseOrderCode: 'desc' },
+    select: { PurchaseOrderCode: true },
+  });
+  const next = last ? Number(last.PurchaseOrderCode.split('-').pop() || '0') + 1 : 1;
+  return `${prefix}${pad4(next)}`;
+}
+
 // ✅ สร้างใบสั่งซื้อ
 export async function createPurchaseOrder(req: Request, res: Response) {
   try {
-    const { SupplierId, PurchaseOrderCode, details = [], ...rest } = req.body;
-    if (!SupplierId || !PurchaseOrderCode)
-      return res.status(400).json({ error: 'SupplierId และ PurchaseOrderCode จำเป็น' });
+    const { SupplierId, details = [], ...rest } = req.body;
+    if (!SupplierId)
+      return res.status(400).json({ error: 'SupplierId จำเป็น' });
 
     const normalized = validateDetails(details);
 
-    const [exists, supplier] = await Promise.all([
-      prisma.purchaseOrder.findUnique({ where: { PurchaseOrderCode } }),
-      prisma.supplier.findUnique({ where: { SupplierId: +SupplierId } }),
-    ]);
-    if (exists) return res.status(409).json({ error: 'รหัสซ้ำ' });
+    const supplier = await prisma.supplier.findUnique({ where: { SupplierId: +SupplierId } });
     if (!supplier) return res.status(400).json({ error: 'ไม่พบ supplier' });
 
     const matIds = normalized.map(d => d.MaterialId);
@@ -55,16 +69,37 @@ export async function createPurchaseOrder(req: Request, res: Response) {
       0
     );
 
-    const po = await prisma.purchaseOrder.create({
-      data: {
-        SupplierId: +SupplierId,
-        PurchaseOrderCode,
-        TotalPrice: total,
-        PurchaseOrderStatus: rest.PurchaseOrderStatus || 'DRAFT',
-        DateTime: rest.DateTime ? new Date(rest.DateTime) : new Date(),
-        ...rest,
-      },
-    });
+    // Generate running code (retry once if collision)
+    let code = await generatePurchaseOrderCode();
+    let po;
+    try {
+      po = await prisma.purchaseOrder.create({
+        data: {
+          SupplierId: +SupplierId,
+          PurchaseOrderCode: code,
+          TotalPrice: total,
+          PurchaseOrderStatus: rest.PurchaseOrderStatus || 'DRAFT',
+          DateTime: rest.DateTime ? new Date(rest.DateTime) : new Date(),
+          ...rest,
+        },
+      });
+    } catch (e: any) {
+      if (e?.code === 'P2002') {
+        code = await generatePurchaseOrderCode();
+        po = await prisma.purchaseOrder.create({
+          data: {
+            SupplierId: +SupplierId,
+            PurchaseOrderCode: code,
+            TotalPrice: total,
+            PurchaseOrderStatus: rest.PurchaseOrderStatus || 'DRAFT',
+            DateTime: rest.DateTime ? new Date(rest.DateTime) : new Date(),
+            ...rest,
+          },
+        });
+      } else {
+        throw e;
+      }
+    }
 
     await prisma.purchaseOrderDetail.createMany({
       data: normalized.map(d => ({
