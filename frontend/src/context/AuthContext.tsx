@@ -16,6 +16,7 @@ type AuthContextType = {
   user: User;
   token: string | null;
   login: (username: string, password: string) => Promise<void>;
+  loginWithLine: (lineId: string) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
@@ -113,6 +114,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(userData);
   };
 
+  // Login using LINE LineId. Backend should accept LineId and return token/user.
+  const loginWithLine = async (lineId: string) => {
+    const res = await fetch(`${API_BASE}/login/line`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ LineId: lineId }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || `LINE login failed (HTTP ${res.status})`);
+    }
+
+    const data = await res.json();
+    const userData = {
+      ...data.user,
+      role: getRoleFromRoleId(data.user.RoleId),
+    };
+
+    localStorage.setItem("auth_token", data.token);
+    localStorage.setItem("auth_user", JSON.stringify(data.user));
+
+    setToken(data.token);
+    setUser(userData);
+  };
+
   const register = async (registerData: RegisterData) => {
     const res = await fetch(`${API_BASE}/register`, {
       method: "POST",
@@ -143,6 +171,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user,
     token,
     login,
+    loginWithLine,
     register,
     logout,
     isLoading,

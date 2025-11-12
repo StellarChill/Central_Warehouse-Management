@@ -11,19 +11,7 @@ import { UserPlus, Warehouse } from "lucide-react";
 import { th } from "../i18n/th";
 import { useAuth } from "../context/AuthContext";
 
-// Mock liff object for development
-const liff = {
-  ready: Promise.resolve(),
-  getProfile: () => Promise.resolve({
-    userId: 'U1234567890abcdef1234567890abcdef',
-    displayName: 'Mock LINE User',
-    pictureUrl: 'https://via.placeholder.com/150',
-  }),
-  init: (config: any) => {
-    console.log("LIFF Init with config:", config);
-    return Promise.resolve();
-  }
-};
+
 
 interface LiffRegisterFormData {
   UserName: string;
@@ -50,6 +38,7 @@ const branches = [
 export default function LiffRegisterPage() {
   const navigate = useNavigate();
   const { register: registerUser } = useAuth();
+  const { loginWithLine } = useAuth();
 
   const [formData, setFormData] = useState<LiffRegisterFormData>({
     UserName: "",
@@ -78,8 +67,19 @@ export default function LiffRegisterPage() {
             LineId: profile.userId,
             UserName: profile.displayName,
           }));
+          // Try to log in user by LineId. If backend recognizes the LineId, this
+          // will set auth state and we can redirect to the app. If not, stay on
+          // the register page so the user can finish registration.
+          try {
+            await loginWithLine(profile.userId);
+            navigate("/", { replace: true });
+            return;
+          } catch (err) {
+            // Not registered yet — user should register. Silently ignore error.
+            console.debug("LIFF user not registered or auto-login failed", err);
+          }
         } else {
-          // LIFF login logic would go here
+          liff.login();
         }
       } catch (error) {
         console.error("LIFF Initialization failed.", error);
@@ -121,12 +121,12 @@ export default function LiffRegisterPage() {
       // possibly creating a user that can only log in via LINE.
       await registerUser({
         UserName: formData.UserName.trim(),
+        UserPassword: "", // LIFF registration doesn't use password — send empty string to satisfy API/type
         RoleId: Number(formData.RoleId),
         BranchId: Number(formData.BranchId),
         TelNumber: formData.TelNumber.trim(),
         Email: formData.Email.trim().toLowerCase(),
         LineId: formData.LineId.trim(),
-        // No password is sent
       });
 
       setSubmitMsg({ type: "success", text: "สมัครสมาชิกสำเร็จ! คุณสามารถปิดหน้านี้ได้" });
