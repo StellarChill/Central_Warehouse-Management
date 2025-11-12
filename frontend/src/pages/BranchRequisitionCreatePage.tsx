@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useMemo, useState, useEffect } from "react";
 import { toast } from "@/components/ui/sonner";
 import { useNavigate } from "react-router-dom";
@@ -19,6 +20,8 @@ export default function BranchRequisitionCreatePage() {
   const [qty, setQty] = useState(1);
   const [unit, setUnit] = useState("ชิ้น");
   const [items, setItems] = useState<Item[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showPreview, setShowPreview] = useState(false);
   const navigate = useNavigate();
 
   // แคตตาล็อกวัตถุดิบ - ดึงจาก backend หากเป็นไปได้
@@ -50,13 +53,21 @@ export default function BranchRequisitionCreatePage() {
   const selectedProduct = useMemo(() => catalog.find((c: any) => String((c as any).MaterialId) === sku), [catalog, sku]);
 
   const addItem = () => {
-    if (!selectedProduct || qty <= 0) return;
-    // Store MaterialId as sku value when available
+    if (!selectedProduct || qty <= 0) {
+      toast.error("กรุณาเลือกวัตถุดิบและระบุจำนวนที่ถูกต้อง");
+      return;
+    }
     const name = (selectedProduct as any).MaterialName || (selectedProduct as any).name;
     const materialId = (selectedProduct as any).MaterialId || undefined;
+    // prevent duplicate material in items
+    if (materialId && items.some((it: any) => Number(it.sku) === Number(materialId))) {
+      toast.error("วัตถุดิบนี้มีอยู่แล้วในรายการ");
+      return;
+    }
     setItems((prev) => [...prev, { name, qty, unit, sku: materialId } as any]);
     setSku("");
     setQty(1);
+    setSearchTerm("");
   };
 
   const removeItem = (idx: number) => {
@@ -66,11 +77,19 @@ export default function BranchRequisitionCreatePage() {
   const { user } = useAuth();
 
   const submit = async () => {
-    if (items.length === 0) return;
+    if (items.length === 0) {
+      toast.error('รายการว่าง');
+      return;
+    }
+    // validate items
+    for (const it of items) {
+      if (!it.sku || Number(it.qty) <= 0) {
+        toast.error('ตรวจสอบรายการ: พบรายการที่ไม่ถูกต้อง');
+        return;
+      }
+    }
     try {
-      // build details array for backend
-      const details = items.map((i: any) => ({ MaterialId: Number(i.sku) || 0, WithdrawnQuantity: Number(i.qty) }));
-      // generate a request code
+      const details = items.map((i: any) => ({ MaterialId: Number(i.sku), WithdrawnQuantity: Number(i.qty) }));
       const code = `REQ-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
       const payload: any = {
         WithdrawnRequestCode: code,
@@ -84,6 +103,7 @@ export default function BranchRequisitionCreatePage() {
       const res = await apiPost('/request', payload);
       toast.success("ส่งคำขอเรียบร้อย", { description: `รหัส: ${res.RequestId} | รายการ: ${items.length}` });
       setItems([]);
+      setShowPreview(false);
       navigate('/requisitions');
     } catch (e: any) {
       toast.error('ส่งคำขอไม่สำเร็จ: ' + (e?.message || 'Unknown error'));
@@ -103,17 +123,25 @@ export default function BranchRequisitionCreatePage() {
               <Input value={branch} onChange={(e) => setBranch(e.target.value)} />
             </div>
             <div>
-              <label className="text-sm">วัตถุดิบ</label>
-              <Select value={sku} onValueChange={(v) => { setSku(v); const p = catalog.find(x => String(x.MaterialId) === v); if (p) setUnit(p.Unit); }} disabled={catalog.length === 0}>
-                <SelectTrigger>
-                  <SelectValue placeholder={catalog.length ? "เลือกวัตถุดิบ" : "กำลังโหลดวัตถุดิบ..."} />
-                </SelectTrigger>
-                <SelectContent>
-                  {catalog.map((c: any) => (
-                    <SelectItem key={c.MaterialId} value={String(c.MaterialId)}>{c.MaterialName}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <label className="text-sm">ค้นหาวัตถุดิบ</label>
+              <Input placeholder={catalog.length ? "พิมพ์เพื่อค้นหา..." : "กำลังโหลด..."} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+              <div className="mt-2">
+                {searchTerm && (
+                  <div className="border rounded bg-white max-h-48 overflow-auto">
+                    {catalog.filter(c => c.MaterialName.toLowerCase().includes(searchTerm.toLowerCase())).map((c: any) => (
+                      <div key={c.MaterialId} className="p-2 hover:bg-slate-50 cursor-pointer" onClick={() => { setSku(String(c.MaterialId)); setUnit(c.Unit); setSearchTerm(''); }}>
+                        {c.MaterialName} <span className="text-muted-foreground text-sm">({c.Unit})</span>
+                      </div>
+                    ))}
+                    {catalog.filter(c => c.MaterialName.toLowerCase().includes(searchTerm.toLowerCase())).length === 0 && (
+                      <div className="p-2 text-sm text-muted-foreground">ไม่พบวัตถุดิบ</div>
+                    )}
+                  </div>
+                )}
+                {!searchTerm && (
+                  <div className="mt-1 text-sm text-muted-foreground">พิมพ์ชื่อวัตถุดิบเพื่อค้นหา</div>
+                )}
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>

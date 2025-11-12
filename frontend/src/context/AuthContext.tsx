@@ -140,6 +140,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     localStorage.setItem("auth_token", data.token);
     localStorage.setItem("auth_user", JSON.stringify(data.user));
+    // mark this session as LIFF login so UI can restrict to requisition page
+    try { localStorage.setItem('liff_only', '1'); } catch (e) { /* ignore */ }
 
     setToken(data.token);
     setUser(userData);
@@ -180,6 +182,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     localStorage.removeItem("auth_token");
     localStorage.removeItem("auth_user");
+    try { localStorage.removeItem('liff_only'); } catch (e) { /* ignore */ }
     setToken(null);
     setUser(null);
   };
