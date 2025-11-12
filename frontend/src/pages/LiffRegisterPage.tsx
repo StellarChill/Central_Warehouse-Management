@@ -39,7 +39,6 @@ const branches = [
 export default function LiffRegisterPage() {
   const navigate = useNavigate();
   const { register: registerUser } = useAuth();
-  const { loginWithLine } = useAuth();
 
   const [formData, setFormData] = useState<LiffRegisterFormData>({
     UserName: "",
@@ -69,17 +68,7 @@ export default function LiffRegisterPage() {
             LineId: profile.userId,
             UserName: profile.displayName,
           }));
-          // Try to log in user by LineId. If backend recognizes the LineId, this
-          // will set auth state and we can redirect to the app. If not, stay on
-          // the register page so the user can finish registration.
-          try {
-            await loginWithLine(profile.userId);
-            navigate("/", { replace: true });
-            return;
-          } catch (err) {
-            // Not registered yet — user should register. Silently ignore error.
-            console.debug("LIFF user not registered or auto-login failed", err);
-          }
+          // User needs to complete registration; no auto-login attempt to avoid 404 on /api/login/line
         } else {
           liff.login();
         }
