@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useMemo, useState, useEffect } from "react";
+import { apiGet } from "@/lib/api";
 import { Search, Plus, Edit, Trash2, ShieldCheck } from "lucide-react";
 
 type Role = "ADMIN" | "CENTER" | "BRANCH";
@@ -45,9 +46,8 @@ export default function AdminUsersPage() {
     const load = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`/api/admin/users?status=pending`, { credentials: "include" });
-        if (!res.ok) throw new Error(`Load failed (HTTP ${res.status})`);
-        const data: RemoteUser[] = await res.json();
+        // use shared apiGet which respects VITE_API_URL in production
+        const data: RemoteUser[] = await apiGet('/admin/users?status=pending');
         const mapped: User[] = data.map((u) => ({
           id: String(u.UserId),
           name: u.UserName,
