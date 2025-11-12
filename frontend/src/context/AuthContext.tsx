@@ -145,12 +145,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setToken(data.token);
     setUser(userData);
-    // If this was a LIFF login, take the user directly to create requisition page.
+
+    // If this was a LIFF login, try robust navigation to create requisition page.
+    // Some LIFF contexts may ignore replace/navigation; attempt replace and
+    // use href fallback after a short delay to increase reliability.
     try {
-      // Use full page replace to avoid router state issues in some LIFF contexts
+      // Primary: full page replace to avoid router state issues in some LIFF contexts
       window.location.replace('/requisitions/create');
+      // Fallback: after a brief delay, force assign href in case replace is ignored
+      setTimeout(() => {
+        try { window.location.href = '/requisitions/create'; } catch (e) { /* ignore */ }
+      }, 250);
     } catch (e) {
-      // ignore - navigation isn't critical here
+      // If replace itself throws, try direct href as a last resort
+      try { window.location.href = '/requisitions/create'; } catch (e) { /* ignore */ }
     }
   };
 
