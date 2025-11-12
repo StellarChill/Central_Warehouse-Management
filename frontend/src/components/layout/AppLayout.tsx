@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Outlet } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
@@ -10,19 +10,33 @@ interface AppLayoutProps {
 
 export function AppLayout({ children }: AppLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [hideSidebar, setHideSidebar] = useState(false);
+
+  useEffect(() => {
+    try {
+      const liffOnly = localStorage.getItem('liff_only');
+      setHideSidebar(!!liffOnly);
+      // if liff-only mode, force close any open sidebar
+      if (liffOnly) setSidebarOpen(false);
+    } catch (e) {
+      setHideSidebar(false);
+    }
+  }, []);
 
   return (
     <div className="flex h-screen bg-gradient-surface font-prompt">
       {/* Sidebar */}
-      <div className={cn(
-        "fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0",
-        sidebarOpen ? "translate-x-0" : "-translate-x-full"
-      )}>
-        <Sidebar onClose={() => setSidebarOpen(false)} />
-      </div>
+      {!hideSidebar && (
+        <div className={cn(
+          "fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0",
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        )}>
+          <Sidebar onClose={() => setSidebarOpen(false)} />
+        </div>
+      )}
 
       {/* Sidebar overlay */}
-      {sidebarOpen && (
+      {!hideSidebar && sidebarOpen && (
         <div 
           className="fixed inset-0 z-40 bg-background/20 backdrop-blur-sm lg:hidden"
           onClick={() => setSidebarOpen(false)}
@@ -31,7 +45,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Header onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
+  <Header onMenuClick={() => setSidebarOpen(!sidebarOpen)} hideMenu={hideSidebar} />
         
         <main className="flex-1 overflow-y-auto bg-background/50 backdrop-blur-xl">
           <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-6">

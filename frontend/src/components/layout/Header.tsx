@@ -16,9 +16,10 @@ import { useAuth } from "../../context/AuthContext";
 
 interface HeaderProps {
   onMenuClick: () => void;
+  hideMenu?: boolean;
 }
 
-export function Header({ onMenuClick }: HeaderProps) {
+export function Header({ onMenuClick, hideMenu }: HeaderProps) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -34,15 +35,17 @@ export function Header({ onMenuClick }: HeaderProps) {
     <header className="h-16 bg-card/80 backdrop-blur-xl border-b border-border/50 shadow-premium">
       <div className="flex items-center justify-between h-full px-4">
         {/* Left section */}
-        <div className="flex items-center gap-2 sm:gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onMenuClick}
-            className="lg:hidden hover:bg-accent"
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
+          <div className="flex items-center gap-2 sm:gap-4">
+          {!hideMenu && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onMenuClick}
+              className="lg:hidden hover:bg-accent"
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+          )}
         </div>
 
         {/* Right section */}

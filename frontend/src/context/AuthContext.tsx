@@ -145,6 +145,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setToken(data.token);
     setUser(userData);
+    // If this was a LIFF login, take the user directly to create requisition page.
+    try {
+      // Use full page replace to avoid router state issues in some LIFF contexts
+      window.location.replace('/requisitions/create');
+    } catch (e) {
+      // ignore - navigation isn't critical here
+    }
   };
 
   const register = async (registerData: RegisterData) => {
