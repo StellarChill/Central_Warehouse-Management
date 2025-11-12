@@ -70,6 +70,48 @@ export async function approveUser(req: Request, res: Response) {
   }
 }
 
+export async function updateUser(req: Request, res: Response) {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'Invalid user id' });
+
+    const { UserName, Email, RoleId, BranchId, UserStatus, LineId } = req.body;
+
+    const data: any = {};
+    if (typeof UserName !== 'undefined') data.UserName = String(UserName);
+    if (typeof Email !== 'undefined') data.Email = String(Email);
+    if (typeof RoleId !== 'undefined') data.RoleId = Number(RoleId);
+    if (typeof BranchId !== 'undefined') data.BranchId = Number(BranchId);
+    if (typeof UserStatus !== 'undefined') data.UserStatus = String(UserStatus);
+    if (typeof LineId !== 'undefined') data.LineId = String(LineId);
+
+    const user = await prisma.user.update({
+      where: { UserId: id },
+      data,
+      include: { Branch: { select: { BranchName: true } } },
+    });
+
+    // Map to client-friendly shape
+    const mapped = {
+      UserId: user.UserId,
+      UserName: user.UserName,
+      RoleId: user.RoleId,
+      BranchId: user.BranchId,
+      BranchName: (user as any).Branch?.BranchName || null,
+      Email: user.Email,
+      LineId: user.LineId,
+      CreatedAt: user.CreatedAt,
+      status: user.UserStatus,
+    };
+
+    return res.json(mapped);
+  } catch (err: any) {
+    console.error('Update user failed', err);
+    if (err.code === 'P2002') return res.status(409).json({ error: 'Unique constraint failed' });
+    return res.status(500).json({ error: err?.message || 'Internal server error' });
+  }
+}
+
 export async function deleteUser(req: Request, res: Response) {
   try {
     const id = Number(req.params.id);
