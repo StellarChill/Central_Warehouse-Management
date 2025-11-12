@@ -18,9 +18,10 @@ type RemoteUser = {
   Email?: string | null;
   LineId?: string | null;
   status?: string | null;
+  CreatedAt?: string | null;
 };
 
-type User = { id: string; name: string; branch: string; role: Role; status: "PENDING" | "ACTIVE" };
+type User = { id: string; name: string; branch: string; role: Role; status: "PENDING" | "ACTIVE"; lineId?: string | null; createdAt?: string | null };
 
 const branches = [
   { id: "1", name: "สาขากลาง (Center A)" },
@@ -51,6 +52,8 @@ export default function AdminUsersPage() {
           id: String(u.UserId),
           name: u.UserName,
           branch: u.BranchName || (u.BranchId ? `สาขา ${u.BranchId}` : "-"),
+          lineId: u.LineId || null,
+          createdAt: u.CreatedAt || null,
           role: u.RoleId === 1 ? "ADMIN" : u.RoleId === 2 ? "CENTER" : "BRANCH",
           status: (u.status as any) === "ACTIVE" ? "ACTIVE" : "PENDING",
         }));
@@ -147,9 +150,11 @@ export default function AdminUsersPage() {
                 <TableRow>
                   <TableHead>รหัส</TableHead>
                   <TableHead>ชื่อ</TableHead>
+                    <TableHead>LineId</TableHead>
                   <TableHead>สาขา</TableHead>
                   <TableHead>สิทธิ์</TableHead>
                   <TableHead>สถานะ</TableHead>
+                    <TableHead>วันที่สมัคร</TableHead>
                   <TableHead className="text-center">การดำเนินการ</TableHead>
                 </TableRow>
               </TableHeader>
@@ -158,9 +163,11 @@ export default function AdminUsersPage() {
                   <TableRow key={u.id}>
                     <TableCell className="font-medium">{u.id}</TableCell>
                     <TableCell>{u.name}</TableCell>
+                    <TableCell className="break-all text-sm">{u.lineId || '-'}</TableCell>
                     <TableCell>{u.branch}</TableCell>
                     <TableCell>{u.role}</TableCell>
                     <TableCell>{u.status === "ACTIVE" ? "ใช้งาน" : "รออนุมัติ"}</TableCell>
+                    <TableCell>{u.createdAt ? new Date(u.createdAt).toLocaleString() : '-'}</TableCell>
                     <TableCell>
                       <div className="flex justify-center gap-2">
                         {u.status !== "ACTIVE" && (

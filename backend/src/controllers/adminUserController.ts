@@ -17,10 +17,28 @@ export async function listUsers(req: Request, res: Response) {
         Email: true,
         LineId: true,
         CreatedAt: true,
+        UserStatus: true,
+        Branch: {
+          select: { BranchName: true },
+        },
       },
       orderBy: { CreatedAt: 'desc' },
     });
-    return res.json(users);
+
+    // Map to client-friendly shape: include BranchName and alias UserStatus -> status
+    const mapped = users.map((u) => ({
+      UserId: u.UserId,
+      UserName: u.UserName,
+      RoleId: u.RoleId,
+      BranchId: u.BranchId,
+      BranchName: (u as any).Branch?.BranchName || null,
+      Email: u.Email,
+      LineId: u.LineId,
+      CreatedAt: u.CreatedAt,
+      status: u.UserStatus || null,
+    }));
+
+    return res.json(mapped);
   } catch (err) {
     console.error('Failed to list users', err);
     return res.status(500).json({ error: 'Internal server error' });
