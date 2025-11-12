@@ -4,52 +4,71 @@ import bcrypt from 'bcryptjs';
 
 export async function register(req: Request, res: Response) {
 	try {
-		const { UserName, UserPassword, RoleId, BranchId, Email, TelNumber, LineId } = req.body;
-		if (!UserName) {
-			return res.status(400).json({ error: 'UserName is required' });
-		}
+			const { UserName, UserPassword, RoleId, BranchId, Email, TelNumber, LineId } = req.body;
+			if (!UserName) return res.status(400).json({ error: 'UserName is required' });
 
-		// If no password provided, allow it only when registering via LINE (LineId present)
-		if (!UserPassword && !LineId) {
-			return res.status(400).json({ error: 'UserPassword is required when not registering via LINE' });
-		}
+			// If no password provided, allow it only when registering via LINE (LineId present)
+			if (!UserPassword && !LineId) {
+				return res.status(400).json({ error: 'UserPassword is required when not registering via LINE' });
+			}
 
-		const existing = await prisma.user.findUnique({ where: { UserName } });
-		if (existing) return res.status(409).json({ error: 'User already exists' });
+			// Normalize numeric ids: treat 0 or invalid as unset so defaults apply
+			const roleIdNum = Number(RoleId);
+			const branchIdNum = Number(BranchId);
+			const roleToUse = Number.isFinite(roleIdNum) && roleIdNum > 0 ? roleIdNum : 3; // default BRANCH
+			const branchToUse = Number.isFinite(branchIdNum) && branchIdNum > 0 ? branchIdNum : 1;
 
-		// If password missing (LIFF flow), generate a random one so user cannot login via password
-		let passwordToHash = UserPassword;
-		if (!passwordToHash) {
-			const crypto = await import('crypto');
-			passwordToHash = crypto.randomBytes(16).toString('hex');
-		}
+			// Check existing by UserName or LineId to return clear errors
+			const existingByName = await prisma.user.findUnique({ where: { UserName } });
+			if (existingByName) return res.status(409).json({ error: 'User already exists' });
+			if (LineId) {
+				const existingByLine = await prisma.user.findFirst({ where: { LineId } });
+				if (existingByLine) return res.status(409).json({ error: 'LINE account already registered' });
+			}
 
-		const hashed = await bcrypt.hash(passwordToHash, 10);
+			// If password missing (LIFF flow), generate a random one so user cannot login via password
+			let passwordToHash = UserPassword;
+			if (!passwordToHash) {
+				const crypto = await import('crypto');
+				passwordToHash = crypto.randomBytes(16).toString('hex');
+			}
 
-			const user = await prisma.user.create({
-			data: {
-				UserName,
-				UserPassword: hashed,
-				RoleId: RoleId ?? 3, // default to BRANCH (less privileged) if not provided
-				BranchId: BranchId ?? 1,
-				Email,
-				TelNumber,
-				LineId,
-					UserStatus: 'PENDING',
-				},
-			select: {
-				UserId: true,
-				UserName: true,
-				RoleId: true,
-				BranchId: true,
-				Email: true,
-				TelNumber: true,
-				LineId: true,
-				CreatedAt: true,
-			},
-		});
+			const hashed = await bcrypt.hash(passwordToHash, 10);
 
-		return res.status(201).json({ user });
+			try {
+				const user = await prisma.user.create({
+					data: {
+						UserName,
+						UserPassword: hashed,
+						RoleId: roleToUse,
+						BranchId: branchToUse,
+						Email,
+						TelNumber,
+						LineId,
+						UserStatus: 'PENDING',
+					},
+					select: {
+						UserId: true,
+						UserName: true,
+						RoleId: true,
+						BranchId: true,
+						Email: true,
+						TelNumber: true,
+						LineId: true,
+						CreatedAt: true,
+					},
+				});
+
+				return res.status(201).json({ user });
+			} catch (e: any) {
+				console.error('Prisma create user failed', e);
+				// Prisma constraint error -> return meaningful message
+				if (e.code === 'P2002') {
+					return res.status(409).json({ error: 'Unique constraint failed' });
+				}
+				return res.status(500).json({ error: 'Internal server error' });
+			}
+    
 	} catch (err) {
 		console.error(err);
 		return res.status(500).json({ error: 'Internal server error' });
