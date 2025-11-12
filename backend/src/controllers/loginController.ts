@@ -23,3 +23,75 @@ export async function login(req: Request, res: Response) {
   const token = jwt.sign({ UserId: user.UserId, RoleId: user.RoleId }, JWT_SECRET, { expiresIn: '1d' });
   return res.json({ token, user: { UserId: user.UserId, UserName: user.UserName, RoleId: user.RoleId, BranchId: user.BranchId } });
 }
+
+export async function loginWithLine(req: Request, res: Response) {
+  // Accept either an id_token (recommended) or a raw LineId (legacy)
+  const { id_token: idToken, LineId } = req.body;
+
+  let lineUserId: string | null = null;
+
+  if (idToken) {
+    // Verify id_token with LINE verify endpoint
+    try {
+      const clientId = process.env.LINE_CHANNEL_ID || process.env.LINE_CLIENT_ID || process.env.LIFF_ID;
+      if (!clientId) {
+        console.warn('LINE client_id not configured in env (LINE_CHANNEL_ID / LINE_CLIENT_ID / LIFF_ID)');
+        return res.status(500).json({ error: 'Server misconfiguration: LINE client id missing' });
+      }
+
+      const params = new URLSearchParams();
+      params.append('id_token', idToken);
+      params.append('client_id', clientId);
+
+      const verifyRes = await fetch('https://api.line.me/oauth2/v2.1/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString(),
+      });
+
+      if (!verifyRes.ok) {
+        const body = await verifyRes.text().catch(() => '');
+        console.warn('LINE id_token verify failed:', verifyRes.status, body);
+        return res.status(401).json({ error: 'Invalid id_token' });
+      }
+
+      const verifyData: any = await verifyRes.json();
+      // 'sub' contains the LINE userId
+      // Extra safety checks: verify audience and expiration
+      const aud = verifyData.aud;
+      const exp = verifyData.exp;
+      if (!aud || !exp) {
+        console.warn('LINE verify response missing aud/exp', verifyData);
+        return res.status(401).json({ error: 'Invalid id_token (missing claims)' });
+      }
+      if (aud !== clientId) {
+        console.warn('LINE id_token audience mismatch', { aud, clientId });
+        return res.status(401).json({ error: 'id_token audience mismatch' });
+      }
+      const now = Math.floor(Date.now() / 1000);
+      if (exp < now) {
+        console.warn('LINE id_token expired', { exp, now });
+        return res.status(401).json({ error: 'id_token expired' });
+      }
+
+      lineUserId = verifyData.sub;
+    } catch (err) {
+      console.error('Error verifying LINE id_token', err);
+      return res.status(500).json({ error: 'Failed to verify id_token' });
+    }
+  } else if (LineId) {
+    // Legacy fallback: accept LineId directly
+    lineUserId = LineId;
+  } else {
+    return res.status(400).json({ error: 'id_token or LineId required' });
+  }
+
+  // หา user ที่ผูกกับ LineId
+  const user = await prisma.user.findFirst({ where: { LineId: lineUserId ?? undefined } });
+  if (!user) {
+    return res.status(404).json({ error: 'User not found. Please register.' });
+  }
+
+  const token = jwt.sign({ UserId: user.UserId, RoleId: user.RoleId }, JWT_SECRET, { expiresIn: '1d' });
+  return res.json({ token, user: { UserId: user.UserId, UserName: user.UserName, RoleId: user.RoleId, BranchId: user.BranchId } });
+}

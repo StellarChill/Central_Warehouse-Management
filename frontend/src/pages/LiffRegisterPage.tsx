@@ -54,6 +54,7 @@ export default function LiffRegisterPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMsg, setSubmitMsg] = useState<SubmitMsg>(null);
   const [liffError, setLiffError] = useState<string | null>(null);
+  const [idToken, setIdToken] = useState<string | null>(null);
 
   useEffect(() => {
     const initializeLiff = async () => {
@@ -63,6 +64,12 @@ export default function LiffRegisterPage() {
         await liff.init({ liffId: import.meta.env.VITE_LIFF_ID });
         if (liff.isLoggedIn()) {
           const profile = await liff.getProfile();
+          // Try to get ID token (preferred) or access token as fallback
+          const gotIdToken = typeof liff.getIDToken === 'function' ? liff.getIDToken() : null;
+          const gotAccessToken = !gotIdToken && typeof liff.getAccessToken === 'function' ? liff.getAccessToken() : null;
+          if (gotIdToken) setIdToken(gotIdToken);
+          else if (gotAccessToken) setIdToken(gotAccessToken);
+
           setFormData((prev) => ({
             ...prev,
             LineId: profile.userId,
@@ -110,33 +117,37 @@ export default function LiffRegisterPage() {
     }
 
     setIsSubmitting(true);
-    try {
-      const payload = {
-        UserName: formData.UserName.trim(),
-        UserPassword: "", // LIFF registration doesn't use password — send empty string to satisfy API/type
-        Company: formData.Company.trim() || undefined,
-        RoleId: Number(formData.RoleId),
-        // If user typed a numeric id, keep it; otherwise send 0 and include BranchName
-        BranchId: Number(formData.BranchId) || 0,
-        BranchName: formData.BranchId.trim() || undefined,
-        TelNumber: formData.TelNumber.trim(),
-        Email: formData.Email.trim().toLowerCase(),
-        LineId: formData.LineId.trim(),
-      };
-      console.log("Registering with payload:", payload);
-      
-      await registerUser(payload);
-
-      setSubmitMsg({ type: "success", text: "สมัครสมาชิกสำเร็จ! กำลังเข้าระบบ..." });
-      // พยายาม login ด้วย LineId แล้วพาไปหน้า admin/users หรือ user-status
       try {
-        await loginWithLine(formData.LineId.trim());
-        navigate("/user-status", { replace: true });
-      } catch (err) {
-        // ถ้า login ล้มเหลว ให้ไปหน้ารอการอนุมัติแทน
-        console.debug("Auto-login after register failed", err);
-        navigate("/awaiting-approval", { replace: true });
-      }
+        const payload = {
+          UserName: formData.UserName.trim(),
+          UserPassword: "", // LIFF registration doesn't use password — send empty string to satisfy API/type
+          Company: formData.Company.trim() || undefined,
+          RoleId: Number(formData.RoleId),
+          // If user typed a numeric id, keep it; otherwise send 0 and include BranchName
+          BranchId: Number(formData.BranchId) || 0,
+          BranchName: formData.BranchId.trim() || undefined,
+          TelNumber: formData.TelNumber.trim(),
+          Email: formData.Email.trim().toLowerCase(),
+          LineId: formData.LineId.trim(),
+        };
+        console.log("Registering with payload:", payload);
+        
+        await registerUser(payload);
+
+        setSubmitMsg({ type: "success", text: "สมัครสมาชิกสำเร็จ! กำลังเข้าระบบ..." });
+        // พยายาม login ด้วย id_token (ถ้ามี) หรือ fallback ไปใช้ LineId
+        try {
+          if (idToken) {
+            await loginWithLine(idToken, true);
+          } else {
+            await loginWithLine(formData.LineId.trim());
+          }
+          navigate("/user-status", { replace: true });
+        } catch (err) {
+          // ถ้า login ล้มเหลว ให้ไปหน้ารอการอนุมัติแทน
+          console.debug("Auto-login after register failed", err);
+          navigate("/awaiting-approval", { replace: true });
+        }
       // Maybe close the LIFF window `liff.closeWindow();`
     } catch (err: any) {
       console.error("Register error:", err);

@@ -16,7 +16,8 @@ type AuthContextType = {
   user: User;
   token: string | null;
   login: (username: string, password: string) => Promise<void>;
-  loginWithLine: (lineId: string) => Promise<void>;
+  // Accept either a LineId (legacy) or an id_token from LIFF (recommended)
+  loginWithLine: (tokenOrLineId: string, isIdToken?: boolean) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
@@ -117,12 +118,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   // Login using LINE LineId. Backend should accept LineId and return token/user.
-  const loginWithLine = async (lineId: string) => {
+  const loginWithLine = async (tokenOrLineId: string, isIdToken = false) => {
+    const body = isIdToken ? { id_token: tokenOrLineId } : { LineId: tokenOrLineId };
     const res = await fetch(`${API_BASE}/login/line`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ LineId: lineId }),
+      body: JSON.stringify(body),
     });
 
     if (!res.ok) {
@@ -152,10 +154,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      let msg = data?.message || data?.error || `Registration failed (HTTP ${res.status})`;
-      if (res.status === 409) msg = "มีชื่อผู้ใช้นี้ในระบบแล้ว";
-      if (res.status === 400) msg = "ข้อมูลไม่ครบถ้วนหรือไม่ถูกต้อง";
+      // Try to parse JSON error body, otherwise read plain text to show helpful message
+      let data: any = {};
+      let textBody = "";
+      try {
+        data = await res.json();
+      } catch (e) {
+        try {
+          textBody = await res.text();
+        } catch (e2) {
+          textBody = "";
+        }
+      }
+
+      let msg = data?.message || data?.error || textBody || `Registration failed (HTTP ${res.status})`;
+      if (res.status === 409) msg = data?.message || "มีชื่อผู้ใช้นี้ในระบบแล้ว";
+      if (res.status === 400) msg = data?.message || textBody || "ข้อมูลไม่ครบถ้วนหรือไม่ถูกต้อง";
       throw new Error(msg);
     }
 
