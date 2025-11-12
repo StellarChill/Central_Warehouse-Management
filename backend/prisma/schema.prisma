@@ -17,6 +17,7 @@ datasource db {
 model User {
   UserId      Int      @id @default(autoincrement())
   UserName    String   @unique
+  UserStatus  String   @default("PENDING") // PENDING, ACTIVE, INACTIVE
   UserPassword String
   RoleId      Int
   BranchId    Int

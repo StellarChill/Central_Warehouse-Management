@@ -101,8 +101,15 @@ export default function LiffRegisterPage() {
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.Email)) next.Email = "รูปแบบอีเมลไม่ถูกต้อง";
     if (!formData.TelNumber) next.TelNumber = "กรอกเบอร์โทร";
     else if (!/^\d{9,10}$/.test(formData.TelNumber)) next.TelNumber = "กรอกเป็นตัวเลข 9-10 หลัก";
-    if (!formData.RoleId) next.RoleId = "เลือกบทบาท";
-    if (!formData.BranchId) next.BranchId = "เลือกสาขา";
+    // For LIFF registration we allow RoleId/BranchId to be empty so admin can assign later
+    if (!formData.RoleId) {
+      // don't require, but set to empty string so backend will default to BRANCH
+      // next.RoleId = "เลือกบทบาท";
+    }
+    if (!formData.BranchId) {
+      // allow empty branch input
+      // next.BranchId = "เลือกสาขา";
+    }
     if (!formData.LineId) next.LineId = "ไม่พบ LINE ID";
     setErrors(next);
     return Object.keys(next).length === 0;

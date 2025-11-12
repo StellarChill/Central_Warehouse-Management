@@ -68,6 +68,7 @@ app.get('/', (_req, res) => {
 });
 
 import userRoute from './routes/userRoute';
+import adminUserRoute from './routes/adminUserRoute';
 import catagoryRoute from './routes/catagoryRoute';
 import branchRoute from './routes/branchRoute';
 import materialRoute from './routes/materialRoute';
@@ -108,6 +109,7 @@ app.get('/health', async (req, res) => {
 });
 
 app.use('/api', userRoute);
+app.use('/api/admin', adminUserRoute);
 app.use('/api/catagory', catagoryRoute);
 app.use('/api/branch', branchRoute);
 app.use('/api/material', materialRoute);

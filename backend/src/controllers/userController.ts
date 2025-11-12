@@ -4,24 +4,39 @@ import bcrypt from 'bcryptjs';
 
 export async function register(req: Request, res: Response) {
 	try {
-		const { UserName, UserPassword, RoleId = 1, BranchId = 1, Email, TelNumber } = req.body;
-		if (!UserName || !UserPassword) {
-			return res.status(400).json({ error: 'UserName and UserPassword are required' });
+		const { UserName, UserPassword, RoleId, BranchId, Email, TelNumber, LineId } = req.body;
+		if (!UserName) {
+			return res.status(400).json({ error: 'UserName is required' });
+		}
+
+		// If no password provided, allow it only when registering via LINE (LineId present)
+		if (!UserPassword && !LineId) {
+			return res.status(400).json({ error: 'UserPassword is required when not registering via LINE' });
 		}
 
 		const existing = await prisma.user.findUnique({ where: { UserName } });
 		if (existing) return res.status(409).json({ error: 'User already exists' });
 
-		const hashed = await bcrypt.hash(UserPassword, 10);
-		const user = await prisma.user.create({
+		// If password missing (LIFF flow), generate a random one so user cannot login via password
+		let passwordToHash = UserPassword;
+		if (!passwordToHash) {
+			const crypto = await import('crypto');
+			passwordToHash = crypto.randomBytes(16).toString('hex');
+		}
+
+		const hashed = await bcrypt.hash(passwordToHash, 10);
+
+			const user = await prisma.user.create({
 			data: {
 				UserName,
 				UserPassword: hashed,
-				RoleId,
-				BranchId,
+				RoleId: RoleId ?? 3, // default to BRANCH (less privileged) if not provided
+				BranchId: BranchId ?? 1,
 				Email,
 				TelNumber,
-			},
+				LineId,
+					UserStatus: 'PENDING',
+				},
 			select: {
 				UserId: true,
 				UserName: true,
@@ -29,6 +44,7 @@ export async function register(req: Request, res: Response) {
 				BranchId: true,
 				Email: true,
 				TelNumber: true,
+				LineId: true,
 				CreatedAt: true,
 			},
 		});
