@@ -48,15 +48,7 @@ export function Header({ onMenuClick }: HeaderProps) {
         {/* Right section */}
         <div className="flex items-center gap-2 sm:gap-4">
           {/* Notifications */}
-          <Button variant="ghost" size="sm" className="relative hover:bg-accent p-2">
-            <Bell className="h-5 w-5" />
-            <Badge 
-              variant="destructive" 
-              className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs"
-            >
-              3
-            </Badge>
-          </Button>
+        
 
           {/* User menu */}
           <DropdownMenu>
@@ -86,17 +78,9 @@ export function Header({ onMenuClick }: HeaderProps) {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
+            
               
-              <DropdownMenuItem className="cursor-pointer hover:bg-accent">
-                <User className="mr-2 h-4 w-4" />
-                {th.nav.profile}
-              </DropdownMenuItem>
-              
-              <DropdownMenuItem className="cursor-pointer hover:bg-accent">
-                <Bell className="mr-2 h-4 w-4" />
-                {th.notifications.title}
-              </DropdownMenuItem>
-              
+             
               <DropdownMenuSeparator />
               
               <DropdownMenuItem 

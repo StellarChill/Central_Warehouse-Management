@@ -375,7 +375,7 @@ export default function PurchaseOrdersPage() {
     const display = mapDisplayStatus(status);
     switch (display) {
       case "PROFESSIONAL":
-        return <Badge variant="secondary" className="bg-gray-100 text-gray-800">ร่าง</Badge>;
+        return <Badge variant="secondary" className="bg-gray-100 text-gray-800">กำลังจัดส่ง</Badge>;
       case "PENDING":
         return <Badge variant="default" className="bg-primary">กำลังสั่งซื้อ</Badge>;
       case "STOCKED":
@@ -424,7 +424,7 @@ export default function PurchaseOrdersPage() {
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case "PROFESSIONAL": return "ร่าง";
+      case "PROFESSIONAL": return "กำลังจัดส่ง";
       case "PENDING": return "กำลังสั่งซื้อ";
       case "STOCKED": return "รับของแล้ว";
       default: return status;
@@ -448,7 +448,7 @@ export default function PurchaseOrdersPage() {
           <CardContent className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">ร่าง</p>
+                <p className="text-sm text-muted-foreground">กำลังจัดส่ง</p>
                 <p className="text-2xl font-bold mt-1">
                   {poList.filter(po => po.status === "DRAFT").length}
                 </p>
@@ -457,19 +457,7 @@ export default function PurchaseOrdersPage() {
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4 sm:p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">กำลังสั่งซื้อ</p>
-                <p className="text-2xl font-bold mt-1">
-                  {poList.filter(po => po.status === "SENT" || po.status === "CONFIRMED").length}
-                </p>
-              </div>
-              <Send className="h-8 w-8 text-primary" />
-            </div>
-          </CardContent>
-        </Card>
+      
         <Card>
           <CardContent className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
@@ -726,7 +714,7 @@ export default function PurchaseOrdersPage() {
 
       {/* Edit PO Dialog */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>แก้ไขใบสั่งซื้อ</DialogTitle>
             <DialogDescription>แก้ไขข้อมูลและรายการวัตถุดิบของ PO</DialogDescription>
