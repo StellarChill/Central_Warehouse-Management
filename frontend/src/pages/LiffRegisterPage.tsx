@@ -104,13 +104,14 @@ export default function LiffRegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitMsg(null);
-    if (!validate()) return;
+    if (!validate()) {
+      console.log("Validation failed", errors);
+      return;
+    }
 
     setIsSubmitting(true);
     try {
-      // Note: The backend needs to handle registration without a password,
-      // possibly creating a user that can only log in via LINE.
-      await registerUser({
+      const payload = {
         UserName: formData.UserName.trim(),
         UserPassword: "", // LIFF registration doesn't use password — send empty string to satisfy API/type
         Company: formData.Company.trim() || undefined,
@@ -121,7 +122,10 @@ export default function LiffRegisterPage() {
         TelNumber: formData.TelNumber.trim(),
         Email: formData.Email.trim().toLowerCase(),
         LineId: formData.LineId.trim(),
-      });
+      };
+      console.log("Registering with payload:", payload);
+      
+      await registerUser(payload);
 
       setSubmitMsg({ type: "success", text: "สมัครสมาชิกสำเร็จ! กำลังเข้าระบบ..." });
       // พยายาม login ด้วย LineId แล้วพาไปหน้า admin/users หรือ user-status
@@ -135,6 +139,7 @@ export default function LiffRegisterPage() {
       }
       // Maybe close the LIFF window `liff.closeWindow();`
     } catch (err: any) {
+      console.error("Register error:", err);
       setSubmitMsg({ type: "error", text: err?.message || "สมัครไม่สำเร็จ ลองใหม่อีกครั้ง" });
     } finally {
       setIsSubmitting(false);
