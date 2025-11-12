@@ -26,10 +26,11 @@ app.use(cors({
     
     // ตรวจสอบ allowed origins
     if (allowedOrigins.includes(origin)) return callback(null, true);
-    
-    // Block origin อื่นๆ
-    console.warn('🚫 CORS blocked:', origin);
-    callback(new Error('Not allowed by CORS'));
+
+    // Block origin อื่นๆ — don't throw an error here (that returns 500 without CORS headers)
+    // instead return false so the cors middleware will not set CORS headers and the browser will block the request.
+    console.warn('🚫 CORS blocked (not in allowedOrigins):', origin);
+    return callback(null, false);
   },
   credentials: true,
 }));
