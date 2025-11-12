@@ -167,9 +167,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      // Prefer backend `message` then `error`, then plain text
       let msg = data?.message || data?.error || textBody || `Registration failed (HTTP ${res.status})`;
-      if (res.status === 409) msg = data?.message || "มีชื่อผู้ใช้นี้ในระบบแล้ว";
-      if (res.status === 400) msg = data?.message || textBody || "ข้อมูลไม่ครบถ้วนหรือไม่ถูกต้อง";
+      if (res.status === 409) msg = data?.message || data?.error || "มีชื่อผู้ใช้นี้ในระบบแล้ว";
+      if (res.status === 400) msg = data?.message || data?.error || textBody || "ข้อมูลไม่ครบถ้วนหรือไม่ถูกต้อง";
       throw new Error(msg);
     }
 
