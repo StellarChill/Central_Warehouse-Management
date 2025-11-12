@@ -153,6 +153,14 @@ function RootRoute() {
     return <LoginPage />;
   }
 
+  // If this session was a LIFF-only login, force redirect to requisition create page
+  try {
+    const liffOnly = localStorage.getItem('liff_only');
+    if (liffOnly) return <Navigate to="/requisitions/create" replace />;
+  } catch (e) {
+    // ignore localStorage errors
+  }
+
   // ถ้า login แล้ว แสดง AppLayout และ nested routes
   return (
     <AppLayout />

@@ -149,7 +149,9 @@ export default function LiffRegisterPage() {
           } else {
             await loginWithLine(formData.LineId.trim());
           }
-          navigate("/user-status", { replace: true });
+          // mark this session as LIFF login only — used to restrict UI to requisition page
+          localStorage.setItem('liff_only', '1');
+          navigate("/requisitions/create", { replace: true });
         } catch (err) {
           // ถ้า login ล้มเหลว ให้ไปหน้ารอการอนุมัติแทน
           console.debug("Auto-login after register failed", err);
