@@ -171,7 +171,7 @@ export default function AdminUsersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((u) => (
+                {filteredPending.map((u) => (
                   <TableRow key={u.id}>
                     <TableCell className="font-medium">{u.id}</TableCell>
                     <TableCell>{u.name}</TableCell>
@@ -187,6 +187,58 @@ export default function AdminUsersPage() {
                             <ShieldCheck className="h-4 w-4 mr-1" /> อนุมัติ
                           </Button>
                         )}
+                        <Button size="sm" variant="ghost" onClick={() => startEdit(u)}><Edit className="h-4 w-4" /></Button>
+                        <Button size="sm" variant="ghost" onClick={() => remove(u.id)}><Trash2 className="h-4 w-4" /></Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Approved users section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <span>ผู้ใช้ที่อนุมัติแล้ว</span>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input className="pl-10 w-80" placeholder="ค้นหา ชื่อ/สาขา/บทบาท" value={q} onChange={(e) => setQ(e.target.value)} />
+            </div>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div>กำลังโหลด...</div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>รหัส</TableHead>
+                  <TableHead>ชื่อ</TableHead>
+                  <TableHead>LineId</TableHead>
+                  <TableHead>สาขา</TableHead>
+                  <TableHead>สิทธิ์</TableHead>
+                  <TableHead>สถานะ</TableHead>
+                  <TableHead>วันที่สมัคร</TableHead>
+                  <TableHead className="text-center">การดำเนินการ</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredApproved.map((u) => (
+                  <TableRow key={u.id}>
+                    <TableCell className="font-medium">{u.id}</TableCell>
+                    <TableCell>{u.name}</TableCell>
+                    <TableCell className="break-all text-sm">{u.lineId || '-'}</TableCell>
+                    <TableCell>{u.branch}</TableCell>
+                    <TableCell>{u.role}</TableCell>
+                    <TableCell>{u.status === "ACTIVE" ? "ใช้งาน" : "รออนุมัติ"}</TableCell>
+                    <TableCell>{u.createdAt ? new Date(u.createdAt).toLocaleString() : '-'}</TableCell>
+                    <TableCell>
+                      <div className="flex justify-center gap-2">
                         <Button size="sm" variant="ghost" onClick={() => startEdit(u)}><Edit className="h-4 w-4" /></Button>
                         <Button size="sm" variant="ghost" onClick={() => remove(u.id)}><Trash2 className="h-4 w-4" /></Button>
                       </div>
