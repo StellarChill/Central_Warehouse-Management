@@ -20,6 +20,7 @@ interface LiffRegisterFormData {
   TelNumber: string;
   Email: string;
   LineId: string;
+  Company: string;
 }
 
 type SubmitMsg = { type: "success" | "error"; text: string } | null;
@@ -47,6 +48,7 @@ export default function LiffRegisterPage() {
     TelNumber: "",
     Email: "",
     LineId: "",
+    Company: "",
   });
 
   const [errors, setErrors] = useState<Partial<Record<keyof LiffRegisterFormData, string>>>({});
@@ -122,14 +124,19 @@ export default function LiffRegisterPage() {
       await registerUser({
         UserName: formData.UserName.trim(),
         UserPassword: "", // LIFF registration doesn't use password — send empty string to satisfy API/type
+        Company: formData.Company.trim() || undefined,
         RoleId: Number(formData.RoleId),
-        BranchId: Number(formData.BranchId),
+        // If user typed a numeric id, keep it; otherwise send 0 and include BranchName
+        BranchId: Number(formData.BranchId) || 0,
+        BranchName: formData.BranchId.trim() || undefined,
         TelNumber: formData.TelNumber.trim(),
         Email: formData.Email.trim().toLowerCase(),
         LineId: formData.LineId.trim(),
       });
 
-      setSubmitMsg({ type: "success", text: "สมัครสมาชิกสำเร็จ! คุณสามารถปิดหน้านี้ได้" });
+      setSubmitMsg({ type: "success", text: "สมัครสมาชิกสำเร็จ! รอการอนุมัติจากผู้ดูแลระบบ" });
+      // พาไปหน้ารอการอนุมัติ
+      navigate("/awaiting-approval", { replace: true });
       // Maybe close the LIFF window `liff.closeWindow();`
     } catch (err: any) {
       setSubmitMsg({ type: "error", text: err?.message || "สมัครไม่สำเร็จ ลองใหม่อีกครั้ง" });
@@ -173,16 +180,17 @@ export default function LiffRegisterPage() {
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-1">
-                <Label htmlFor="LineId">LINE ID</Label>
-                <Input id="LineId" value={formData.LineId} disabled placeholder="กำลังโหลดข้อมูลจาก LINE..." />
-                {errors.LineId && <p className="text-xs text-red-500">{errors.LineId}</p>}
-              </div>
+           
 
               <div className="space-y-1">
                 <Label htmlFor="UserName">ชื่อผู้ใช้</Label>
                 <Input id="UserName" value={formData.UserName} onChange={handleChange("UserName")} placeholder="ชื่อที่แสดงใน LINE" />
                 {errors.UserName && <p className="text-xs text-red-500">{errors.UserName}</p>}
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="Company">ชื่อบริษัท / หน่วยงาน</Label>
+                <Input id="Company" value={formData.Company} onChange={handleChange("Company")} placeholder="ชื่อบริษัทหรือหน่วยงานของคุณ" />
               </div>
 
               <div className="space-y-1">
@@ -198,39 +206,15 @@ export default function LiffRegisterPage() {
               </div>
 
               <div className="space-y-1">
-                <Label>บทบาท</Label>
-                <Select value={formData.RoleId} onValueChange={(v) => setFormData((p) => ({ ...p, RoleId: v }))}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="เลือกบทบาท" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {roles.map((r) => (
-                      <SelectItem key={r.id} value={r.id}>
-                        {r.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.RoleId && <p className="text-xs text-red-500">{errors.RoleId}</p>}
-              </div>
-
-              <div className="space-y-1">
-                <Label>สาขา</Label>
-                <Select value={formData.BranchId} onValueChange={(v) => setFormData((p) => ({ ...p, BranchId: v }))}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="เลือกสาขา" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {branches.map((b) => (
-                      <SelectItem key={b.id} value={b.id}>
-                        {b.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="BranchId">สาขา / หน่วยงาน</Label>
+                <Input
+                  id="BranchId"
+                  value={formData.BranchId}
+                  onChange={handleChange("BranchId")}
+                  placeholder="พิมพ์ชื่อสาขา เช่น สาขากรุงเทพมหานคร"
+                />
                 {errors.BranchId && <p className="text-xs text-red-500">{errors.BranchId}</p>}
               </div>
-
               <Button type="submit" disabled={isSubmitting || !!liffError} className="w-full h-12 text-lg mt-2">
                 {isSubmitting ? "กำลังสมัคร..." : "ยืนยันการสมัคร"}
               </Button>

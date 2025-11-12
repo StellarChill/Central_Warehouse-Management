@@ -21,6 +21,7 @@ interface RegisterFormData {
   TelNumber: string;
   Email: string;
   LineId: string;   // optional
+  Company: string;  // optional
 }
 
 type SubmitMsg = { type: "success" | "error"; text: string } | null;
@@ -70,6 +71,7 @@ export default function RegisterPage() {
     TelNumber: "",
     Email: "",
     LineId: "",
+    Company: "",
   });
 
   const [errors, setErrors] = useState<Partial<Record<keyof RegisterFormData, string>>>({});
@@ -115,6 +117,7 @@ export default function RegisterPage() {
       await registerUser({
         UserName: formData.UserName.trim(),
         UserPassword: formData.UserPassword,
+        Company: formData.Company.trim() || undefined,
         RoleId: Number(formData.RoleId),
         BranchId: Number(formData.BranchId),
         TelNumber: formData.TelNumber.trim(),
@@ -122,8 +125,8 @@ export default function RegisterPage() {
         LineId: formData.LineId.trim() || undefined, // optional
       });
 
-      setSubmitMsg({ type: "success", text: "สมัครสมาชิกสำเร็จ! กำลังพาไปหน้าเข้าสู่ระบบ..." });
-      redirectTimerRef.current = window.setTimeout(() => navigate("/login"), 1500);
+      setSubmitMsg({ type: "success", text: "สมัครสมาชิกสำเร็จ! รอการอนุมัติจากผู้ดูแลระบบ" });
+      redirectTimerRef.current = window.setTimeout(() => navigate("/awaiting-approval"), 1500);
     } catch (err: any) {
       setSubmitMsg({ type: "error", text: err?.message || "สมัครไม่สำเร็จ ลองใหม่อีกครั้ง" });
     } finally {
@@ -219,6 +222,11 @@ export default function RegisterPage() {
                   <Label htmlFor="TelNumber">เบอร์โทร</Label>
                   <Input id="TelNumber" value={formData.TelNumber} onChange={handleChange("TelNumber")} placeholder="0801234567" />
                   {errors.TelNumber && <p className="text-xs text-red-500">{errors.TelNumber}</p>}
+                </div>
+
+                <div className="space-y-1">
+                  <Label htmlFor="Company">ชื่อบริษัท / หน่วยงาน (ถ้ามี)</Label>
+                  <Input id="Company" value={formData.Company} onChange={handleChange("Company")} placeholder="เช่น บริษัท เอ จำกัด" />
                 </div>
 
                 <div className="space-y-1">

@@ -25,6 +25,8 @@ type AuthContextType = {
 type RegisterData = {
   UserName: string;
   UserPassword: string;
+  Company?: string;
+  BranchName?: string;
   RoleId: number;
   BranchId: number;
   Email: string;
