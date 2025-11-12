@@ -20,10 +20,31 @@ export async function register(req: Request, res: Response) {
 
 			// Check existing by UserName or LineId to return clear errors
 			const existingByName = await prisma.user.findUnique({ where: { UserName } });
-			if (existingByName) return res.status(409).json({ error: 'User already exists' });
+			if (existingByName) {
+				// Return existing user info to help UI/admin locate the duplicate
+				return res.status(409).json({ error: 'User already exists', user: {
+					UserId: existingByName.UserId,
+					UserName: existingByName.UserName,
+					UserStatus: existingByName.UserStatus,
+					LineId: existingByName.LineId,
+					CreatedAt: existingByName.CreatedAt,
+					RoleId: existingByName.RoleId,
+					BranchId: existingByName.BranchId,
+				} });
+			}
 			if (LineId) {
 				const existingByLine = await prisma.user.findFirst({ where: { LineId } });
-				if (existingByLine) return res.status(409).json({ error: 'LINE account already registered' });
+				if (existingByLine) {
+					return res.status(409).json({ error: 'LINE account already registered', user: {
+						UserId: existingByLine.UserId,
+						UserName: existingByLine.UserName,
+						UserStatus: existingByLine.UserStatus,
+						LineId: existingByLine.LineId,
+						CreatedAt: existingByLine.CreatedAt,
+						RoleId: existingByLine.RoleId,
+						BranchId: existingByLine.BranchId,
+					} });
+				}
 			}
 
 			// If password missing (LIFF flow), generate a random one so user cannot login via password
