@@ -38,7 +38,7 @@ const branches = [
 
 export default function LiffRegisterPage() {
   const navigate = useNavigate();
-  const { register: registerUser } = useAuth();
+  const { register: registerUser, loginWithLine } = useAuth();
 
   const [formData, setFormData] = useState<LiffRegisterFormData>({
     UserName: "",
@@ -123,9 +123,16 @@ export default function LiffRegisterPage() {
         LineId: formData.LineId.trim(),
       });
 
-      setSubmitMsg({ type: "success", text: "สมัครสมาชิกสำเร็จ! รอการอนุมัติจากผู้ดูแลระบบ" });
-      // พาไปหน้ารอการอนุมัติ
-      navigate("/awaiting-approval", { replace: true });
+      setSubmitMsg({ type: "success", text: "สมัครสมาชิกสำเร็จ! กำลังเข้าระบบ..." });
+      // พยายาม login ด้วย LineId แล้วพาไปหน้า admin/users หรือ user-status
+      try {
+        await loginWithLine(formData.LineId.trim());
+        navigate("/user-status", { replace: true });
+      } catch (err) {
+        // ถ้า login ล้มเหลว ให้ไปหน้ารอการอนุมัติแทน
+        console.debug("Auto-login after register failed", err);
+        navigate("/awaiting-approval", { replace: true });
+      }
       // Maybe close the LIFF window `liff.closeWindow();`
     } catch (err: any) {
       setSubmitMsg({ type: "error", text: err?.message || "สมัครไม่สำเร็จ ลองใหม่อีกครั้ง" });

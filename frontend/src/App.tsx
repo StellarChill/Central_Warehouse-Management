@@ -35,6 +35,7 @@ const LoginPage = lazy(() => import("./pages/LoginPage"));
 const RegisterPage = lazy(() => import("./pages/RegisterPage"));
 const LiffRegisterPage = lazy(() => import("./pages/LiffRegisterPage"));
 const WaitingApprovalPage = lazy(() => import("./pages/WaitingApprovalPage"));
+const UserStatusPage = lazy(() => import("./pages/UserStatusPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // ---- React Query sane defaults ----
@@ -71,6 +72,7 @@ const App = () => (
                 <Route path="/" element={<RootRoute />}>
                   {/* Child routes should be relative to render inside AppLayout's <Outlet /> */}
                   <Route index element={<DashboardPage />} />
+                  <Route path="user-status" element={<UserStatusPage />} />
                   <Route path="suppliers" element={<SuppliersPage />} />
                   <Route path="ingredients" element={<ProductsPage />} />
                   <Route path="categories" element={<CategoriesManagePage />} />
