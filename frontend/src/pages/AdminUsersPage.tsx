@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useMemo, useState, useEffect } from "react";
-import { apiGet } from "@/lib/api";
+import { apiGet, apiPost, apiPut, apiDelete } from "@/lib/api";
 import { Search, Plus, Edit, Trash2, ShieldCheck } from "lucide-react";
 
 type Role = "ADMIN" | "CENTER" | "BRANCH";
@@ -37,7 +37,8 @@ export default function AdminUsersPage() {
   const [form, setForm] = useState<{ name: string; branch: string; role: Role; status: "PENDING" | "ACTIVE"; userId?: string; company?: string }>(
     { name: "", branch: "ศูนย์", role: "BRANCH", status: "PENDING" }
   );
-  const [users, setUsers] = useState<User[]>([]);
+  const [pendingUsers, setPendingUsers] = useState<User[]>([]);
+  const [approvedUsers, setApprovedUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -46,8 +47,8 @@ export default function AdminUsersPage() {
     const load = async () => {
       setLoading(true);
       try {
-        // use shared apiGet which respects VITE_API_URL in production
-        const data: RemoteUser[] = await apiGet('/admin/users?status=pending');
+        // fetch all users and split by status so admin can view both pending and approved
+        const data: RemoteUser[] = await apiGet('/admin/users');
         const mapped: User[] = data.map((u) => ({
           id: String(u.UserId),
           name: u.UserName,
@@ -57,9 +58,10 @@ export default function AdminUsersPage() {
           role: u.RoleId === 1 ? "ADMIN" : u.RoleId === 2 ? "CENTER" : "BRANCH",
           status: (u.status as any) === "ACTIVE" ? "ACTIVE" : "PENDING",
         }));
-        setUsers(mapped);
+        setPendingUsers(mapped.filter((m) => m.status === 'PENDING'));
+        setApprovedUsers(mapped.filter((m) => m.status === 'ACTIVE'));
       } catch (err) {
-        console.error("Failed to load pending users", err);
+        console.error("Failed to load users", err);
       } finally {
         setLoading(false);
       }
@@ -67,11 +69,17 @@ export default function AdminUsersPage() {
     load();
   }, []);
 
-  const filtered = useMemo(() => {
+  const filteredPending = useMemo(() => {
     const s = q.trim().toLowerCase();
-    if (!s) return users;
-    return users.filter((u) => [u.id, u.name, u.branch, u.role].some((v) => String(v).toLowerCase().includes(s)));
-  }, [q, users]);
+    if (!s) return pendingUsers;
+    return pendingUsers.filter((u) => [u.id, u.name, u.branch, u.role, u.lineId].some((v) => String(v || '').toLowerCase().includes(s)));
+  }, [q, pendingUsers]);
+
+  const filteredApproved = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    if (!s) return approvedUsers;
+    return approvedUsers.filter((u) => [u.id, u.name, u.branch, u.role, u.lineId].some((v) => String(v || '').toLowerCase().includes(s)));
+  }, [q, approvedUsers]);
 
   const startEdit = (u: User) => {
     setEditing(u);
@@ -90,18 +98,22 @@ export default function AdminUsersPage() {
         Company: form.company || undefined,
         status: "ACTIVE",
       };
-      const res = await fetch(`/api/admin/users/${form.userId}/approve`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new Error(text || `Approve failed (HTTP ${res.status})`);
-      }
-      // Remove or update user in UI
-      setUsers((prev) => prev.filter((x) => x.id !== form.userId));
+      const result = await apiPost(`/admin/users/${form.userId}/approve`, body);
+
+      // result is updated user mapped from backend; convert to frontend User
+      const updated: User = {
+        id: String(result.UserId),
+        name: result.UserName,
+        branch: result.BranchName || (result.BranchId ? `สาขา ${result.BranchId}` : "-"),
+        role: result.RoleId === 1 ? "ADMIN" : result.RoleId === 2 ? "CENTER" : "BRANCH",
+        status: (result.status as any) === "ACTIVE" ? "ACTIVE" : "PENDING",
+        lineId: result.LineId || null,
+        createdAt: result.CreatedAt || null,
+      };
+
+      // remove from pending and add to approved
+      setPendingUsers((prev) => prev.filter((p) => p.id !== form.userId));
+      setApprovedUsers((prev) => [updated, ...prev]);
       setOpen(false);
     } catch (err: any) {
       alert(err?.message || "อนุมัติไม่สำเร็จ");
@@ -113,9 +125,9 @@ export default function AdminUsersPage() {
   const remove = async (id: string) => {
     if (!confirm("ยืนยันการลบผู้ใช้?")) return;
     try {
-      const res = await fetch(`/api/admin/users/${id}`, { method: "DELETE", credentials: "include" });
-      if (!res.ok) throw new Error(`Delete failed (HTTP ${res.status})`);
-      setUsers((prev) => prev.filter((u) => u.id !== id));
+      await apiDelete(`/admin/users/${id}`);
+      setPendingUsers((prev) => prev.filter((u) => u.id !== id));
+      setApprovedUsers((prev) => prev.filter((u) => u.id !== id));
     } catch (err) {
       alert("ลบไม่สำเร็จ");
     }
