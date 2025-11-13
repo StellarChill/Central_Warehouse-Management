@@ -156,7 +156,11 @@ function RootRoute() {
   // If this session was a LIFF-only login, force redirect to requisition create page
   try {
     const liffOnly = localStorage.getItem('liff_only');
-    if (liffOnly) return <Navigate to="/requisitions/create" replace />;
+    if (liffOnly) {
+      // Remove the flag so it only redirects once
+      localStorage.removeItem('liff_only');
+      return <Navigate to="/requisitions/create" replace />;
+    }
   } catch (e) {
     // ignore localStorage errors
   }
