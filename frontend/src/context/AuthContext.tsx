@@ -138,28 +138,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       role: getRoleFromRoleId(data.user.RoleId),
     };
 
+    // Mark this session as a LIFF-only login
+    // This tells App.tsx to redirect to the requisition page
+    try {
+      localStorage.setItem('liff_only', '1');
+    } catch (e) {
+      console.error("Failed to set liff_only flag in localStorage", e);
+    }
+
     localStorage.setItem("auth_token", data.token);
     localStorage.setItem("auth_user", JSON.stringify(data.user));
-    // mark this session as LIFF login so UI can restrict to requisition page
-    try { localStorage.setItem('liff_only', '1'); } catch (e) { /* ignore */ }
 
     setToken(data.token);
     setUser(userData);
 
-    // If this was a LIFF login, try robust navigation to create requisition page.
-    // Some LIFF contexts may ignore replace/navigation; attempt replace and
-    // use href fallback after a short delay to increase reliability.
-    try {
-      // Primary: full page replace to avoid router state issues in some LIFF contexts
-      window.location.replace('/requisitions/create');
-      // Fallback: after a brief delay, force assign href in case replace is ignored
-      setTimeout(() => {
-        try { window.location.href = '/requisitions/create'; } catch (e) { /* ignore */ }
-      }, 250);
-    } catch (e) {
-      // If replace itself throws, try direct href as a last resort
-      try { window.location.href = '/requisitions/create'; } catch (e) { /* ignore */ }
-    }
+    // After setting user, the RootRoute in App.tsx will handle the redirect
   };
 
   const register = async (registerData: RegisterData) => {
