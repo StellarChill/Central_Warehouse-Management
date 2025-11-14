@@ -1,3 +1,4 @@
+// backend/src/controllers/loginController.ts
 import prisma from '../prisma';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -10,33 +11,59 @@ export async function login(req: Request, res: Response) {
   if (!UserName || !UserPassword) {
     return res.status(400).json({ error: 'UserName and UserPassword required' });
   }
+
   const user = await prisma.user.findUnique({ where: { UserName } });
-  console.log("user", user);
+  console.log('user', user);
   if (!user) {
     return res.status(401).json({ error: 'Invalid credentials A1' });
   }
+
   const valid = await bcrypt.compare(UserPassword, user.UserPassword);
-  console.log("valid", valid);
+  console.log('valid', valid);
   if (!valid) {
     return res.status(401).json({ error: 'Invalid credentials A2' });
   }
-  const token = jwt.sign({ UserId: user.UserId, RoleId: user.RoleId }, JWT_SECRET, { expiresIn: '1d' });
-  return res.json({ token, user: { UserId: user.UserId, UserName: user.UserName, RoleId: user.RoleId, BranchId: user.BranchId } });
+
+  const token = jwt.sign(
+    { UserId: user.UserId, RoleId: user.RoleId },
+    JWT_SECRET,
+    { expiresIn: '1d' },
+  );
+
+  return res.json({
+    token,
+    user: {
+      UserId: user.UserId,
+      UserName: user.UserName,
+      RoleId: user.RoleId,
+      BranchId: user.BranchId,
+      Email: user.Email,
+      UserStatus: user.UserStatus,
+    },
+  });
 }
 
+// 🔥 Login ด้วย LINE (LineId หรือ id_token)
 export async function loginWithLine(req: Request, res: Response) {
-  // Accept either an id_token (recommended) or a raw LineId (legacy)
   const { id_token: idToken, LineId } = req.body;
 
   let lineUserId: string | null = null;
 
   if (idToken) {
-    // Verify id_token with LINE verify endpoint
+    // Verify id_token กับ LINE
     try {
-      const clientId = process.env.LINE_CHANNEL_ID || process.env.LINE_CLIENT_ID || process.env.LIFF_ID;
+      const clientId =
+        process.env.LINE_CHANNEL_ID ||
+        process.env.LINE_CLIENT_ID ||
+        process.env.LIFF_ID;
+
       if (!clientId) {
-        console.warn('LINE client_id not configured in env (LINE_CHANNEL_ID / LINE_CLIENT_ID / LIFF_ID)');
-        return res.status(500).json({ error: 'Server misconfiguration: LINE client id missing' });
+        console.warn(
+          'LINE client_id not configured in env (LINE_CHANNEL_ID / LINE_CLIENT_ID / LIFF_ID)',
+        );
+        return res
+          .status(500)
+          .json({ error: 'Server misconfiguration: LINE client id missing' });
       }
 
       const params = new URLSearchParams();
@@ -56,42 +83,79 @@ export async function loginWithLine(req: Request, res: Response) {
       }
 
       const verifyData: any = await verifyRes.json();
-      // 'sub' contains the LINE userId
-      // Extra safety checks: verify audience and expiration
       const aud = verifyData.aud;
       const exp = verifyData.exp;
+
       if (!aud || !exp) {
         console.warn('LINE verify response missing aud/exp', verifyData);
-        return res.status(401).json({ error: 'Invalid id_token (missing claims)' });
+        return res
+          .status(401)
+          .json({ error: 'Invalid id_token (missing claims)' });
       }
+
       if (aud !== clientId) {
         console.warn('LINE id_token audience mismatch', { aud, clientId });
         return res.status(401).json({ error: 'id_token audience mismatch' });
       }
+
       const now = Math.floor(Date.now() / 1000);
       if (exp < now) {
         console.warn('LINE id_token expired', { exp, now });
         return res.status(401).json({ error: 'id_token expired' });
       }
 
+      // sub = LINE userId
       lineUserId = verifyData.sub;
     } catch (err) {
       console.error('Error verifying LINE id_token', err);
       return res.status(500).json({ error: 'Failed to verify id_token' });
     }
   } else if (LineId) {
-    // Legacy fallback: accept LineId directly
+    // legacy: รับ LineId ตรง ๆ (จาก profile.userId)
     lineUserId = LineId;
   } else {
     return res.status(400).json({ error: 'id_token or LineId required' });
   }
 
-  // หา user ที่ผูกกับ LineId
-  const user = await prisma.user.findFirst({ where: { LineId: lineUserId ?? undefined } });
+  // หา user จาก LineId
+  const user = await prisma.user.findFirst({
+    where: { LineId: lineUserId ?? undefined },
+  });
+
   if (!user) {
-    return res.status(404).json({ error: 'User not found. Please register.' });
+    return res
+      .status(404)
+      .json({ error: 'User not found. Please register.' });
   }
 
-  const token = jwt.sign({ UserId: user.UserId, RoleId: user.RoleId }, JWT_SECRET, { expiresIn: '1d' });
-  return res.json({ token, user: { UserId: user.UserId, UserName: user.UserName, RoleId: user.RoleId, BranchId: user.BranchId } });
+  // ❗ ถ้า user ยัง PENDING ให้บอกไปเลยว่ารออนุมัติอยู่
+  if (user.UserStatus === 'PENDING') {
+    return res.status(403).json({
+      error: 'User is pending approval',
+      status: user.UserStatus,
+    });
+  }
+
+  const token = jwt.sign(
+    { UserId: user.UserId, RoleId: user.RoleId },
+    JWT_SECRET,
+    { expiresIn: '1d' },
+  );
+
+  return res.json({
+    token,
+    user: {
+      UserId: user.UserId,
+      UserName: user.UserName,
+      RoleId: user.RoleId,
+      BranchId: user.BranchId,
+      Email: user.Email,
+      UserStatus: user.UserStatus,
+    },
+  });
 }
+
+export default {
+  login,
+  loginWithLine,
+};
