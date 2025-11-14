@@ -45,65 +45,56 @@ export default function LiffRegisterPage() {
   const [isCheckingUser, setIsCheckingUser] = useState(true);
 
   useEffect(() => {
-    const initializeLiffAndLogin = async () => {
-      try {
-        // ใช้ liff จริง (ต้องมี script ใน index.html)
-        // @ts-ignore
-        await liff.init({ liffId: import.meta.env.VITE_LIFF_ID });
+  const initializeLiffAndLogin = async () => {
+    try {
+      await liff.init({ liffId: import.meta.env.VITE_LIFF_ID });
 
-        // ถ้ายังไม่ login กับ LINE ให้เด้งไป login ก่อน
-        // @ts-ignore
-        if (!liff.isLoggedIn()) {
-          // @ts-ignore
-          liff.login();
-          return;
-        }
-
-        // @ts-ignore
-        const profile = await liff.getProfile();
-        const lineId = profile.userId as string;
-
-        // เติมค่า default ในฟอร์ม (ใช้ตอนสมัคร)
-        setFormData((prev) => ({
-          ...prev,
-          LineId: lineId,
-          UserName: profile.displayName || prev.UserName,
-        }));
-
-        // พยายาม auto-login ด้วย LineId
-        try {
-          await loginWithLine(lineId);
-          localStorage.setItem("liff_only", "1");
-
-          // ถ้า login สำเร็จ แสดงว่า admin approve แล้ว → เด้งไปหน้าเบิก
-          navigate("/requisitions/create", { replace: true });
-          return;
-        } catch (err: any) {
-          console.info("LINE auto-login failed", err?.message || err);
-
-          // ถ้า message มีคำว่า pending → ให้ไปหน้า waiting
-          if (
-            typeof err?.message === "string" &&
-            err.message.toLowerCase().includes("pending")
-          ) {
-            navigate("/awaiting-approval", { replace: true });
-            return;
-          }
-
-          // ถ้า user ไม่เจอ / ยังไม่เคยสมัคร → ให้แสดงฟอร์มต่อ
-          // ไม่ต้องทำอะไรเพิ่ม
-        }
-      } catch (error) {
-        console.error("LIFF Initialization failed.", error);
-        setLiffError("ไม่สามารถเชื่อมต่อกับ LINE ได้");
-      } finally {
-        setIsCheckingUser(false);
+      if (!liff.isLoggedIn()) {
+        liff.login();
+        return;
       }
-    };
 
-    initializeLiffAndLogin();
-  }, [loginWithLine, navigate]);
+      const profile = await liff.getProfile();
+      const lineId = profile.userId;
 
+      // Set default values in form
+      setFormData(prev => ({
+        ...prev,
+        LineId: lineId,
+        UserName: profile.displayName
+      }));
+
+      // 🔥 ลอง login ด้วย LineId เพื่อตรวจว่า user นี้มีอยู่ใน DB แล้วไหม
+      try {
+        await loginWithLine(lineId);
+        localStorage.setItem("liff_only", "1");
+
+        // ถ้า login ผ่าน = มี user ในฐานข้อมูลแล้ว + ถูก approve แล้ว
+        navigate("/requisitions/create", { replace: true });
+        return;
+      } catch (err: any) {
+
+        // ถ้า user ยังไม่ approve
+        if (String(err.message).includes("pending")) {
+          navigate("/awaiting-approval", { replace: true });
+          return;
+        }
+
+        // ถ้า loginWithLine error = แปลว่ายังไม่มี user ในฐานข้อมูล
+        // >>> ให้โชว์ฟอร์มสมัครต่อไป
+        console.log("User not in DB. Showing register form.");
+      }
+
+    } catch (error) {
+      console.error("LIFF init error", error);
+      setLiffError("ไม่สามารถเชื่อมต่อกับ LINE ได้");
+    } finally {
+      setIsCheckingUser(false);
+    }
+  };
+
+  initializeLiffAndLogin();
+}, [loginWithLine, navigate]);
   const handleChange =
     (field: keyof LiffRegisterFormData) =>
     (e: React.ChangeEvent<HTMLInputElement>) => {
