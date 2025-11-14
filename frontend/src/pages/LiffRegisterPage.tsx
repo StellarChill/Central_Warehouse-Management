@@ -55,38 +55,57 @@ export default function LiffRegisterPage() {
   const [submitMsg, setSubmitMsg] = useState<SubmitMsg>(null);
   const [liffError, setLiffError] = useState<string | null>(null);
   const [idToken, setIdToken] = useState<string | null>(null);
+  const [isCheckingUser, setIsCheckingUser] = useState(true);
 
   useEffect(() => {
-    const initializeLiff = async () => {
+    const initializeLiffAndLogin = async () => {
       try {
         // In a real scenario, you would import and use the actual liff object.
         // For now, we use a mock.
         await liff.init({ liffId: import.meta.env.VITE_LIFF_ID });
-        if (liff.isLoggedIn()) {
-          const profile = await liff.getProfile();
-          // Try to get ID token (preferred) or access token as fallback
-          const gotIdToken = typeof liff.getIDToken === 'function' ? liff.getIDToken() : null;
-          const gotAccessToken = !gotIdToken && typeof liff.getAccessToken === 'function' ? liff.getAccessToken() : null;
-          if (gotIdToken) setIdToken(gotIdToken);
-          else if (gotAccessToken) setIdToken(gotAccessToken);
-
-          setFormData((prev) => ({
-            ...prev,
-            LineId: profile.userId,
-            UserName: profile.displayName,
-          }));
-          // User needs to complete registration; no auto-login attempt to avoid 404 on /api/login/line
-        } else {
+        if (!liff.isLoggedIn()) {
           liff.login();
+          return; // Stop execution, liff.login() will redirect
         }
+
+        // We have a logged-in user, let's try to log them into our app
+        const gotIdToken = liff.getIDToken();
+        if (gotIdToken) {
+          try {
+            await loginWithLine(gotIdToken, true);
+            // SUCCESS: User is already registered.
+            // Mark this as LIFF-only login and redirect to root, which will handle the redirect to requisitions/create
+            localStorage.setItem('liff_only', '1');
+            navigate("/", { replace: true });
+            return; // Stop further execution
+          } catch (error) {
+            // FAIL: User is not registered in our backend.
+            // We'll fall through and show them the registration form.
+            console.info("Auto-login failed, user likely needs to register.", error);
+          }
+        }
+
+        // If we reach here, login failed. Show the registration form.
+        const profile = await liff.getProfile();
+        setFormData((prev) => ({
+          ...prev,
+          LineId: profile.userId,
+          UserName: profile.displayName,
+        }));
+        if (gotIdToken) {
+          setIdToken(gotIdToken);
+        }
+        
       } catch (error) {
         console.error("LIFF Initialization failed.", error);
         setLiffError("ไม่สามารถเชื่อมต่อกับ LINE ได้");
+      } finally {
+        setIsCheckingUser(false);
       }
     };
 
-    initializeLiff();
-  }, []);
+    initializeLiffAndLogin();
+  }, [loginWithLine]);
 
   const handleChange =
     (field: keyof LiffRegisterFormData) =>
@@ -151,7 +170,7 @@ export default function LiffRegisterPage() {
           }
           // mark this session as LIFF login only — used to restrict UI to requisition page
           localStorage.setItem('liff_only', '1');
-          navigate("/requisitions/create", { replace: true });
+          navigate("/", { replace: true });
         } catch (err) {
           // ถ้า login ล้มเหลว ให้ไปหน้ารอการอนุมัติแทน
           console.debug("Auto-login after register failed", err);

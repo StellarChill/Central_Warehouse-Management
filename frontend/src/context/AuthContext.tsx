@@ -138,21 +138,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       role: getRoleFromRoleId(data.user.RoleId),
     };
 
-    // Mark this session as a LIFF-only login
-    // This tells App.tsx to redirect to the requisition page
-    try {
-      localStorage.setItem('liff_only', '1');
-    } catch (e) {
-      console.error("Failed to set liff_only flag in localStorage", e);
-    }
-
     localStorage.setItem("auth_token", data.token);
     localStorage.setItem("auth_user", JSON.stringify(data.user));
 
     setToken(data.token);
     setUser(userData);
-
-    // After setting user, the RootRoute in App.tsx will handle the redirect
   };
 
   const register = async (registerData: RegisterData) => {
