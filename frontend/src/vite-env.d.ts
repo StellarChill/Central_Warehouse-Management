@@ -3,5 +3,8 @@
 import type { Liff } from "@liff/liff-types";
 
 declare global {
-  const liff: Liff;
+  // Make LIFF available on globalThis for browser and test environments
+  var liff: Liff;
 }
+
+export {};

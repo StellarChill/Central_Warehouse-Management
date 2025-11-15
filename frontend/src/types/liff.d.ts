@@ -1,6 +1,14 @@
+import type { Liff } from '@liff/liff-types';
+
 declare global {
   interface Window {
-    liff: any; // You might want to define a more specific type for liff if you have its typings
+    liff: Liff;
+  }
+  // For Node/Jest globals
+  namespace NodeJS {
+    interface Global {
+      liff: Liff;
+    }
   }
 }
 

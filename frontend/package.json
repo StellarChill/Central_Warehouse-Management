@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "prebuild": "chmod +x node_modules/.bin/vite || true",
+    "prebuild": "node -e \"try{require('fs').chmodSync('node_modules/.bin/vite',0o755)}catch(e){}\"",
     "build": "tsc -b && vite build",
     "test": "jest",
     "build:dev": "vite build --mode development",
