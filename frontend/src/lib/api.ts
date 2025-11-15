@@ -107,6 +107,52 @@ export async function apiDelete(endpoint: string) {
 }
 
 // ==========================================
+// Requisitions (Withdrawn Requests)
+// ==========================================
+
+export type WithdrawnRequest = {
+  RequestId: number;
+  RequestDate: string;
+  WithdrawnRequestStatus: string;
+  BranchId: number;
+  WithdrawnRequestCode: string;
+  CreatedAt: string;
+  UpdatedAt: string;
+  CreatedBy?: number | null;
+  UpdatedBy?: number | null;
+};
+
+export type WithdrawnRequestDetail = {
+  RequestDetailId: number;
+  RequestId: number;
+  MaterialId: number;
+  WithdrawnQuantity: number;
+};
+
+export async function getRequisitions(): Promise<WithdrawnRequest[]> {
+  return apiGet('/request');
+}
+
+export async function getRequisition(id: number): Promise<WithdrawnRequest & { WithdrawnRequestDetails: WithdrawnRequestDetail[] }> {
+  return apiGet(`/request/${id}`);
+}
+
+export async function approveRequisition(id: number) {
+  const user = getUser();
+  return apiPut(`/request/${id}`, { WithdrawnRequestStatus: 'APPROVED', UpdatedBy: user?.UserId || undefined });
+}
+
+export async function rejectRequisition(id: number) {
+  const user = getUser();
+  return apiPut(`/request/${id}`, { WithdrawnRequestStatus: 'REJECTED', UpdatedBy: user?.UserId || undefined });
+}
+
+export async function shipRequisition(id: number) {
+  // Create issue from request; server will allocate stock and mark issue
+  return apiPost(`/issue/from-request/${id}`, {});
+}
+
+// ==========================================
 // Branch API
 // ==========================================
 

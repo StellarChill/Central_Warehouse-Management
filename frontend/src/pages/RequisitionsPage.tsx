@@ -3,89 +3,76 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useMemo, useState } from "react";
-import { Search, Package } from "lucide-react";
-import { useStock } from "@/context/StockContext";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { approveRequisition, getRequisitions, rejectRequisition, shipRequisition, type WithdrawnRequest } from "@/lib/api";
+import { usePermissions } from "@/hooks/use-permissions";
 
-type Requisition = {
-  id: string;
-  branch: string;
-  requestedBy: string;
-  items: { name: string; qty: number; unit: string }[];
-  status: "PENDING" | "REJECTED" | "PREPARING" | "SHIPPED";
+type Row = {
+  id: number;
+  code: string;
+  branchId: number;
+  requestedBy?: number | null;
+  status: string;
+  date: string;
 };
 
 export default function RequisitionsPage() {
   const [q, setQ] = useState("");
-  const { issue } = useStock();
+  const [rows, setRows] = useState<Row[]>([]);
+  const [loading, setLoading] = useState(false);
+  const { canApproveRequisition } = usePermissions();
 
-  const [reqs, setReqs] = useState<Requisition[]>([
-    {
-      id: "REQ-2024-089",
-      branch: "สาขาลาดพร้าว",
-      requestedBy: "วิชาญ",
-      status: "PENDING",
-      items: [
-        { name: "น้ำดื่ม 600ml", qty: 100, unit: "ขวด" },
-        { name: "ข้าวสาร 5kg", qty: 20, unit: "ถุง" },
-      ],
-    },
-    {
-      id: "REQ-2024-090",
-      branch: "สาขาบางนา",
-      requestedBy: "สุดา",
-      status: "PREPARING",
-      items: [{ name: "นม 1L", qty: 60, unit: "กล่อง" }],
-    },
-    {
-      id: "REQ-2024-091",
-      branch: "สาขาหาดใหญ่",
-      requestedBy: "ปรีชา",
-      status: "SHIPPED",
-      items: [{ name: "ผักรวม แพ็ค", qty: 30, unit: "แพ็ค" }],
-    },
-  ]);
+  async function load() {
+    setLoading(true);
+    try {
+      const data = await getRequisitions();
+      const mapped: Row[] = data.map((r: WithdrawnRequest) => ({
+        id: r.RequestId,
+        code: r.WithdrawnRequestCode,
+        branchId: r.BranchId,
+        requestedBy: r.CreatedBy ?? null,
+        status: r.WithdrawnRequestStatus,
+        date: r.RequestDate,
+      }));
+      setRows(mapped);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    load();
+  }, []);
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
-    if (!s) return reqs;
-    return reqs.filter((r) =>
-      [r.id, r.branch, r.requestedBy].some((v) => v.toLowerCase().includes(s))
-    );
-  }, [q, reqs]);
+    if (!s) return rows;
+    return rows.filter((r) => [r.code, String(r.branchId), String(r.requestedBy ?? "")].some((v) => v.toLowerCase().includes(s)));
+  }, [q, rows]);
 
-  const approve = (id: string) =>
-    setReqs((prev) => prev.map((r) => (r.id === id ? { ...r, status: "PREPARING" } : r)));
-
-  const reject = (id: string) =>
-    setReqs((prev) => prev.map((r) => (r.id === id ? { ...r, status: "REJECTED" } : r)));
-
-  const ship = (id: string) => {
-    const req = reqs.find((r) => r.id === id);
-    if (req) {
-      for (const it of req.items) {
-        // demo: ใช้ชื่อเป็น sku placeholder
-        issue(it.name as any, it.qty, `Ship ${id}`);
-      }
-    }
-    setReqs((prev) => prev.map((r) => (r.id === id ? { ...r, status: "SHIPPED" } : r)));
-  };
+  async function onApprove(id: number) {
+    await approveRequisition(id);
+    await load();
+  }
+  async function onReject(id: number) {
+    await rejectRequisition(id);
+    await load();
+  }
+  async function onShip(id: number) {
+    await shipRequisition(id);
+    await load();
+  }
 
   return (
     <div className="space-y-6">
-      
-
-      {/* ✅ เหลือเฉพาะตาราง */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
-            <span>รายการคำขอเบิกวัตถุดิบ</span>
+            <span>Requisitions</span>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                className="pl-10 w-80"
-                placeholder="ค้นหา รหัส/สาขา/ผู้ขอ"
+                className="pl-3 w-80"
+                placeholder="Search by code/branch/user"
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
               />
@@ -96,74 +83,49 @@ export default function RequisitionsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>เลขที่</TableHead>
-                <TableHead>สาขา</TableHead>
-                <TableHead>ผู้ขอเบิก</TableHead>
-                <TableHead>รายการที่ต้องการ</TableHead>
-                <TableHead>สถานะ</TableHead>
-                <TableHead className="text-center">การดำเนินการ</TableHead>
+                <TableHead>Code</TableHead>
+                <TableHead>Branch</TableHead>
+                <TableHead>User</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead className="text-center">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.map((r) => (
                 <TableRow key={r.id} className="hover:bg-muted/50">
-                  <TableCell className="font-medium">{r.id}</TableCell>
-                  <TableCell>{r.branch}</TableCell>
-                  <TableCell>{r.requestedBy}</TableCell>
-                  <TableCell>
-                    <div className="space-y-1">
-                      {r.items.map((i, idx) => (
-                        <div key={idx} className="flex items-center gap-2 text-sm">
-                          <Package className="h-4 w-4 text-muted-foreground" />
-                          <span>{i.name}</span>
-                          <span className="thai-number">
-                            × {i.qty.toLocaleString()} {i.unit}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </TableCell>
+                  <TableCell className="font-medium">{r.code}</TableCell>
+                  <TableCell>{r.branchId}</TableCell>
+                  <TableCell>{r.requestedBy ?? '-'}</TableCell>
                   <TableCell>
                     {(() => {
-                      const text =
-                        r.status === "PENDING"
-                          ? "รอดำเนินการ"
-                          : r.status === "PREPARING"
-                          ? "จัดเตรียมแล้ว"
-                          : r.status === "SHIPPED"
-                          ? "จัดส่งแล้ว"
-                          : "จัดส่งไม่สำเร็จ";
+                      const status = r.status?.toUpperCase?.() || '';
                       const cls =
-                        r.status === "SHIPPED"
+                        status === 'SHIPPED' || status === 'COMPLETED'
                           ? "bg-success/10 text-success border-success/20"
-                          : r.status === "REJECTED"
+                          : status === 'REJECTED'
                           ? "bg-destructive/10 text-destructive border-destructive/20"
-                          : r.status === "PREPARING"
+                          : status === 'APPROVED' || status === 'PREPARING'
                           ? "bg-info/10 text-info border-info/20"
                           : "bg-warning/10 text-warning-foreground border-warning/20";
                       return (
                         <Badge variant="outline" className={cls}>
-                          {text}
+                          {status || 'REQUESTED'}
                         </Badge>
                       );
                     })()}
                   </TableCell>
+                  <TableCell>{new Date(r.date).toLocaleString()}</TableCell>
                   <TableCell>
                     <div className="flex items-center justify-center gap-2">
-                      {r.status === "PENDING" && (
+                      {canApproveRequisition && r.status === 'REQUESTED' && (
                         <>
-                          <Button size="sm" variant="outline" onClick={() => approve(r.id)}>
-                            อนุมัติ
-                          </Button>
-                          <Button size="sm" variant="ghost" onClick={() => reject(r.id)} className="text-destructive hover:bg-destructive/10">
-                            ปฏิเสธ
-                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => onApprove(r.id)}>Approve</Button>
+                          <Button size="sm" variant="ghost" onClick={() => onReject(r.id)} className="text-destructive hover:bg-destructive/10">Reject</Button>
                         </>
                       )}
-                      {r.status === "PREPARING" && (
-                        <Button size="sm" onClick={() => ship(r.id)}>
-                          ทำเครื่องหมายว่า "จัดส่งแล้ว"
-                        </Button>
+                      {canApproveRequisition && (r.status === 'APPROVED' || r.status === 'PREPARING') && (
+                        <Button size="sm" onClick={() => onShip(r.id)}>Ship</Button>
                       )}
                     </div>
                   </TableCell>
@@ -176,3 +138,4 @@ export default function RequisitionsPage() {
     </div>
   );
 }
+
