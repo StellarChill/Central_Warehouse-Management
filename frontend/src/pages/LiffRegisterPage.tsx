@@ -48,10 +48,30 @@ export default function LiffRegisterPage() {
   const initializeLiffAndLogin = async () => {
     try {
       await liff.init({ liffId: import.meta.env.VITE_LIFF_ID });
+      try {
+        if ((liff as any).ready) await (liff as any).ready;
+      } catch {}
 
       if (!liff.isLoggedIn()) {
-        liff.login();
+        liff.login({ redirectUri: window.location.href });
         return;
+      }
+      
+      // Prefer ID token flow first
+      const idToken = (liff as any).getIDToken ? (liff as any).getIDToken() : undefined;
+      if (idToken) {
+        try {
+          await loginWithLine(idToken, true);
+          localStorage.setItem("liff_only", "1");
+          navigate("/requisitions/create", { replace: true });
+          return;
+        } catch (err: any) {
+          if (String(err.message).toLowerCase().includes("pending")) {
+            navigate("/awaiting-approval", { replace: true });
+            return;
+          }
+          // Fall back to profile/LineId
+        }
       }
 
       const profile = await liff.getProfile();
