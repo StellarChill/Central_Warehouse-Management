@@ -151,6 +151,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       role: getRoleFromRoleId(data.user.RoleId),
     };
 
+    localStorage.setItem("liff_only", "true");
     localStorage.setItem("auth_token", data.token);
     localStorage.setItem("auth_user", JSON.stringify(data.user));
 
