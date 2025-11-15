@@ -74,7 +74,18 @@ export default function BranchRequisitionCreatePage() {
     setItems((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
+
+  // If user opens this page directly without auth, send them to LIFF login page
+  useEffect(() => {
+    if (!isLoading && !user) {
+      navigate('/liff', { replace: true });
+    }
+  }, [isLoading, user, navigate]);
+
+  if (isLoading || !user) {
+    return null; // or a lightweight loader
+  }
 
   const submit = async () => {
     if (items.length === 0) {
