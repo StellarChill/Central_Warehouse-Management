@@ -6,24 +6,12 @@ module.exports = {
     '^@/(.*)$': '<rootDir>/src/$1',
     '../context/AuthContext': '<rootDir>/src/context/__mocks__/AuthContext.tsx',
     '../lib/api': '<rootDir>/src/lib/__mocks__/api.ts',
+    '^.+\\.(css|less|scss)$': 'jest-transform-stub',
   },
   transform: {
     '^.+\\.(js|jsx|ts|tsx)$': 'babel-jest',
-    '\\.ts$': ['ts-jest', {
-      // ts-jest configuration here
-      // for example:
-      tsconfig: 'tsconfig.json',
-      diagnostics: {
-        ignoreCodes: [1343]
-      },
-      astTransformers: {
-        before: [
-          {
-            path: 'ts-jest-mock-import-meta',
-            options: { metaObject: { env: { VITE_LIFF_ID: 'test-liff-id' } } }
-          }
-        ]
-      }
-    }],
   },
+  transformIgnorePatterns: [
+    '/node_modules/(?!(@testing-library/react|react-router-dom|react-router|@tanstack/react-query|@radix-ui|lucide-react|date-fns|embla-carousel-react|input-otp|next-themes|react-day-picker|react-hook-form|react-resizable-panels|recharts|sonner|tailwind-merge|tailwindcss-animate|vaul))',
+  ],
 };
