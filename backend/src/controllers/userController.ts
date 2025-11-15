@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 
 export async function register(req: Request, res: Response) {
 	try {
-			const { UserName, UserPassword, RoleId, BranchId, Email, TelNumber, LineId } = req.body;
+			const { UserName, UserPassword, RoleId, BranchId, Email, TelNumber, LineId, CompanyId: CompanyIdBody } = req.body;
 			if (!UserName) return res.status(400).json({ error: 'UserName is required' });
 
 			// If no password provided, allow it only when registering via LINE (LineId present)
@@ -17,6 +17,18 @@ export async function register(req: Request, res: Response) {
 			const branchIdNum = Number(BranchId);
 			const roleToUse = Number.isFinite(roleIdNum) && roleIdNum > 0 ? roleIdNum : 3; // default BRANCH
 			const branchToUse = Number.isFinite(branchIdNum) && branchIdNum > 0 ? branchIdNum : 1;
+
+			// Resolve CompanyId: prefer provided, otherwise derive from Branch
+			let companyIdToUse: number | null = null;
+			if (Number.isFinite(Number(CompanyIdBody)) && Number(CompanyIdBody) > 0) {
+				companyIdToUse = Number(CompanyIdBody);
+			} else if (Number.isFinite(branchToUse) && branchToUse > 0) {
+				const br = await prisma.branch.findUnique({ where: { BranchId: branchToUse } });
+				if (br) companyIdToUse = br.CompanyId;
+			}
+			if (!companyIdToUse) {
+				return res.status(400).json({ error: 'CompanyId is required (pass CompanyId or a BranchId belonging to a company)' });
+			}
 
 			// Check existing by UserName or LineId to return clear errors
 			const existingByName = await prisma.user.findUnique({ where: { UserName } });
@@ -59,6 +71,7 @@ export async function register(req: Request, res: Response) {
 			try {
 				const user = await prisma.user.create({
 					data: {
+						CompanyId: companyIdToUse!,
 						UserName,
 						UserPassword: hashed,
 						RoleId: roleToUse,

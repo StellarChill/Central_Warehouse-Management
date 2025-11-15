@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../prisma';
+import { getCompanyId, httpError } from '../utils/context';
 
 function validateMaterialPayload(body: any) {
   if (!body.MaterialName) return 'MaterialName is required';
@@ -15,13 +16,14 @@ export async function createMaterial(req: Request, res: Response) {
     const err = validateMaterialPayload(req.body);
     if (err) return res.status(400).json({ error: err });
 
+    const companyId = getCompanyId(req, true)!;
     const { MaterialName, Unit, Price, CatagoryId, MaterialCode, CreatedBy } = req.body;
 
-    const exists = await prisma.material.findUnique({ where: { MaterialCode } });
+    const exists = await prisma.material.findFirst({ where: { MaterialCode, CompanyId: companyId } });
     if (exists) return res.status(409).json({ error: 'MaterialCode already exists' });
 
     const material = await prisma.material.create({
-      data: { MaterialName, Unit, Price: Number(Price), CatagoryId: Number(CatagoryId), MaterialCode, CreatedBy },
+      data: { CompanyId: companyId, MaterialName, Unit, Price: Number(Price), CatagoryId: Number(CatagoryId), MaterialCode, CreatedBy },
     });
     return res.status(201).json(material);
   } catch (e: any) {
@@ -34,7 +36,8 @@ export async function createMaterial(req: Request, res: Response) {
 
 export async function listMaterials(req: Request, res: Response) {
   try {
-    const materials = await prisma.material.findMany({ orderBy: { MaterialName: 'asc' } });
+    const companyId = getCompanyId(req, true)!;
+    const materials = await prisma.material.findMany({ where: { CompanyId: companyId }, orderBy: { MaterialName: 'asc' } });
     return res.json(materials);
   } catch (e) {
     console.error(e);
@@ -44,9 +47,10 @@ export async function listMaterials(req: Request, res: Response) {
 
 export async function getMaterial(req: Request, res: Response) {
   try {
+    const companyId = getCompanyId(req, true)!;
     const id = Number(req.params.id);
     if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid id' });
-    const material = await prisma.material.findUnique({ where: { MaterialId: id } });
+    const material = await prisma.material.findFirst({ where: { MaterialId: id, CompanyId: companyId } });
     if (!material) return res.status(404).json({ error: 'Not found' });
     return res.json(material);
   } catch (e) {
@@ -57,6 +61,7 @@ export async function getMaterial(req: Request, res: Response) {
 
 export async function updateMaterial(req: Request, res: Response) {
   try {
+    const companyId = getCompanyId(req, true)!;
     const id = Number(req.params.id);
     if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid id' });
 
@@ -70,10 +75,9 @@ export async function updateMaterial(req: Request, res: Response) {
     if (MaterialCode !== undefined) data.MaterialCode = MaterialCode;
     if (UpdatedBy !== undefined) data.UpdatedBy = UpdatedBy;
 
-    const material = await prisma.material.update({
-      where: { MaterialId: id },
-      data,
-    });
+    const existed = await prisma.material.findFirst({ where: { MaterialId: id, CompanyId: companyId } });
+    if (!existed) throw httpError(404, 'Not found');
+    const material = await prisma.material.update({ where: { MaterialId: id }, data });
     return res.json(material);
   } catch (e: any) {
     console.error(e);
@@ -86,9 +90,11 @@ export async function updateMaterial(req: Request, res: Response) {
 
 export async function deleteMaterial(req: Request, res: Response) {
   try {
+    const companyId = getCompanyId(req, true)!;
     const id = Number(req.params.id);
     if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid id' });
-
+    const existed = await prisma.material.findFirst({ where: { MaterialId: id, CompanyId: companyId } });
+    if (!existed) return res.status(404).json({ error: 'Not found' });
     await prisma.material.delete({ where: { MaterialId: id } });
     return res.status(204).send();
   } catch (e: any) {

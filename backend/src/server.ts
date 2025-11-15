@@ -79,6 +79,8 @@ import receiptRoute from './routes/receiptRoute';
 import stockRoute from './routes/stockRoute';
 import withdrawnRequestRoute from './routes/withdrawnRequestRoute';
 import issueRoute from './routes/issueRoute';
+import warehouseRoute from './routes/warehouseRoute';
+import companyRoute from './routes/companyRoute';
 
 // Health check endpoint สำหรับ Render
 app.get('/', (req, res) => {
@@ -120,6 +122,8 @@ app.use('/api/receipt', receiptRoute);
 app.use('/api/stock', stockRoute);
 app.use('/api/request', withdrawnRequestRoute);
 app.use('/api/issue', issueRoute);
+app.use('/api/warehouse', warehouseRoute);
+app.use('/api/company', companyRoute);
 
 // เริ่มรันเซิร์ฟเวอร์
 app.listen(PORT, async () => {

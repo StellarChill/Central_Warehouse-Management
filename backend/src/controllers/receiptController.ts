@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../prisma';
+import { getCompanyId, getWarehouseId } from '../utils/context';
 
 // ---------- Helpers ----------
 type NormalizedDetail = { MaterialId: number; MaterialQuantity: number };
@@ -30,9 +31,9 @@ function parseDetails(details: any): NormalizedDetail[] {
   return out;
 }
 
-async function getPoDetailMap(poId: number, materialIds: number[]) {
+async function getPoDetailMap(companyId: number, poId: number, materialIds: number[]) {
   const pods = await prisma.purchaseOrderDetail.findMany({
-    where: { PurchaseOrderId: poId, MaterialId: { in: materialIds } },
+    where: { CompanyId: companyId, PurchaseOrderId: poId, MaterialId: { in: materialIds } },
     select: { PurchaseOrderDetailId: true, MaterialId: true, PurchaseOrderPrice: true, PurchaseOrderQuantity: true },
   });
   if (pods.length !== new Set(materialIds).size) {
@@ -47,10 +48,11 @@ function computeTotal(details: NormalizedDetail[], map: Map<number, PoDetailEntr
   return details.reduce((sum, d) => sum + d.MaterialQuantity * (map.get(d.MaterialId)?.price ?? 0), 0);
 }
 
-async function getReceivedSumMap(poId: number, materialIds: number[], excludeReceiptId?: number) {
+async function getReceivedSumMap(companyId: number, poId: number, materialIds: number[], excludeReceiptId?: number) {
   // Sum of received quantities per material for the given PO, optionally excluding one receipt (for update case)
   const where: any = {
     MaterialId: { in: materialIds },
+    CompanyId: companyId,
     Receipt: { PurchaseOrderId: poId },
   };
   if (excludeReceiptId) {
@@ -69,10 +71,10 @@ async function getReceivedSumMap(poId: number, materialIds: number[], excludeRec
 }
 
 // Validate details do not exceed PO remaining quantities and return map + total
-async function enforceNotExceed(poId: number, details: NormalizedDetail[], excludeReceiptId?: number) {
+async function enforceNotExceed(companyId: number, poId: number, details: NormalizedDetail[], excludeReceiptId?: number) {
   const matIds = details.map(d => d.MaterialId);
-  const map = await getPoDetailMap(poId, matIds);
-  const receivedMap = await getReceivedSumMap(poId, matIds, excludeReceiptId);
+  const map = await getPoDetailMap(companyId, poId, matIds);
+  const receivedMap = await getReceivedSumMap(companyId, poId, matIds, excludeReceiptId);
   const violations: string[] = [];
   for (const d of details) {
     const ordered = map.get(d.MaterialId)!.orderedQty;
@@ -130,26 +132,30 @@ async function generateReceiptCode() {
 // Create Receipt from a PO
 export async function createReceipt(req: Request, res: Response) {
   try {
+    const CompanyId = getCompanyId(req, true)!;
+    const WarehouseId = getWarehouseId(req, true)!;
     const { PurchaseOrderId, ReceiptDateTime, details, CreatedBy } = req.body;
     if (!PurchaseOrderId) throw httpError(400, 'PurchaseOrderId is required');
 
     const normalized = parseDetails(details);
     const poId = Number(PurchaseOrderId);
 
-    const po = await prisma.purchaseOrder.findUnique({ where: { PurchaseOrderId: poId } });
+    const po = await prisma.purchaseOrder.findFirst({ where: { PurchaseOrderId: poId, CompanyId } });
     if (!po) throw httpError(400, 'PurchaseOrder not found');
 
-    const { map, total } = await enforceNotExceed(poId, normalized);
+    const { map, total } = await enforceNotExceed(CompanyId, poId, normalized);
     const rdt = ReceiptDateTime ? new Date(ReceiptDateTime) : new Date();
 
     // Generate running code (retry once on collision)
     let code = await generateReceiptCode();
     const created = await prisma.$transaction(async (tx) => {
       const receipt = await tx.receipt.create({
-        data: { PurchaseOrderId: poId, ReceiptCode: code, ReceiptDateTime: rdt, ReceiptTotalPrice: total, CreatedBy },
+        data: { CompanyId, PurchaseOrderId: poId, ReceiptCode: code, ReceiptDateTime: rdt, ReceiptTotalPrice: total, CreatedBy },
       });
       await tx.receiptDetail.createMany({
         data: normalized.map(d => ({
+          CompanyId,
+          WarehouseId,
           ReceiptId: receipt.ReceiptId,
           PurchaseOrderDetailId: map.get(d.MaterialId)!.podId,
           MaterialId: d.MaterialId,
@@ -161,6 +167,8 @@ export async function createReceipt(req: Request, res: Response) {
       // Create stock rows per material (batch-level)
       await tx.stock.createMany({
         data: normalized.map((d, i) => ({
+          CompanyId,
+          WarehouseId,
           MaterialId: d.MaterialId,
           Quantity: d.MaterialQuantity,
           Barcode: genBarcode(code, d.MaterialId, i + 1),
@@ -178,12 +186,12 @@ export async function createReceipt(req: Request, res: Response) {
     // After creation, if the PO is fully received, mark it as RECEIVED
     try {
       const allPods = await prisma.purchaseOrderDetail.findMany({
-        where: { PurchaseOrderId: created.PurchaseOrderId },
+        where: { CompanyId, PurchaseOrderId: created.PurchaseOrderId },
         select: { MaterialId: true, PurchaseOrderQuantity: true },
       });
       const matIds = allPods.map((p) => p.MaterialId);
       if (matIds.length) {
-        const receivedMap = await getReceivedSumMap(created.PurchaseOrderId, matIds);
+        const receivedMap = await getReceivedSumMap(CompanyId, created.PurchaseOrderId, matIds);
         const allDone = allPods.every((p) => (receivedMap.get(p.MaterialId) ?? 0) >= p.PurchaseOrderQuantity);
         if (allDone) {
           await prisma.purchaseOrder.update({
@@ -204,7 +212,9 @@ export async function createReceipt(req: Request, res: Response) {
 
 export async function listReceipts(_req: Request, res: Response) {
   try {
+    const CompanyId = getCompanyId(_req as any, true)!;
     const rows = await prisma.receipt.findMany({
+      where: { CompanyId },
       orderBy: { ReceiptDateTime: 'desc' },
       include: { PurchaseOrder: { select: poSelect } },
     });
@@ -216,9 +226,10 @@ export async function listReceipts(_req: Request, res: Response) {
 
 export async function getReceipt(req: Request, res: Response) {
   try {
+    const CompanyId = getCompanyId(req, true)!;
     const id = Number(req.params.id);
     if (!Number.isFinite(id)) throw httpError(400, 'Invalid id');
-    const r = await prisma.receipt.findUnique({ where: { ReceiptId: id }, include: includeReceipt });
+    const r = await prisma.receipt.findFirst({ where: { ReceiptId: id, CompanyId }, include: includeReceipt });
     if (!r) throw httpError(404, 'Not found');
     return res.json(flattenReceipt(r));
   } catch (e) {
@@ -229,6 +240,8 @@ export async function getReceipt(req: Request, res: Response) {
 // Replace header and all details (optional)
 export async function updateReceipt(req: Request, res: Response) {
   try {
+    const CompanyId = getCompanyId(req, true)!;
+    const WarehouseId = getWarehouseId(req, true)!;
     const id = Number(req.params.id);
     if (!Number.isFinite(id)) throw httpError(400, 'Invalid id');
 
@@ -240,13 +253,15 @@ export async function updateReceipt(req: Request, res: Response) {
     await prisma.$transaction(async (tx) => {
       if (details !== undefined) {
         const normalized = parseDetails(details);
-        const receipt = await tx.receipt.findUnique({ where: { ReceiptId: id } });
+        const receipt = await tx.receipt.findFirst({ where: { ReceiptId: id, CompanyId } });
         if (!receipt) throw httpError(404, 'Not found');
-        const { map, total } = await enforceNotExceed(receipt.PurchaseOrderId, normalized, id);
+        const { map, total } = await enforceNotExceed(CompanyId, receipt.PurchaseOrderId, normalized, id);
         // Replace details
         await tx.receiptDetail.deleteMany({ where: { ReceiptId: id } });
         await tx.receiptDetail.createMany({
           data: normalized.map(d => ({
+            CompanyId,
+            WarehouseId,
             ReceiptId: id,
             PurchaseOrderDetailId: map.get(d.MaterialId)!.podId,
             MaterialId: d.MaterialId,
@@ -258,6 +273,8 @@ export async function updateReceipt(req: Request, res: Response) {
         await tx.stock.deleteMany({ where: { ReceiptId: id } });
         await tx.stock.createMany({
           data: normalized.map((d, i) => ({
+            CompanyId,
+            WarehouseId,
             MaterialId: d.MaterialId,
             Quantity: d.MaterialQuantity,
             Barcode: genBarcode(`R${id}`, d.MaterialId, i + 1),
@@ -276,15 +293,15 @@ export async function updateReceipt(req: Request, res: Response) {
 
     // After update, re-evaluate PO completion
     try {
-      const receipt = await prisma.receipt.findUnique({ where: { ReceiptId: id } });
+      const receipt = await prisma.receipt.findFirst({ where: { ReceiptId: id, CompanyId } });
       if (receipt) {
         const allPods = await prisma.purchaseOrderDetail.findMany({
-          where: { PurchaseOrderId: receipt.PurchaseOrderId },
+          where: { CompanyId, PurchaseOrderId: receipt.PurchaseOrderId },
           select: { MaterialId: true, PurchaseOrderQuantity: true },
         });
         const matIds = allPods.map((p) => p.MaterialId);
         if (matIds.length) {
-          const receivedMap = await getReceivedSumMap(receipt.PurchaseOrderId, matIds);
+          const receivedMap = await getReceivedSumMap(CompanyId, receipt.PurchaseOrderId, matIds);
           const allDone = allPods.every((p) => (receivedMap.get(p.MaterialId) ?? 0) >= p.PurchaseOrderQuantity);
           await prisma.purchaseOrder.update({
             where: { PurchaseOrderId: receipt.PurchaseOrderId },
@@ -304,8 +321,11 @@ export async function updateReceipt(req: Request, res: Response) {
 
 export async function deleteReceipt(req: Request, res: Response) {
   try {
+    const CompanyId = getCompanyId(req, true)!;
     const id = Number(req.params.id);
     if (!Number.isFinite(id)) throw httpError(400, 'Invalid id');
+    const existed = await prisma.receipt.findFirst({ where: { ReceiptId: id, CompanyId } });
+    if (!existed) throw httpError(404, 'Not found');
     await prisma.$transaction(async (tx) => {
       await tx.stock.deleteMany({ where: { ReceiptId: id } });
       await tx.receiptDetail.deleteMany({ where: { ReceiptId: id } });

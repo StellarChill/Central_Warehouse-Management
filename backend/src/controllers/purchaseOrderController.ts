@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../prisma';
+import { getCompanyId, httpError } from '../utils/context';
 
 // Helper: ตรวจสอบรายละเอียด PO
 function validateDetails(details: any[]) {
@@ -50,17 +51,18 @@ async function generatePurchaseOrderCode() {
 // ✅ สร้างใบสั่งซื้อ
 export async function createPurchaseOrder(req: Request, res: Response) {
   try {
+    const CompanyId = getCompanyId(req, true)!;
     const { SupplierId, details = [], ...rest } = req.body;
     if (!SupplierId)
       return res.status(400).json({ error: 'SupplierId จำเป็น' });
 
     const normalized = validateDetails(details);
 
-    const supplier = await prisma.supplier.findUnique({ where: { SupplierId: +SupplierId } });
+    const supplier = await prisma.supplier.findFirst({ where: { SupplierId: +SupplierId, CompanyId } });
     if (!supplier) return res.status(400).json({ error: 'ไม่พบ supplier' });
 
     const matIds = normalized.map(d => d.MaterialId);
-    const mats = await prisma.material.findMany({ where: { MaterialId: { in: matIds } } });
+    const mats = await prisma.material.findMany({ where: { MaterialId: { in: matIds }, CompanyId } });
     if (mats.length !== matIds.length)
       return res.status(400).json({ error: 'มี MaterialId ที่ไม่ถูกต้อง' });
 
@@ -75,6 +77,7 @@ export async function createPurchaseOrder(req: Request, res: Response) {
     try {
       po = await prisma.purchaseOrder.create({
         data: {
+          CompanyId,
           SupplierId: +SupplierId,
           PurchaseOrderCode: code,
           TotalPrice: total,
@@ -88,6 +91,7 @@ export async function createPurchaseOrder(req: Request, res: Response) {
         code = await generatePurchaseOrderCode();
         po = await prisma.purchaseOrder.create({
           data: {
+            CompanyId,
             SupplierId: +SupplierId,
             PurchaseOrderCode: code,
             TotalPrice: total,
@@ -105,6 +109,7 @@ export async function createPurchaseOrder(req: Request, res: Response) {
       data: normalized.map(d => ({
         ...d,
         PurchaseOrderId: po.PurchaseOrderId,
+        CompanyId,
         CreatedBy: rest.CreatedBy,
       })),
     });
@@ -132,7 +137,9 @@ export async function createPurchaseOrder(req: Request, res: Response) {
 // ✅ ดึงรายการทั้งหมด
 export async function listPurchaseOrders(_req: Request, res: Response) {
   try {
+    const CompanyId = getCompanyId(_req as any, true)!;
     const pos = await prisma.purchaseOrder.findMany({
+      where: { CompanyId },
       orderBy: { DateTime: 'desc' },
       include: { 
         Supplier: { select: { SupplierName: true } },
@@ -153,9 +160,10 @@ export async function listPurchaseOrders(_req: Request, res: Response) {
 // ✅ ดึงใบสั่งซื้อตาม ID
 export async function getPurchaseOrder(req: Request, res: Response) {
   try {
+    const CompanyId = getCompanyId(req, true)!;
     const id = +req.params.id;
-    const po = await prisma.purchaseOrder.findUnique({
-      where: { PurchaseOrderId: id },
+    const po = await prisma.purchaseOrder.findFirst({
+      where: { PurchaseOrderId: id, CompanyId },
       include: { Supplier: true, PurchaseOrderDetails: true },
     });
     if (!po) return res.status(404).json({ error: 'ไม่พบข้อมูล' });
@@ -168,18 +176,22 @@ export async function getPurchaseOrder(req: Request, res: Response) {
 // ✅ อัปเดตใบสั่งซื้อ
 export async function updatePurchaseOrder(req: Request, res: Response) {
   try {
+    const CompanyId = getCompanyId(req, true)!;
     const id = +req.params.id;
     const { details, ...rest } = req.body;
 
     const data: any = { ...rest };
     if (rest.DateTime) data.DateTime = new Date(rest.DateTime);
 
+    const existed = await prisma.purchaseOrder.findFirst({ where: { PurchaseOrderId: id, CompanyId } });
+    if (!existed) throw httpError(404, 'Not found');
+
     await prisma.$transaction(async (tx) => {
       if (details) {
         const normalized = validateDetails(details);
         await tx.purchaseOrderDetail.deleteMany({ where: { PurchaseOrderId: id } });
         await tx.purchaseOrderDetail.createMany({
-          data: normalized.map(d => ({ ...d, PurchaseOrderId: id })),
+            data: normalized.map(d => ({ ...d, PurchaseOrderId: id, CompanyId })),
         });
         data.TotalPrice = normalized.reduce(
           (sum, d) => sum + d.PurchaseOrderQuantity * d.PurchaseOrderPrice,
@@ -202,7 +214,10 @@ export async function updatePurchaseOrder(req: Request, res: Response) {
 // ✅ ลบใบสั่งซื้อ
 export async function deletePurchaseOrder(req: Request, res: Response) {
   try {
+    const CompanyId = getCompanyId(req, true)!;
     const id = +req.params.id;
+    const existed = await prisma.purchaseOrder.findFirst({ where: { PurchaseOrderId: id, CompanyId } });
+    if (!existed) return res.status(404).json({ error: 'ไม่พบหรือไม่สามารถลบได้' });
     await prisma.$transaction(async (tx) => {
       await tx.purchaseOrderDetail.deleteMany({ where: { PurchaseOrderId: id } });
       await tx.purchaseOrder.delete({ where: { PurchaseOrderId: id } });

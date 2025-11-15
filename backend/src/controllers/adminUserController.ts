@@ -1,10 +1,12 @@
 import { Request, Response } from 'express';
 import prisma from '../prisma';
+import { getCompanyId, httpError } from '../utils/context';
 
 export async function listUsers(req: Request, res: Response) {
   try {
+    const CompanyId = getCompanyId(req, true)!;
     const status = (req.query.status as string)?.toUpperCase();
-    const where: any = {};
+    const where: any = { CompanyId };
     if (status) where.UserStatus = status;
 
     const users = await prisma.user.findMany({
@@ -47,6 +49,7 @@ export async function listUsers(req: Request, res: Response) {
 
 export async function approveUser(req: Request, res: Response) {
   try {
+    const CompanyId = getCompanyId(req, true)!;
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: 'Invalid user id' });
 
@@ -59,9 +62,9 @@ export async function approveUser(req: Request, res: Response) {
       // Optionally we could create/find a branch record. For now, store BranchName in User's BranchId if BranchId not provided
       // but since User table doesn't have BranchName, we keep BranchId and let admin manage branches separately
     }
-  // Company field is not stored on User model; skip
     if (status) data.UserStatus = status;
-
+    const existed = await prisma.user.findFirst({ where: { UserId: id, CompanyId } });
+    if (!existed) throw httpError(404, 'Not found');
     const user = await prisma.user.update({ where: { UserId: id }, data, select: { UserId: true, UserName: true, RoleId: true, BranchId: true, UserStatus: true } });
     return res.json(user);
   } catch (err: any) {
@@ -72,6 +75,7 @@ export async function approveUser(req: Request, res: Response) {
 
 export async function updateUser(req: Request, res: Response) {
   try {
+    const CompanyId = getCompanyId(req, true)!;
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: 'Invalid user id' });
 
@@ -85,11 +89,9 @@ export async function updateUser(req: Request, res: Response) {
     if (typeof UserStatus !== 'undefined') data.UserStatus = String(UserStatus);
     if (typeof LineId !== 'undefined') data.LineId = String(LineId);
 
-    const user = await prisma.user.update({
-      where: { UserId: id },
-      data,
-      include: { Branch: { select: { BranchName: true } } },
-    });
+    const existed = await prisma.user.findFirst({ where: { UserId: id, CompanyId } });
+    if (!existed) throw httpError(404, 'Not found');
+    const user = await prisma.user.update({ where: { UserId: id }, data, include: { Branch: { select: { BranchName: true } } } });
 
     // Map to client-friendly shape
     const mapped = {
@@ -114,8 +116,11 @@ export async function updateUser(req: Request, res: Response) {
 
 export async function deleteUser(req: Request, res: Response) {
   try {
+    const CompanyId = getCompanyId(req, true)!;
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: 'Invalid user id' });
+    const existed = await prisma.user.findFirst({ where: { UserId: id, CompanyId } });
+    if (!existed) return res.status(404).json({ error: 'Not found' });
     await prisma.user.delete({ where: { UserId: id } });
     return res.status(204).send();
   } catch (err) {

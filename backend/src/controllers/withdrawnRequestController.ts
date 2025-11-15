@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../prisma';
+import { getCompanyId } from '../utils/context';
 
 // Helpers
 type ReqDetail = { MaterialId: number; WithdrawnQuantity: number };
@@ -36,13 +37,14 @@ function handleError(res: Response, e: any) {
 // Create Withdrawn Request
 export async function createWithdrawnRequest(req: Request, res: Response) {
   try {
+    const CompanyId = getCompanyId(req, true)!;
     const { WithdrawnRequestCode, BranchId, RequestDate, WithdrawnRequestStatus, details, CreatedBy } = req.body;
     if (!WithdrawnRequestCode) throw httpError(400, 'WithdrawnRequestCode is required');
     if (!BranchId) throw httpError(400, 'BranchId is required');
     const parsed = parseDetails(details);
 
     // Check duplicate code
-    const dup = await prisma.withdrawnRequest.findUnique({ where: { WithdrawnRequestCode } });
+    const dup = await prisma.withdrawnRequest.findFirst({ where: { WithdrawnRequestCode, CompanyId } });
     if (dup) throw httpError(409, 'WithdrawnRequestCode already exists');
 
     // Optional: Validate materials exist
@@ -52,6 +54,7 @@ export async function createWithdrawnRequest(req: Request, res: Response) {
     const created = await prisma.$transaction(async (tx) => {
       const request = await tx.withdrawnRequest.create({
         data: {
+          CompanyId,
           WithdrawnRequestCode,
           BranchId: Number(BranchId),
           RequestDate: RequestDate ? new Date(RequestDate) : new Date(),
@@ -62,6 +65,7 @@ export async function createWithdrawnRequest(req: Request, res: Response) {
 
       await tx.withdrawnRequestDetail.createMany({
         data: parsed.map(d => ({
+          CompanyId,
           RequestId: request.RequestId,
           MaterialId: d.MaterialId,
           WithdrawnQuantity: d.WithdrawnQuantity,
@@ -85,7 +89,9 @@ export async function createWithdrawnRequest(req: Request, res: Response) {
 
 export async function listWithdrawnRequests(_req: Request, res: Response) {
   try {
+    const CompanyId = getCompanyId(_req as any, true)!;
     const rows = await prisma.withdrawnRequest.findMany({
+      where: { CompanyId },
       orderBy: { RequestDate: 'desc' },
     });
     return res.json(rows);
@@ -96,10 +102,11 @@ export async function listWithdrawnRequests(_req: Request, res: Response) {
 
 export async function getWithdrawnRequest(req: Request, res: Response) {
   try {
+    const CompanyId = getCompanyId(req, true)!;
     const id = Number(req.params.id);
     if (!Number.isFinite(id)) throw httpError(400, 'Invalid id');
-    const row = await prisma.withdrawnRequest.findUnique({
-      where: { RequestId: id },
+    const row = await prisma.withdrawnRequest.findFirst({
+      where: { RequestId: id, CompanyId },
       include: { WithdrawnRequestDetails: true },
     });
     if (!row) throw httpError(404, 'Not found');
@@ -111,12 +118,13 @@ export async function getWithdrawnRequest(req: Request, res: Response) {
 
 export async function updateWithdrawnRequest(req: Request, res: Response) {
   try {
+    const CompanyId = getCompanyId(req, true)!;
     const id = Number(req.params.id);
     if (!Number.isFinite(id)) throw httpError(400, 'Invalid id');
     const { RequestDate, WithdrawnRequestStatus, details, UpdatedBy } = req.body;
 
     // Prevent update if already issued
-    const existedIssue = await prisma.issue.findUnique({ where: { RequestId: id } });
+    const existedIssue = await prisma.issue.findFirst({ where: { RequestId: id, CompanyId } });
     if (existedIssue) throw httpError(400, 'Cannot update: Issue already created for this request');
 
     const header: any = {};
@@ -130,6 +138,7 @@ export async function updateWithdrawnRequest(req: Request, res: Response) {
         await tx.withdrawnRequestDetail.deleteMany({ where: { RequestId: id } });
         await tx.withdrawnRequestDetail.createMany({
           data: parsed.map(d => ({
+            CompanyId,
             RequestId: id,
             MaterialId: d.MaterialId,
             WithdrawnQuantity: d.WithdrawnQuantity,
@@ -150,11 +159,12 @@ export async function updateWithdrawnRequest(req: Request, res: Response) {
 
 export async function deleteWithdrawnRequest(req: Request, res: Response) {
   try {
+    const CompanyId = getCompanyId(req, true)!;
     const id = Number(req.params.id);
     if (!Number.isFinite(id)) throw httpError(400, 'Invalid id');
 
     // Prevent delete if already issued
-    const existedIssue = await prisma.issue.findUnique({ where: { RequestId: id } });
+    const existedIssue = await prisma.issue.findFirst({ where: { RequestId: id, CompanyId } });
     if (existedIssue) throw httpError(400, 'Cannot delete: Issue already created for this request');
 
     await prisma.$transaction(async (tx) => {

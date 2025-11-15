@@ -14,6 +14,66 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Company {
+  CompanyId        Int      @id @default(autoincrement())
+  CompanyName      String
+  CompanyAddress   String?
+  TaxId            String?
+  CompanyCode      String   @unique
+  CompanyTelNumber String?
+  CompanyEmail     String?
+  CreatedAt        DateTime @default(now())
+  CreatedBy        Int?
+  UpdatedAt        DateTime @updatedAt
+  UpdatedBy        Int?
+
+  @@index([CompanyName])
+  @@index([CompanyCode])
+
+  CreatedByUser User? @relation("CompanyCreatedBy", fields: [CreatedBy], references: [UserId])
+  UpdatedByUser User? @relation("CompanyUpdatedBy", fields: [UpdatedBy], references: [UserId])
+
+  Users                   User[]
+  Branches                Branch[]
+  Suppliers               Supplier[]
+  Materials               Material[]
+  PurchaseOrders          PurchaseOrder[]
+  Catagories              Catagory[]
+  Stocks                  Stock[]
+  Receipts                Receipt[]
+  WithdrawnRequests       WithdrawnRequest[]
+  ReceiptDetails          ReceiptDetail[]
+  WithdrawnRequestDetails WithdrawnRequestDetail[]
+  Issues                  Issue[]
+  IssueDetails            IssueDetail[]
+  PurchaseOrderDetails    PurchaseOrderDetail[]
+  Warehouses              Warehouse[]
+}
+
+model Warehouse {
+  WarehouseId      Int      @id @default(autoincrement())
+  WarehouseName    String
+  CompanyId        Int
+  WarehouseAddress String?
+  WarehouseCode    String   @unique
+  CreatedAt        DateTime @default(now())
+  CreatedBy        Int?
+  UpdatedAt        DateTime @updatedAt
+  UpdatedBy        Int?
+
+  @@index([WarehouseName])
+  @@index([CompanyId])
+  @@index([WarehouseCode])
+
+  CreatedByUser User?   @relation("WarehouseCreatedBy", fields: [CreatedBy], references: [UserId])
+  UpdatedByUser User?   @relation("WarehouseUpdatedBy", fields: [UpdatedBy], references: [UserId])
+
+  Company      Company @relation(fields: [CompanyId], references: [CompanyId])
+
+  Stocks         Stock[]
+  ReceiptDetails ReceiptDetail[]
+}
+
 model User {
   UserId      Int      @id @default(autoincrement())
   UserName    String   @unique
@@ -21,6 +81,7 @@ model User {
   UserPassword String
   RoleId      Int
   BranchId    Int
+  CompanyId   Int
   TelNumber   String?
   Email       String?
   LineId      String?
@@ -31,9 +92,11 @@ model User {
 
   @@index([UserName])
   @@index([BranchId])
+  @@index([CompanyId])
 
   Role        Role     @relation(fields: [RoleId], references: [RoleId])
   Branch      Branch   @relation(fields: [BranchId], references: [BranchId])
+  Company     Company  @relation(fields: [CompanyId], references: [CompanyId])
 
   BranchCreatedBy               Branch[]               @relation("BranchCreatedBy")
   BranchUpdatedBy               Branch[]               @relation("BranchUpdatedBy")
@@ -61,11 +124,16 @@ model User {
   IssueUpdatedBy                Issue[]                @relation("IssueUpdatedBy")
   IssueDetailCreatedBy          IssueDetail[]          @relation("IssueDetailCreatedBy")
   IssueDetailUpdatedBy          IssueDetail[]          @relation("IssueDetailUpdatedBy")
+  CompanyCreatedBy              Company[]              @relation("CompanyCreatedBy")
+  CompanyUpdatedBy              Company[]              @relation("CompanyUpdatedBy")
+  WarehouseCreatedBy            Warehouse[]            @relation("WarehouseCreatedBy")
+  WarehouseUpdatedBy            Warehouse[]            @relation("WarehouseUpdatedBy")
 }
 
 model Branch {
   BranchId      Int      @id @default(autoincrement())
   BranchName    String
+  CompanyId     Int
   BranchAddress String?
   BranchCode    String   @unique
   CreatedAt     DateTime @default(now())
@@ -74,10 +142,12 @@ model Branch {
   UpdatedBy     Int?
 
   @@index([BranchName])
+  @@index([CompanyId])
 
   CreatedByUser User? @relation("BranchCreatedBy", fields: [CreatedBy], references: [UserId])
   UpdatedByUser User? @relation("BranchUpdatedBy", fields: [UpdatedBy], references: [UserId])
 
+  Company            Company @relation(fields: [CompanyId], references: [CompanyId])
   Users                User[]
   WithdrawnRequests    WithdrawnRequest[]
   Issues               Issue[]
@@ -87,6 +157,7 @@ model PurchaseOrderDetail {
   PurchaseOrderDetailId Int      @id @default(autoincrement())
   PurchaseOrderId       Int
   MaterialId            Int
+  CompanyId             Int
   PurchaseOrderQuantity Int
   PurchaseOrderPrice    Float
   PurchaseOrderUnit     String
@@ -97,12 +168,14 @@ model PurchaseOrderDetail {
 
   @@index([PurchaseOrderId])
   @@index([MaterialId])
+  @@index([CompanyId])
 
   CreatedByUser         User? @relation("PurchaseOrderDetailCreatedBy", fields: [CreatedBy], references: [UserId])
   UpdatedByUser         User? @relation("PurchaseOrderDetailUpdatedBy", fields: [UpdatedBy], references: [UserId])
 
   PurchaseOrder         PurchaseOrder @relation(fields: [PurchaseOrderId], references: [PurchaseOrderId])
   Material              Material      @relation(fields: [MaterialId], references: [MaterialId])
+  Company               Company       @relation(fields: [CompanyId], references: [CompanyId])
 
   ReceiptDetails        ReceiptDetail[]
 
@@ -123,6 +196,7 @@ model Role {
 model Supplier {
   SupplierId         Int    @id @default(autoincrement())
   SupplierName       String
+  CompanyId          Int
   SupplierAddress    String?
   SupplierCode       String @unique
   SupplierTelNumber  String?
@@ -133,10 +207,12 @@ model Supplier {
 
   @@index([SupplierName])
   @@index([SupplierCode])
+  @@index([CompanyId])
 
   CreatedByUser      User? @relation("SupplierCreatedBy", fields: [CreatedBy], references: [UserId])
   UpdatedByUser      User? @relation("SupplierUpdatedBy", fields: [UpdatedBy], references: [UserId])
 
+  Company            Company @relation(fields: [CompanyId], references: [CompanyId])
   PurchaseOrders     PurchaseOrder[]
 }
 
@@ -146,6 +222,7 @@ model Material {
   Unit           String
   Price          Float
   CatagoryId     Int
+  CompanyId      Int
   MaterialCode   String  @unique
   CreatedAt      DateTime @default(now())
   CreatedBy      Int?
@@ -154,11 +231,13 @@ model Material {
 
   @@index([MaterialName])
   @@index([MaterialCode])
+  @@index([CompanyId])
 
   CreatedByUser  User? @relation("MaterialCreatedBy", fields: [CreatedBy], references: [UserId])
   UpdatedByUser  User? @relation("MaterialUpdatedBy", fields: [UpdatedBy], references: [UserId])
 
   Catagory       Catagory @relation(fields: [CatagoryId], references: [CatagoryId])
+  Company        Company  @relation(fields: [CompanyId], references: [CompanyId])
   Stocks         Stock[]
   PurchaseOrderDetails PurchaseOrderDetail[]
   ReceiptDetails ReceiptDetail[]
@@ -171,6 +250,7 @@ model PurchaseOrder {
   DateTime              DateTime
   TotalPrice            Float
   SupplierId            Int
+  CompanyId             Int
   PurchaseOrderCode     String  @unique
   PurchaseOrderStatus   String
   PurchaseOrderAddress  String?
@@ -183,11 +263,13 @@ model PurchaseOrder {
 
   @@index([PurchaseOrderCode])
   @@index([PurchaseOrderStatus])
+  @@index([CompanyId])
 
   CreatedByUser         User? @relation("PurchaseOrderCreatedBy", fields: [CreatedBy], references: [UserId])
   UpdatedByUser         User? @relation("PurchaseOrderUpdatedBy", fields: [UpdatedBy], references: [UserId])
 
   Supplier              Supplier @relation(fields: [SupplierId], references: [SupplierId])
+  Company               Company  @relation(fields: [CompanyId], references: [CompanyId])
   PurchaseOrderDetails  PurchaseOrderDetail[]
   Receipts              Receipt[]
   Stocks                Stock[]
@@ -196,6 +278,7 @@ model PurchaseOrder {
 model Catagory {
   CatagoryId     Int     @id @default(autoincrement())
   CatagoryName   String
+  CompanyId      Int
   CatagoryCode   String  @unique
   CreatedAt      DateTime @default(now())
   CreatedBy      Int?
@@ -204,16 +287,20 @@ model Catagory {
 
   @@index([CatagoryName])
   @@index([CatagoryCode])
+  @@index([CompanyId])
 
   CreatedByUser  User? @relation("CatagoryCreatedBy", fields: [CreatedBy], references: [UserId])
   UpdatedByUser  User? @relation("CatagoryUpdatedBy", fields: [UpdatedBy], references: [UserId])
 
+  Company        Company  @relation(fields: [CompanyId], references: [CompanyId])
   Materials      Material[]
 }
 
 model Stock {
   StockId         Int     @id @default(autoincrement())
   MaterialId      Int
+  CompanyId       Int
+  WarehouseId     Int
   Quantity        Int
   Barcode         String  @unique
   StockPrice      Float
@@ -227,6 +314,8 @@ model Stock {
   UpdatedBy       Int?
 
   @@index([Barcode])
+  @@index([CompanyId])
+  @@index([WarehouseId])
 
   CreatedByUser   User? @relation("StockCreatedBy", fields: [CreatedBy], references: [UserId])
   UpdatedByUser   User? @relation("StockUpdatedBy", fields: [UpdatedBy], references: [UserId])
@@ -234,6 +323,8 @@ model Stock {
   Material        Material @relation(fields: [MaterialId], references: [MaterialId])
   Receipt         Receipt? @relation(fields: [ReceiptId], references: [ReceiptId])
   PurchaseOrder   PurchaseOrder? @relation(fields: [PurchaseOrderId], references: [PurchaseOrderId])
+  Company         Company  @relation(fields: [CompanyId], references: [CompanyId])
+  Warehouse       Warehouse @relation(fields: [WarehouseId], references: [WarehouseId])
 }
 
 model Receipt {
@@ -241,6 +332,7 @@ model Receipt {
   ReceiptDateTime    DateTime
   ReceiptTotalPrice  Float
   PurchaseOrderId    Int
+  CompanyId          Int
   ReceiptCode        String  @unique
   CreatedAt          DateTime @default(now())
   CreatedBy          Int?
@@ -248,11 +340,13 @@ model Receipt {
   UpdatedBy          Int?
 
   @@index([ReceiptCode])
+  @@index([CompanyId])
   
   CreatedByUser      User? @relation("ReceiptCreatedBy", fields: [CreatedBy], references: [UserId])
   UpdatedByUser      User? @relation("ReceiptUpdatedBy", fields: [UpdatedBy], references: [UserId])
 
   PurchaseOrder      PurchaseOrder @relation(fields: [PurchaseOrderId], references: [PurchaseOrderId])
+  Company            Company @relation(fields: [CompanyId], references: [CompanyId])
   ReceiptDetails     ReceiptDetail[]
   Stocks             Stock[]
 }
@@ -262,6 +356,7 @@ model WithdrawnRequest {
   RequestDate               DateTime
   WithdrawnRequestStatus    String
   BranchId                  Int
+  CompanyId                 Int
   WithdrawnRequestCode      String  @unique
   CreatedAt                 DateTime @default(now())
   CreatedBy                 Int?
@@ -269,11 +364,13 @@ model WithdrawnRequest {
   UpdatedBy                 Int?
 
   @@index([WithdrawnRequestCode])
+  @@index([CompanyId])
 
   CreatedByUser             User? @relation("WithdrawnRequestCreatedBy", fields: [CreatedBy], references: [UserId])
   UpdatedByUser             User? @relation("WithdrawnRequestUpdatedBy", fields: [UpdatedBy], references: [UserId])
 
   Branch                    Branch   @relation(fields: [BranchId], references: [BranchId])
+  Company                   Company  @relation(fields: [CompanyId], references: [CompanyId])
   WithdrawnRequestDetails   WithdrawnRequestDetail[]
   Issues                    Issue[]
 }
@@ -283,6 +380,8 @@ model ReceiptDetail {
   ReceiptId              Int
   PurchaseOrderDetailId  Int
   MaterialId             Int
+  CompanyId              Int
+  WarehouseId            Int
   MaterialQuantity       Int
   CreatedAt              DateTime @default(now())
   CreatedBy              Int?
@@ -291,6 +390,8 @@ model ReceiptDetail {
 
   @@index([ReceiptId])
   @@index([MaterialId])
+  @@index([CompanyId])
+  @@index([WarehouseId])
 
   CreatedByUser          User? @relation("ReceiptDetailCreatedBy", fields: [CreatedBy], references: [UserId])
   UpdatedByUser          User? @relation("ReceiptDetailUpdatedBy", fields: [UpdatedBy], references: [UserId])
@@ -298,6 +399,8 @@ model ReceiptDetail {
   Receipt                Receipt   @relation(fields: [ReceiptId], references: [ReceiptId])
   PurchaseOrderDetail    PurchaseOrderDetail @relation(fields: [PurchaseOrderDetailId], references: [PurchaseOrderDetailId])
   Material               Material  @relation(fields: [MaterialId], references: [MaterialId])
+  Company                Company   @relation(fields: [CompanyId], references: [CompanyId])
+  Warehouse              Warehouse @relation(fields: [WarehouseId], references: [WarehouseId])
 
   @@unique([ReceiptId, MaterialId])
 }
@@ -306,6 +409,7 @@ model WithdrawnRequestDetail {
   WithdrawnRequestDetailId Int     @id @default(autoincrement())
   RequestId               Int
   MaterialId              Int
+  CompanyId               Int
   WithdrawnQuantity       Int
   CreatedAt               DateTime @default(now())
   CreatedBy               Int?
@@ -314,12 +418,14 @@ model WithdrawnRequestDetail {
 
   @@index([RequestId])
   @@index([MaterialId])
+  @@index([CompanyId])
 
   CreatedByUser           User? @relation("WithdrawnRequestDetailCreatedBy", fields: [CreatedBy], references: [UserId])
   UpdatedByUser           User? @relation("WithdrawnRequestDetailUpdatedBy", fields: [UpdatedBy], references: [UserId])
 
   WithdrawnRequest        WithdrawnRequest @relation(fields: [RequestId], references: [RequestId])
   Material                Material         @relation(fields: [MaterialId], references: [MaterialId])
+  Company                 Company          @relation(fields: [CompanyId], references: [CompanyId])
 
   @@unique([RequestId, MaterialId])
 }
@@ -328,6 +434,7 @@ model Issue {
   IssueId      Int     @id @default(autoincrement())
   RequestId    Int    @unique
   BranchId     Int
+  CompanyId    Int
   IssueStatus  String
   IssueDate    DateTime
   CreatedAt    DateTime @default(now())
@@ -337,12 +444,14 @@ model Issue {
 
   @@index([RequestId])
   @@index([BranchId])
+  @@index([CompanyId])
 
   CreatedByUser User? @relation("IssueCreatedBy", fields: [CreatedBy], references: [UserId])
   UpdatedByUser User? @relation("IssueUpdatedBy", fields: [UpdatedBy], references: [UserId])
 
   WithdrawnRequest WithdrawnRequest @relation(fields: [RequestId], references: [RequestId])
   Branch           Branch           @relation(fields: [BranchId], references: [BranchId])
+  Company          Company          @relation(fields: [CompanyId], references: [CompanyId])
   IssueDetails     IssueDetail[]
 }
 
@@ -353,6 +462,7 @@ model IssueDetail {
   Barcode         String
   IssueQuantity   Int
   IssueId         Int
+  CompanyId       Int
   CreatedAt       DateTime @default(now())
   CreatedBy       Int?
   UpdatedAt       DateTime @updatedAt
@@ -360,12 +470,14 @@ model IssueDetail {
 
   @@index([RequestId])
   @@index([MaterialId])
+  @@index([CompanyId])
 
   CreatedByUser   User?    @relation("IssueDetailCreatedBy", fields: [CreatedBy], references: [UserId])
   UpdatedByUser   User?    @relation("IssueDetailUpdatedBy", fields: [UpdatedBy], references: [UserId])
 
   Issue           Issue    @relation(fields: [IssueId], references: [IssueId])
   Material        Material @relation(fields: [MaterialId], references: [MaterialId])
+  Company         Company  @relation(fields: [CompanyId], references: [CompanyId])
 
   @@unique([IssueId, MaterialId, Barcode])
 }
