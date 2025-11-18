@@ -4,18 +4,13 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import {
-  BrowserRouter,
-  Routes,
-  Route,
-  Navigate,
-  useLocation,
-} from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AppLayout } from "./components/layout/AppLayout";
 import { AuthProvider, useAuth, Role } from "./context/AuthContext";
 import { StockProvider } from "./context/StockContext";
 
 // ---- Code-split pages (improves first-load perf) ----
+// Legacy dashboard kept but not used as root; routing now uses role landing
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 const PurchaseOrdersPage = lazy(() => import("./pages/PurchaseOrdersPage"));
 const InventoryPage = lazy(() => import("./pages/InventoryPage"));
@@ -37,6 +32,11 @@ const LiffRegisterPage = lazy(() => import("./pages/LiffRegisterPage"));
 const WaitingApprovalPage = lazy(() => import("./pages/WaitingApprovalPage"));
 const UserStatusPage = lazy(() => import("./pages/UserStatusPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const PlatformDashboardPage = lazy(() => import("./pages/PlatformDashboardPage"));
+const PlatformCompaniesPage = lazy(() => import("./pages/PlatformCompaniesPage"));
+const CompanyDashboardPage = lazy(() => import("./pages/CompanyDashboardPage"));
+const BranchDashboardPage = lazy(() => import("./pages/BranchDashboardPage"));
+const CompanyRegisterPage = lazy(() => import("./pages/CompanyRegisterPage"));
 
 // ---- React Query sane defaults ----
 const queryClient = new QueryClient({
@@ -65,13 +65,15 @@ const App = () => (
                 
                 {/* Public routes */}
                 <Route path="/register" element={<RegisterPage />} />
+                {/* Company self-service registration */}
+                <Route path="/register-company" element={<CompanyRegisterPage />} />
                 <Route path="/liff" element={<LiffRegisterPage />} />
                 <Route path="/awaiting-approval" element={<WaitingApprovalPage />} />
 
-                {/* Root route - shows login if not authenticated, dashboard if authenticated */}
+                {/* Root route - shows login if not authenticated; renders layout for all nested routes */}
                 <Route path="/" element={<RootRoute />}>
-                  {/* Child routes should be relative to render inside AppLayout's <Outlet /> */}
-                  <Route index element={<DashboardPage />} />
+                  {/* Index redirects user to appropriate portal based on role */}
+                  <Route index element={<RoleLanding />} />
                   <Route path="user-status" element={<UserStatusPage />} />
                   <Route path="suppliers" element={<SuppliersPage />} />
                   <Route path="ingredients" element={<ProductsPage />} />
@@ -84,6 +86,43 @@ const App = () => (
                   />
                   <Route path="receiving" element={<ReceivingPage />} />
                   <Route path="requisitions" element={<RequisitionsPage />} />
+                  {/* Platform admin portal */}
+                  <Route
+                    path="platform"
+                    element={
+                      <Guard allow={["PLATFORM_ADMIN"]}>
+                        <PlatformDashboardPage />
+                      </Guard>
+                    }
+                  />
+                  <Route
+                    path="platform/companies"
+                    element={
+                      <Guard allow={["PLATFORM_ADMIN"]}>
+                        <PlatformCompaniesPage />
+                      </Guard>
+                    }
+                  />
+
+                  {/* Company admin portal */}
+                  <Route
+                    path="admin"
+                    element={
+                      <Guard allow={["COMPANY_ADMIN", "ADMIN"]}>
+                        <CompanyDashboardPage />
+                      </Guard>
+                    }
+                  />
+
+                  {/* Branch/Warehouse portal */}
+                  <Route
+                    path="branch"
+                    element={
+                      <Guard allow={["BRANCH_MANAGER", "BRANCH_USER", "CENTER", "BRANCH", "WAREHOUSE_ADMIN"]}>
+                        <BranchDashboardPage />
+                      </Guard>
+                    }
+                  />
                   <Route
                     path="admin"
                     element={
@@ -142,6 +181,7 @@ function LoadingScreen() {
 // ---- RootRoute: แสดง login ถ้ายังไม่ได้ login, dashboard ถ้า login แล้ว ----
 function RootRoute() {
   const { user, isLoading } = useAuth();
+  const location = useLocation();
 
   // ถ้ากำลังโหลดข้อมูล user จาก localStorage ให้แสดง loading
   if (isLoading) {
@@ -151,18 +191,6 @@ function RootRoute() {
   // ถ้ายัง login ไม่ได้ แสดง login page
   if (!user) {
     return <LoginPage />;
-  }
-
-  // If this session was a LIFF-only login, force redirect to requisition create page
-  try {
-    const liffOnly = localStorage.getItem('liff_only');
-    if (liffOnly) {
-      // Remove the flag so it only redirects once
-      localStorage.removeItem('liff_only');
-      return <Navigate to="/requisitions/create" replace />;
-    }
-  } catch (e) {
-    // ignore localStorage errors
   }
 
   // ถ้า login แล้ว แสดง AppLayout และ nested routes
@@ -205,3 +233,24 @@ function Guard({
 }
 
 export default App;
+
+// Role-based landing at index path only
+function RoleLanding() {
+  const { user, isLoading } = useAuth();
+  const location = useLocation();
+  if (isLoading) return <LoadingScreen />;
+  if (!user) return <LoginPage />;
+  const role = user.role;
+  // If this session was a LIFF-only login, force redirect once
+  try {
+    const liffOnly = localStorage.getItem('liff_only');
+    if (liffOnly) {
+      localStorage.removeItem('liff_only');
+      return <Navigate to="/requisitions/create" replace />;
+    }
+  } catch {}
+  if (role === 'PLATFORM_ADMIN') return <Navigate to="/platform" replace />;
+  if (role === 'COMPANY_ADMIN' || role === 'ADMIN') return <Navigate to="/admin" replace />;
+  return <Navigate to="/branch" replace />;
+}
+

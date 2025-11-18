@@ -178,9 +178,16 @@ export default function LoginPage() {
                   )}
                 </Button>
 
-                <p className="text-center text-sm text-muted-foreground">
-                  ยังไม่มีบัญชี? <Link to="/register" className="text-primary hover:underline">สมัครสมาชิก</Link>
-                </p>
+                <div className="text-center text-sm text-muted-foreground space-y-1">
+                  <p>
+                    ยังไม่มีบัญชีองค์กร?{' '}
+                    <Link to="/register-company" className="text-primary hover:underline">สมัครสำหรับองค์กร</Link>
+                  </p>
+                  <p>
+                    หรือสมัครผู้ใช้ทั่วไป?{' '}
+                    <Link to="/register" className="text-primary hover:underline">สมัครสมาชิก</Link>
+                  </p>
+                </div>
 
               
 

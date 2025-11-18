@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import { createCatagory, listCatagories, getCatagory, updateCatagory, deleteCatagory } from '../controllers/catagoryController';
+import { authenticateToken } from '../middlewares/authMiddleware';
 
 const router = Router();
+router.use(authenticateToken);
 
 router.post('/', createCatagory);
 router.get('/', listCatagories);

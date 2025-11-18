@@ -47,6 +47,7 @@ export const th = {
 
   // User Roles
   roles: {
+    PLATFORM_ADMIN: "ผู้ดูแลแพลตฟอร์ม",
     ADMIN: "ผู้ดูแลระบบ",
     CENTER: "คลังสินค้าศูนย์",
     BRANCH: "สาขา",

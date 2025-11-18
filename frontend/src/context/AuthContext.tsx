@@ -8,7 +8,7 @@ import {
   useEffect,
 } from "react";
 
-export type Role = "ADMIN" | "CENTER" | "BRANCH";
+export type Role = "PLATFORM_ADMIN" | "PLATFORM_STAFF" | "COMPANY_ADMIN" | "WAREHOUSE_ADMIN" | "BRANCH_MANAGER" | "BRANCH_USER" | "VIEWER" | "ADMIN" | "CENTER" | "BRANCH";
 
 // User type ที่ได้จาก backend
 type User = {
@@ -16,9 +16,11 @@ type User = {
   UserName: string;
   RoleId: number;
   BranchId: number;
+  CompanyId?: number;
   Email?: string;
   UserStatus?: string; // 👈 เพิ่มสถานะ user
-  role: Role; // map จาก RoleId
+  role: Role; // from roleCode or RoleId
+  roleCode?: string;
 } | null;
 
 type AuthContextType = {
@@ -28,6 +30,17 @@ type AuthContextType = {
   // Accept either a LineId (legacy) or an id_token from LIFF (recommended)
   loginWithLine: (tokenOrLineId: string, isIdToken?: boolean) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
+  registerCompany: (payload: {
+    CompanyName: string;
+    CompanyAddress?: string;
+    TaxId?: string;
+    CompanyEmail?: string;
+    CompanyTelNumber?: string;
+    AdminUserName: string;
+    AdminUserPassword: string;
+    AdminEmail?: string;
+    AdminTelNumber?: string;
+  }) => Promise<any>;
   logout: () => void;
   isLoading: boolean;
 };
@@ -62,11 +75,27 @@ const getApiBase = () => {
 const API_BASE = getApiBase();
 
 // แปลง RoleId เป็น Role string
-function getRoleFromRoleId(roleId: number): Role {
+function roleFromRoleId(roleId: number): Role {
   if (roleId === 1) return "ADMIN";
   if (roleId === 2) return "CENTER";
   if (roleId === 3) return "BRANCH";
   return "BRANCH"; // default
+}
+
+function roleFromPayload(u: any): Role {
+  const code = (u?.roleCode || u?.RoleCode || '').toString().toUpperCase();
+  if (code === 'PLATFORM_ADMIN') return 'PLATFORM_ADMIN';
+  if (code === 'PLATFORM_STAFF') return 'PLATFORM_STAFF';
+  if (code === 'COMPANY_ADMIN') return 'COMPANY_ADMIN';
+  if (code === 'WAREHOUSE_ADMIN') return 'WAREHOUSE_ADMIN';
+  if (code === 'BRANCH_MANAGER') return 'BRANCH_MANAGER';
+  if (code === 'BRANCH_USER') return 'BRANCH_USER';
+  if (code === 'VIEWER') return 'VIEWER';
+  if (code === 'ADMIN') return 'ADMIN';
+  if (code === 'CENTER') return 'CENTER';
+  if (code === 'BRANCH') return 'BRANCH';
+  // fallback by RoleId
+  return roleFromRoleId(Number(u?.RoleId));
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -85,7 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(storedToken);
         setUser({
           ...userData,
-          role: getRoleFromRoleId(userData.RoleId),
+          role: roleFromPayload(userData),
         });
       } catch (err) {
         console.error("Failed to parse stored user:", err);
@@ -112,7 +141,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const data = await res.json();
     const userData = {
       ...data.user,
-      role: getRoleFromRoleId(data.user.RoleId),
+      role: roleFromPayload(data.user),
     };
 
     localStorage.setItem("auth_token", data.token);
@@ -148,7 +177,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const data = await res.json();
     const userData = {
       ...data.user,
-      role: getRoleFromRoleId(data.user.RoleId),
+      role: roleFromPayload(data.user),
     };
 
     localStorage.setItem("liff_only", "true");
@@ -199,6 +228,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // สมัครเสร็จ แต่ยังไม่ login ที่นี่
   };
 
+  // Company self-service registration
+  const registerCompany = async (payload: {
+    CompanyName: string;
+    CompanyAddress?: string;
+    TaxId?: string;
+    CompanyEmail?: string;
+    CompanyTelNumber?: string;
+    AdminUserName: string;
+    AdminUserPassword: string;
+    AdminEmail?: string;
+    AdminTelNumber?: string;
+  }) => {
+    // Call the public nested-body endpoint
+    const res = await fetch(`${API_BASE}/public/company-register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        company: {
+          CompanyName: payload.CompanyName,
+          CompanyAddress: payload.CompanyAddress,
+          TaxId: payload.TaxId,
+          CompanyEmail: payload.CompanyEmail,
+          CompanyTelNumber: payload.CompanyTelNumber,
+        },
+        adminUser: {
+          UserName: payload.AdminUserName,
+          UserPassword: payload.AdminUserPassword,
+          Email: payload.AdminEmail,
+          TelNumber: payload.AdminTelNumber,
+        },
+      }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({} as any));
+      throw new Error(data?.error || `Register company failed (HTTP ${res.status})`);
+    }
+    const data = await res.json();
+    // Auto-login new company admin
+    localStorage.setItem('auth_token', data.token);
+    localStorage.setItem('auth_user', JSON.stringify(data.user));
+    setToken(data.token);
+    setUser({ ...data.user, role: roleFromPayload(data.user) });
+    return data;
+  };
+
   const logout = () => {
     localStorage.removeItem("auth_token");
     localStorage.removeItem("auth_user");
@@ -218,6 +292,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       loginWithLine,
       register,
+      registerCompany,
       logout,
       isLoading,
     }),

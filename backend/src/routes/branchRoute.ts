@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import { createBranch, listBranches, getBranch, updateBranch, deleteBranch } from '../controllers/branchController';
+import { authenticateToken } from '../middlewares/authMiddleware';
 
 const router = Router();
+router.use(authenticateToken);
 
 router.post('/', createBranch);
 router.get('/', listBranches);

@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import { createPurchaseOrder, listPurchaseOrders, getPurchaseOrder, updatePurchaseOrder, updatePurchaseOrderStatus, deletePurchaseOrder } from '../controllers/purchaseOrderController';
+import { authenticateToken } from '../middlewares/authMiddleware';
 
 const router = Router();
+router.use(authenticateToken);
 
 router.post('/', createPurchaseOrder);
 router.get('/', listPurchaseOrders);

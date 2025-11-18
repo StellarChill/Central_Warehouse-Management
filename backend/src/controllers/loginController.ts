@@ -12,7 +12,10 @@ export async function login(req: Request, res: Response) {
     return res.status(400).json({ error: 'UserName and UserPassword required' });
   }
 
-  const user = await prisma.user.findUnique({ where: { UserName } });
+  const user = await prisma.user.findUnique({
+    where: { UserName },
+    include: { Role: true },
+  });
   console.log('user', user);
   if (!user) {
     return res.status(401).json({ error: 'Invalid credentials A1' });
@@ -24,8 +27,18 @@ export async function login(req: Request, res: Response) {
     return res.status(401).json({ error: 'Invalid credentials A2' });
   }
 
+  if (user.UserStatus && user.UserStatus !== 'ACTIVE') {
+    return res.status(403).json({ error: `User is not active (${user.UserStatus})` });
+  }
+
   const token = jwt.sign(
-    { UserId: user.UserId, RoleId: user.RoleId },
+    {
+      UserId: user.UserId,
+      RoleId: user.RoleId,
+      roleCode: (user as any).Role?.RoleCode,
+      CompanyId: user.CompanyId,
+      BranchId: user.BranchId,
+    },
     JWT_SECRET,
     { expiresIn: '1d' },
   );
@@ -36,7 +49,9 @@ export async function login(req: Request, res: Response) {
       UserId: user.UserId,
       UserName: user.UserName,
       RoleId: user.RoleId,
+      roleCode: (user as any).Role?.RoleCode ?? null,
       BranchId: user.BranchId,
+      CompanyId: user.CompanyId,
       Email: user.Email,
       UserStatus: user.UserStatus,
     },
@@ -120,6 +135,7 @@ export async function loginWithLine(req: Request, res: Response) {
   // หา user จาก LineId
   const user = await prisma.user.findFirst({
     where: { LineId: lineUserId ?? undefined },
+    include: { Role: true },
   });
 
   if (!user) {
@@ -137,7 +153,13 @@ export async function loginWithLine(req: Request, res: Response) {
   }
 
   const token = jwt.sign(
-    { UserId: user.UserId, RoleId: user.RoleId },
+    {
+      UserId: user.UserId,
+      RoleId: user.RoleId,
+      roleCode: (user as any).Role?.RoleCode,
+      CompanyId: user.CompanyId,
+      BranchId: user.BranchId,
+    },
     JWT_SECRET,
     { expiresIn: '1d' },
   );
@@ -148,7 +170,9 @@ export async function loginWithLine(req: Request, res: Response) {
       UserId: user.UserId,
       UserName: user.UserName,
       RoleId: user.RoleId,
+      roleCode: (user as any).Role?.RoleCode ?? null,
       BranchId: user.BranchId,
+      CompanyId: user.CompanyId,
       Email: user.Email,
       UserStatus: user.UserStatus,
     },

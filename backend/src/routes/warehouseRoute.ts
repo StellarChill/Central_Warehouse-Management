@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import { createWarehouse, listWarehouses, getWarehouse, updateWarehouse, deleteWarehouse } from '../controllers/warehouseController';
+import { authenticateToken } from '../middlewares/authMiddleware';
 
 const router = Router();
+router.use(authenticateToken);
 
 router.post('/', createWarehouse);
 router.get('/', listWarehouses);
