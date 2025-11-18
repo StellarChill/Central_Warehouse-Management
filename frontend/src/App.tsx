@@ -37,6 +37,7 @@ const PlatformCompaniesPage = lazy(() => import("./pages/PlatformCompaniesPage")
 const CompanyDashboardPage = lazy(() => import("./pages/CompanyDashboardPage"));
 const BranchDashboardPage = lazy(() => import("./pages/BranchDashboardPage"));
 const CompanyRegisterPage = lazy(() => import("./pages/CompanyRegisterPage"));
+const HomePage = lazy(() => import("./pages/HomePage"));
 
 // ---- React Query sane defaults ----
 const queryClient = new QueryClient({
@@ -60,8 +61,8 @@ const App = () => (
           <BrowserRouter>
             <Suspense fallback={<LoadingScreen />}>
               <Routes>
-                {/* Redirect /login to / */}
-                <Route path="/login" element={<Navigate to="/" replace />} />
+                {/* Login page */}
+                <Route path="/login" element={<LoginPage />} />
                 
                 {/* Public routes */}
                 <Route path="/register" element={<RegisterPage />} />
@@ -190,7 +191,7 @@ function RootRoute() {
 
   // ถ้ายัง login ไม่ได้ แสดง login page
   if (!user) {
-    return <LoginPage />;
+    return <HomePage />;
   }
 
   // ถ้า login แล้ว แสดง AppLayout และ nested routes

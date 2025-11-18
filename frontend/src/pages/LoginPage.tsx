@@ -7,8 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Warehouse, Shield, Users, CheckCircle, Eye, EyeOff } from "lucide-react";
-import { th } from "../i18n/th";
+import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
 export default function LoginPage() {
@@ -31,18 +30,7 @@ export default function LoginPage() {
     }
   }, [user, navigate, location]);
 
-  const features = [
-    { icon: Warehouse, title: "จัดการคลังสินค้า", description: "ติดตามสต็อก การรับ-จ่าย และการเคลื่อนไหวสินค้า" },
-    { icon: Users, title: "ระบบผู้จำหน่าย", description: "จัดการข้อมูลผู้จำหน่าย สร้างใบสั่งซื้อ และติดตามการส่งมอบ" },
-    { icon: Shield, title: "ความปลอดภัยสูง", description: "เข้าสู่ระบบด้วยอีเมล/รหัสผ่าน " },
-  ];
-
-  const benefits = [
-    "**********",
-    "**********",
-   "**********",
-"**********",
-  ];
+  // ลดเนื้อหาให้เรียบง่าย ไม่ใส่สื่อการตลาด/แบรนดิ้งเก่า
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,53 +55,10 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen gradient-surface flex items-center justify-center p-4">
       <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-        {/* Left - Branding & copy */}
-        <div className="space-y-8">
-          <div className="text-center lg:text-left">
-            <div className="flex items-center justify-center lg:justify-start gap-3 mb-6">
-              <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center">
-                <Warehouse className="h-7 w-7 text-white" />
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold">{th.dashboard.title}</h1>
-                <p className="text-muted-foreground">{th.dashboard.subtitle}</p>
-              </div>
-            </div>
-            <p className="text-lg text-muted-foreground mb-8">
-              ระบบจัดการที่ครบครันสำหรับธุรกิจของคุณ
-              <br />
-              หน้าล็อกอินสาธิต (ยังไม่เชื่อมต่อจริง)
-            </p>
-          </div>
-
-          <div className="space-y-4">
-            {features.map((f) => (
-              <div key={f.title} className="flex items-start gap-4 p-4 rounded-lg bg-card/50 backdrop-blur-sm">
-                <div className="p-2 rounded-lg bg-primary/10">
-                  <f.icon className="h-6 w-6 text-primary" />
-                </div>
-                <div>
-                  <h3 className="font-semibold mb-1">{f.title}</h3>
-                  <p className="text-sm text-muted-foreground">{f.description}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="hidden lg:block">
-            <h3 className="font-semibold mb-4 flex items-center gap-2">
-              <CheckCircle className="h-5 w-5 text-success" />
-              ไฮไลต์
-            </h3>
-            <div className="space-y-2">
-              {benefits.map((b) => (
-                <div key={b} className="flex items-center gap-3 text-sm">
-                  <CheckCircle className="h-4 w-4 text-success shrink-0" />
-                  <span>{b}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+        {/* Left - Minimal brand area */}
+        <div className="space-y-6 text-center lg:text-left">
+          <h1 className="text-3xl font-bold">เข้าสู่ระบบ WMS Cloud</h1>
+          <p className="text-muted-foreground">กรอกชื่อผู้ใช้และรหัสผ่านเพื่อใช้งานระบบ</p>
         </div>
 
         {/* Right - Card */}
@@ -178,27 +123,14 @@ export default function LoginPage() {
                   )}
                 </Button>
 
-                <div className="text-center text-sm text-muted-foreground space-y-1">
-                  <p>
-                    ยังไม่มีบัญชีองค์กร?{' '}
-                    <Link to="/register-company" className="text-primary hover:underline">สมัครสำหรับองค์กร</Link>
-                  </p>
-                  <p>
-                    หรือสมัครผู้ใช้ทั่วไป?{' '}
-                    <Link to="/register" className="text-primary hover:underline">สมัครสมาชิก</Link>
-                  </p>
+                <div className="text-center text-sm text-muted-foreground">
+                  ยังไม่มีบัญชีองค์กร?{' '}
+                  <Link to="/register-company" className="text-primary hover:underline">สมัครสำหรับองค์กร</Link>
                 </div>
 
               
 
-                <div className="space-y-2 text-center">
-                 
-                  <div className="flex flex-wrap justify-center gap-2">
-                    <Badge variant="outline" className="text-xs">{th.roles.ADMIN}</Badge>
-                    <Badge variant="outline" className="text-xs">{th.roles.CENTER}</Badge>
-                    <Badge variant="outline" className="text-xs">{th.roles.BRANCH}</Badge>
-                  </div>
-                </div>
+                {/* Removed old role badges and marketing */}
               </form>
             </CardContent>
           </Card>
