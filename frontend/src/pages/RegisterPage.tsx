@@ -50,6 +50,13 @@ const benefits = [
   "เปลี่ยนบทบาท/สาขาภายหลังได้",
 ];
 
+// จำลองรายการบริษัทที่มีอยู่แล้วในระบบ (ภายหลังดึงจาก API)
+const companies = [
+  { id: "c1", name: "บริษัท เอ จำกัด" },
+  { id: "c2", name: "บริษัท บี เทคโนโลยี" },
+  { id: "c3", name: "องค์กรซี โซลูชั่นส์" },
+];
+
 export default function RegisterPage() {
   const navigate = useNavigate();
   const redirectTimerRef = useRef<number | null>(null);
@@ -79,6 +86,7 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [submitMsg, setSubmitMsg] = useState<SubmitMsg>(null);
+  const [companySelect, setCompanySelect] = useState<string>(""); // c1/c2/.../other
 
   useEffect(() => {
     return () => {
@@ -103,6 +111,9 @@ export default function RegisterPage() {
     if (formData.confirmPassword !== formData.UserPassword) next.confirmPassword = "รหัสผ่านยืนยันไม่ตรงกัน";
     if (!formData.RoleId) next.RoleId = "เลือกบทบาท";
     if (!formData.BranchId) next.BranchId = "เลือกสาขา";
+    // ต้องเลือกบริษัท (หรือกรอกเอง)
+    if (!companySelect) next.Company = "เลือกบริษัทที่มีอยู่ หรือเลือก 'อื่นๆ' แล้วกรอกชื่อ";
+    if (companySelect === "other" && !formData.Company.trim()) next.Company = "กรอกชื่อบริษัท/หน่วยงาน";
     setErrors(next);
     return Object.keys(next).length === 0;
   };
@@ -114,6 +125,13 @@ export default function RegisterPage() {
 
     setIsSubmitting(true);
     try {
+      // map companySelect -> Company field
+      if (companySelect && companySelect !== "other") {
+        const found = companies.find((c) => c.id === companySelect);
+        if (found) {
+          formData.Company = found.name;
+        }
+      }
       await registerUser({
         UserName: formData.UserName.trim(),
         UserPassword: formData.UserPassword,
@@ -225,8 +243,25 @@ export default function RegisterPage() {
                 </div>
 
                 <div className="space-y-1">
-                  <Label htmlFor="Company">ชื่อบริษัท / หน่วยงาน (ถ้ามี)</Label>
-                  <Input id="Company" value={formData.Company} onChange={handleChange("Company")} placeholder="เช่น บริษัท เอ จำกัด" />
+                  <Label>บริษัท / หน่วยงาน</Label>
+                  <Select value={companySelect} onValueChange={(v) => setCompanySelect(v)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="เลือกบริษัทที่มีอยู่ หรือเลือก 'อื่นๆ'" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {companies.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                      ))}
+                      <SelectItem value="other">อื่นๆ (พิมพ์ชื่อบริษัทเอง)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {companySelect === "other" && (
+                    <div className="mt-2">
+                      <Label htmlFor="Company" className="text-xs">พิมพ์ชื่อบริษัท / หน่วยงาน</Label>
+                      <Input id="Company" value={formData.Company} onChange={handleChange("Company")} placeholder="เช่น บริษัท เอ จำกัด" />
+                    </div>
+                  )}
+                  {errors.Company && <p className="text-xs text-red-500">{errors.Company}</p>}
                 </div>
 
                 <div className="space-y-1">

@@ -107,6 +107,49 @@ export async function apiDelete(endpoint: string) {
 }
 
 // ==========================================
+// Platform Admin APIs
+// ==========================================
+
+export type PlatformSignupUser = {
+  UserId: number;
+  UserName: string;
+  Email?: string | null;
+  TelNumber?: string | null;
+  LineId?: string | null;
+  RequestedRoleText?: string | null;
+  TempCompanyId?: number | null;
+  UserStatusApprove: 'PENDING' | 'APPROVED' | 'REJECTED';
+  UserStatusActive: 'ACTIVE' | 'INACTIVE';
+  CreatedAt: string;
+  TempCompany?: {
+    TempCompanyId: number;
+    TempCompanyName: string;
+    TempCompanyCode: string;
+    TempCompanyAddress?: string | null;
+    TempCompanyTaxId?: string | null;
+    TempCompanyTelNumber?: string | null;
+    TempCompanyEmail?: string | null;
+  } | null;
+};
+
+export async function platformListUsers(status: 'PENDING' | 'APPROVED' | 'REJECTED' = 'PENDING') {
+  const q = encodeURIComponent(status);
+  return apiGet(`/platform/users/pending?status=${q}`) as Promise<PlatformSignupUser[]>;
+}
+
+export async function platformApproveUser(id: number) {
+  return apiPost(`/platform/users/${id}/approve`, { action: 'APPROVE' });
+}
+
+export async function platformRejectUser(id: number) {
+  return apiPost(`/platform/users/${id}/approve`, { action: 'REJECT' });
+}
+
+export async function platformSetUserActive(id: number, status: 'ACTIVE' | 'INACTIVE') {
+  return apiPost(`/platform/users/${id}/active`, { status });
+}
+
+// ==========================================
 // Requisitions (Withdrawn Requests)
 // ==========================================
 

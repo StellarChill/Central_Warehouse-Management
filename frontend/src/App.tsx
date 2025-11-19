@@ -26,7 +26,8 @@ const AdminUsersPage = lazy(() => import("./pages/AdminUsersPage"));
 const AdminBranchesPage = lazy(() => import("./pages/AdminBranchesPage"));
 const AdminReportsPage = lazy(() => import("./pages/AdminReportsPage"));
 const AdminHomePage = lazy(() => import("./pages/AdminHomePage"));
-const LoginPage = lazy(() => import("./pages/LoginPage"));
+const AuthPage = lazy(() => import("./pages/AuthPage"));
+const RegisterLandingPage = lazy(() => import("./pages/RegisterLandingPage"));
 const RegisterPage = lazy(() => import("./pages/RegisterPage"));
 const LiffRegisterPage = lazy(() => import("./pages/LiffRegisterPage"));
 const WaitingApprovalPage = lazy(() => import("./pages/WaitingApprovalPage"));
@@ -34,10 +35,15 @@ const UserStatusPage = lazy(() => import("./pages/UserStatusPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const PlatformDashboardPage = lazy(() => import("./pages/PlatformDashboardPage"));
 const PlatformCompaniesPage = lazy(() => import("./pages/PlatformCompaniesPage"));
+const PlatformApprovalsPage = lazy(() => import("./pages/PlatformApprovalsPage"));
 const CompanyDashboardPage = lazy(() => import("./pages/CompanyDashboardPage"));
 const BranchDashboardPage = lazy(() => import("./pages/BranchDashboardPage"));
 const CompanyRegisterPage = lazy(() => import("./pages/CompanyRegisterPage"));
 const HomePage = lazy(() => import("./pages/HomePage"));
+const WarehouseManagementPage = lazy(() => import("./pages/WarehouseManagementPage"));
+const WarehouseOverviewPage = lazy(() => import("./pages/WarehouseOverviewPage"));
+const WarehouseDetailPage = lazy(() => import("./pages/WarehouseDetailPage"));
+const WarehouseDashboardPage = lazy(() => import("./pages/WarehouseDashboardPage"));
 
 // ---- React Query sane defaults ----
 const queryClient = new QueryClient({
@@ -61,11 +67,12 @@ const App = () => (
           <BrowserRouter>
             <Suspense fallback={<LoadingScreen />}>
               <Routes>
-                {/* Login page */}
-                <Route path="/login" element={<LoginPage />} />
+                {/* Auth (login + register in one page) */}
+                <Route path="/login" element={<AuthPage />} />
                 
                 {/* Public routes */}
-                <Route path="/register" element={<RegisterPage />} />
+                <Route path="/register" element={<RegisterLandingPage />} />
+                <Route path="/register/user" element={<RegisterPage />} />
                 {/* Company self-service registration */}
                 <Route path="/register-company" element={<CompanyRegisterPage />} />
                 <Route path="/liff" element={<LiffRegisterPage />} />
@@ -101,6 +108,22 @@ const App = () => (
                     element={
                       <Guard allow={["PLATFORM_ADMIN"]}>
                         <PlatformCompaniesPage />
+                      </Guard>
+                    }
+                  />
+                  <Route
+                    path="platform/approvals"
+                    element={
+                      <Guard allow={["PLATFORM_ADMIN"]}>
+                        <PlatformApprovalsPage />
+                      </Guard>
+                    }
+                  />
+                  <Route
+                    path="platform/users"
+                    element={
+                      <Guard allow={["PLATFORM_ADMIN"]}>
+                        <PlatformApprovalsPage />
                       </Guard>
                     }
                   />
@@ -157,6 +180,10 @@ const App = () => (
                       </Guard>
                     }
                   />
+                  <Route path="/warehouse-management" element={<WarehouseManagementPage />} />
+                  <Route path="/warehouse-overview" element={<WarehouseOverviewPage />} />
+                  <Route path="/warehouse/:id" element={<WarehouseDetailPage />} />
+                  <Route path="/warehouse/:id/dashboard" element={<WarehouseDashboardPage />} />
                 </Route>
 
                 {/* Catch-all */}
@@ -237,21 +264,9 @@ export default App;
 
 // Role-based landing at index path only
 function RoleLanding() {
-  const { user, isLoading } = useAuth();
-  const location = useLocation();
-  if (isLoading) return <LoadingScreen />;
-  if (!user) return <LoginPage />;
-  const role = user.role;
-  // If this session was a LIFF-only login, force redirect once
-  try {
-    const liffOnly = localStorage.getItem('liff_only');
-    if (liffOnly) {
-      localStorage.removeItem('liff_only');
-      return <Navigate to="/requisitions/create" replace />;
-    }
-  } catch {}
-  if (role === 'PLATFORM_ADMIN') return <Navigate to="/platform" replace />;
-  if (role === 'COMPANY_ADMIN' || role === 'ADMIN') return <Navigate to="/admin" replace />;
-  return <Navigate to="/branch" replace />;
+  const { user } = useAuth();
+  if (user?.role === 'PLATFORM_ADMIN') return <Navigate to="/platform" replace />;
+  if (user?.role === 'COMPANY_ADMIN' || user?.role === 'ADMIN') return <Navigate to="/admin" replace />;
+  return <Navigate to="/warehouse-overview" replace />;
 }
 
