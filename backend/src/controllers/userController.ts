@@ -7,7 +7,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'changeme';
 
 export async function register(req: Request, res: Response) {
 	try {
-			const { UserName, UserPassword, RoleId, BranchId, Email, TelNumber, LineId, CompanyId: CompanyIdBody } = req.body;
+			const { UserName, UserPassword, RoleId, BranchId, Email, TelNumber, LineId, CompanyId: CompanyIdBody, RequestedRoleText, RoleText, RequestedRole } = req.body;
 			if (!UserName) return res.status(400).json({ error: 'UserName is required' });
 
 			// If no password provided, allow it only when registering via LINE (LineId present)
@@ -73,7 +73,7 @@ export async function register(req: Request, res: Response) {
 
 			try {
 				const user = await prisma.user.create({
-					data: {
+					data: ({
 						CompanyId: companyIdToUse!,
 						UserName,
 						UserPassword: hashed,
@@ -82,9 +82,10 @@ export async function register(req: Request, res: Response) {
 						Email,
 						TelNumber,
 						LineId,
+						RequestedRoleText: (RequestedRoleText || RoleText || RequestedRole) ?? null,
 						UserStatus: 'PENDING',
-					},
-					select: {
+					} as any),
+					select: ({
 						UserId: true,
 						UserName: true,
 						RoleId: true,
@@ -92,8 +93,9 @@ export async function register(req: Request, res: Response) {
 						Email: true,
 						TelNumber: true,
 						LineId: true,
+						RequestedRoleText: true,
 						CreatedAt: true,
-					},
+					} as any),
 				});
 
 				return res.status(201).json({ user });
@@ -113,6 +115,113 @@ export async function register(req: Request, res: Response) {
 }
 
 export default {};
+
+// Public signup with TempCompany. User will be approved by platform admin later.
+export async function registerPublic(req: Request, res: Response) {
+	try {
+		const { UserName, UserPassword, LineId, Email, TelNumber, tempCompany = {}, TempCompanyId, RequestedRoleText, RoleText, RequestedRole } = req.body || {};
+		if (!UserName) return res.status(400).json({ error: 'UserName is required' });
+
+		// Check duplicates
+		const existedByName = await prisma.user.findUnique({ where: { UserName } });
+		if (existedByName) return res.status(409).json({ error: 'User already exists' });
+		if (LineId) {
+			const existedByLine = await prisma.user.findFirst({ where: { LineId } });
+			if (existedByLine) return res.status(409).json({ error: 'LINE account already registered' });
+		}
+
+		// Resolve or create TempCompany
+		let tempId: number | null = null;
+		if (TempCompanyId) {
+			const tmp = await prisma.tempCompany.findUnique({ where: { TempCompanyId: Number(TempCompanyId) } });
+			if (!tmp) return res.status(400).json({ error: 'TempCompanyId not found' });
+			tempId = tmp.TempCompanyId;
+		} else {
+			const {
+				TempCompanyName,
+				TempCompanyCode,
+				TempCompanyAddress,
+				TempCompanyTaxId,
+				TempCompanyTelNumber,
+				TempCompanyEmail,
+			} = tempCompany || {};
+			if (!TempCompanyName) return res.status(400).json({ error: 'TempCompanyName is required' });
+			// Generate/ensure TempCompanyCode
+			const base = String(TempCompanyCode || TempCompanyName)
+				.toUpperCase()
+				.replace(/[^A-Z0-9]+/g, '-')
+				.replace(/(^-|-$)/g, '') || 'TEMP-CO';
+			let code = base;
+			let i = 1;
+			while (await prisma.tempCompany.findUnique({ where: { TempCompanyCode: code } })) {
+				code = `${base}-${++i}`;
+			}
+			const created = await prisma.tempCompany.create({
+				data: {
+					TempCompanyName,
+					TempCompanyCode: code,
+					TempCompanyAddress: TempCompanyAddress ?? null,
+					TempCompanyTaxId: TempCompanyTaxId ?? null,
+					TempCompanyTelNumber: TempCompanyTelNumber ?? null,
+					TempCompanyEmail: TempCompanyEmail ?? null,
+				},
+			});
+			tempId = created.TempCompanyId;
+		}
+
+		// Password handling (allow LIFF-only signup without password)
+		let pwd = UserPassword as string | undefined;
+		if (!pwd) {
+			const crypto = await import('crypto');
+			pwd = crypto.randomBytes(16).toString('hex');
+		}
+		const hashed = await bcrypt.hash(pwd, 10);
+
+		// Place the new user under PLATFORM company, minimal role/branch
+		const platform = await prisma.company.findUnique({ where: { CompanyCode: 'PLATFORM' } });
+		if (!platform) return res.status(500).json({ error: 'Platform company not configured' });
+		const platformBranch = await prisma.branch.findUnique({ where: { BranchCode: 'PLATFORM-CENTER' } });
+		if (!platformBranch) return res.status(500).json({ error: 'Platform branch not configured' });
+		const viewerRole = await prisma.role.findFirst({ where: { OR: [{ RoleCode: 'VIEWER' }, { RoleCode: 'BRANCH_USER' }] } });
+		if (!viewerRole) return res.status(500).json({ error: 'Viewer role not configured' });
+
+		const user = await prisma.user.create({
+			data: ({
+				CompanyId: platform.CompanyId,
+				BranchId: platformBranch.BranchId,
+				RoleId: viewerRole.RoleId,
+				UserName,
+				UserPassword: hashed,
+				Email: Email ?? null,
+				TelNumber: TelNumber ?? null,
+				LineId: LineId ?? null,
+				TempCompanyId: tempId,
+				RequestedRoleText: (RequestedRoleText || RoleText || RequestedRole) ?? null,
+				UserStatus: 'PENDING',
+				UserStatusApprove: 'PENDING',
+				UserStatusActive: 'ACTIVE',
+			} as any),
+			select: ({
+				UserId: true,
+				UserName: true,
+				RequestedRoleText: true,
+				TempCompanyId: true,
+				UserStatusApprove: true,
+				UserStatusActive: true,
+				CreatedAt: true,
+			} as any),
+		});
+
+		return res.status(201).json({
+			message: 'Signup submitted. Waiting for admin approval.',
+			user,
+		});
+	} catch (e: any) {
+		console.error('registerPublic failed', e);
+		if (e?.code === 'P2002') return res.status(409).json({ error: 'Unique constraint failed' });
+		return res.status(500).json({ error: 'Internal server error' });
+	}
+}
 
 // Self-service company registration: creates Company, default Branch & Warehouse, and a Company Admin user
 export async function registerCompany(req: Request, res: Response) {

@@ -27,8 +27,14 @@ export async function login(req: Request, res: Response) {
     return res.status(401).json({ error: 'Invalid credentials A2' });
   }
 
-  if (user.UserStatus && user.UserStatus !== 'ACTIVE') {
-    return res.status(403).json({ error: `User is not active (${user.UserStatus})` });
+  // Enforce new approval/active checks
+  // Block if platform admin hasn't approved yet
+  if (user.UserStatusApprove && user.UserStatusApprove !== 'APPROVED') {
+    return res.status(403).json({ error: `User not approved (${user.UserStatusApprove})` });
+  }
+  // Block if user has been deactivated
+  if (user.UserStatusActive && user.UserStatusActive !== 'ACTIVE') {
+    return res.status(403).json({ error: `User inactive (${user.UserStatusActive})` });
   }
 
   const token = jwt.sign(
@@ -54,6 +60,8 @@ export async function login(req: Request, res: Response) {
       CompanyId: user.CompanyId,
       Email: user.Email,
       UserStatus: user.UserStatus,
+      UserStatusApprove: (user as any).UserStatusApprove ?? null,
+      UserStatusActive: (user as any).UserStatusActive ?? null,
     },
   });
 }
@@ -145,11 +153,12 @@ export async function loginWithLine(req: Request, res: Response) {
   }
 
   // ❗ ถ้า user ยัง PENDING ให้บอกไปเลยว่ารออนุมัติอยู่
-  if (user.UserStatus === 'PENDING') {
-    return res.status(403).json({
-      error: 'User is pending approval',
-      status: user.UserStatus,
-    });
+  // New gating on approval + active
+  if (user.UserStatusApprove && user.UserStatusApprove !== 'APPROVED') {
+    return res.status(403).json({ error: 'User is pending approval', status: user.UserStatusApprove });
+  }
+  if (user.UserStatusActive && user.UserStatusActive !== 'ACTIVE') {
+    return res.status(403).json({ error: 'User inactive', status: user.UserStatusActive });
   }
 
   const token = jwt.sign(
@@ -175,6 +184,8 @@ export async function loginWithLine(req: Request, res: Response) {
       CompanyId: user.CompanyId,
       Email: user.Email,
       UserStatus: user.UserStatus,
+      UserStatusApprove: (user as any).UserStatusApprove ?? null,
+      UserStatusActive: (user as any).UserStatusActive ?? null,
     },
   });
 }

@@ -140,6 +140,8 @@ async function main() {
         Email: 'platform.admin@example.com',
         TelNumber: '0900000000',
         UserStatus: 'ACTIVE',
+        UserStatusApprove: 'APPROVED',
+        UserStatusActive: 'ACTIVE',
       },
     });
   }
@@ -162,6 +164,8 @@ async function main() {
       Email: 'admin.kfc@example.com',
       TelNumber: '0900000001',
       UserStatus: 'ACTIVE',
+      UserStatusApprove: 'APPROVED',
+      UserStatusActive: 'ACTIVE',
     },
   });
   await prisma.user.upsert({
@@ -176,6 +180,8 @@ async function main() {
       Email: 'admin.mcd@example.com',
       TelNumber: '0900000002',
       UserStatus: 'ACTIVE',
+      UserStatusApprove: 'APPROVED',
+      UserStatusActive: 'ACTIVE',
     },
   });
 

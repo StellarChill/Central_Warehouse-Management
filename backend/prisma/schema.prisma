@@ -22,6 +22,7 @@ model Company {
   CompanyCode      String   @unique
   CompanyTelNumber String?
   CompanyEmail     String?
+  CompanyStatus    String   @default("ACTIVE")
   CreatedAt        DateTime @default(now())
   CreatedBy        Int?
   UpdatedAt        DateTime @updatedAt
@@ -29,6 +30,7 @@ model Company {
 
   @@index([CompanyName])
   @@index([CompanyCode])
+  @@index([CompanyStatus])
 
   CreatedByUser User? @relation("CompanyCreatedBy", fields: [CreatedBy], references: [UserId])
   UpdatedByUser User? @relation("CompanyUpdatedBy", fields: [UpdatedBy], references: [UserId])
@@ -48,6 +50,29 @@ model Company {
   IssueDetails            IssueDetail[]
   PurchaseOrderDetails    PurchaseOrderDetail[]
   Warehouses              Warehouse[]
+}
+
+// Temporary company info provided at user signup before system admin approves
+model TempCompany {
+  TempCompanyId        Int      @id @default(autoincrement())
+  TempCompanyName      String
+  TempCompanyAddress   String?
+  TempCompanyTaxId     String?
+  TempCompanyCode      String   @unique
+  TempCompanyTelNumber String?
+  TempCompanyEmail     String?
+  CreatedAt            DateTime @default(now())
+  CreatedBy            Int?
+  UpdatedAt            DateTime @updatedAt
+  UpdatedBy            Int?
+
+  @@index([TempCompanyName])
+  @@index([TempCompanyCode])
+
+  CreatedByUser User? @relation("TempCompanyCreatedBy", fields: [CreatedBy], references: [UserId])
+  UpdatedByUser User? @relation("TempCompanyUpdatedBy", fields: [UpdatedBy], references: [UserId])
+
+  Users        User[]
 }
 
 model Warehouse {
@@ -77,11 +102,19 @@ model Warehouse {
 model User {
   UserId      Int      @id @default(autoincrement())
   UserName    String   @unique
-  UserStatus  String   @default("PENDING") // PENDING, ACTIVE, INACTIVE
+  // Deprecated: original combined status, retained for backward compatibility
+  UserStatus  String   @default("PENDING") // legacy field
+  // System admin approval status: PENDING, APPROVED, REJECTED
+  UserStatusApprove String @default("PENDING")
+  // Membership active status within assigned company: ACTIVE or INACTIVE
+  UserStatusActive  String @default("ACTIVE")
+  // Free-text role requested at signup; platform admin will choose actual Role later
+  RequestedRoleText String?
   UserPassword String
   RoleId      Int
   BranchId    Int
   CompanyId   Int
+  TempCompanyId Int?
   TelNumber   String?
   Email       String?
   LineId      String?
@@ -93,10 +126,15 @@ model User {
   @@index([UserName])
   @@index([BranchId])
   @@index([CompanyId])
+  @@index([TempCompanyId])
+  @@index([UserStatusApprove])
+  @@index([UserStatusActive])
+  @@index([RequestedRoleText])
 
   Role        Role     @relation(fields: [RoleId], references: [RoleId])
   Branch      Branch   @relation(fields: [BranchId], references: [BranchId])
   Company     Company  @relation(fields: [CompanyId], references: [CompanyId])
+  TempCompany TempCompany? @relation(fields: [TempCompanyId], references: [TempCompanyId])
 
   BranchCreatedBy               Branch[]               @relation("BranchCreatedBy")
   BranchUpdatedBy               Branch[]               @relation("BranchUpdatedBy")
@@ -128,6 +166,8 @@ model User {
   CompanyUpdatedBy              Company[]              @relation("CompanyUpdatedBy")
   WarehouseCreatedBy            Warehouse[]            @relation("WarehouseCreatedBy")
   WarehouseUpdatedBy            Warehouse[]            @relation("WarehouseUpdatedBy")
+  TempCompanyCreatedBy          TempCompany[]          @relation("TempCompanyCreatedBy")
+  TempCompanyUpdatedBy          TempCompany[]          @relation("TempCompanyUpdatedBy")
 }
 
 model Branch {
