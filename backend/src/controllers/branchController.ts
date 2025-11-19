@@ -13,8 +13,14 @@ export async function createBranch(req: Request, res: Response) {
     const err = validateBranchPayload(req.body);
     if (err) return res.status(400).json({ error: err });
 
-    const CompanyId = getCompanyId(req, true)!;
-    const { BranchName, BranchAddress, BranchCode, CreatedBy } = req.body;
+    const tokenCompanyId = getCompanyId(req, true)!;
+    const { CompanyId, BranchName, BranchAddress, BranchCode, CreatedBy } = req.body;
+
+    // Ensure the CompanyId in the request matches the token's CompanyId
+    if (CompanyId !== tokenCompanyId) {
+      return res.status(403).json({ error: 'You are not authorized to create branches for this company' });
+    }
+
     const exists = await prisma.branch.findFirst({ where: { BranchCode, CompanyId } });
     if (exists) return res.status(409).json({ error: 'BranchCode already exists' });
 
@@ -31,8 +37,18 @@ export async function createBranch(req: Request, res: Response) {
 
 export async function listBranches(req: Request, res: Response) {
   try {
-    const CompanyId = getCompanyId(req, true)!;
-    const branches = await prisma.branch.findMany({ where: { CompanyId }, orderBy: { BranchName: 'asc' } });
+    const userRole = req.user?.RoleCode; // Assuming `req.user` contains user info
+
+    let branches;
+    if (userRole === 'PLATFORM_ADMIN') {
+      // Fetch all branches for PLATFORM_ADMIN
+      branches = await prisma.branch.findMany({ orderBy: { BranchName: 'asc' } });
+    } else {
+      // Restrict branches to the user's company
+      const CompanyId = getCompanyId(req, true)!;
+      branches = await prisma.branch.findMany({ where: { CompanyId }, orderBy: { BranchName: 'asc' } });
+    }
+
     return res.json(branches);
   } catch (e) {
     console.error(e);

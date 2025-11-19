@@ -103,7 +103,6 @@ model User {
   UserId      Int      @id @default(autoincrement())
   UserName    String   @unique
   // Deprecated: original combined status, retained for backward compatibility
-  UserStatus  String   @default("PENDING") // legacy field
   // System admin approval status: PENDING, APPROVED, REJECTED
   UserStatusApprove String @default("PENDING")
   // Membership active status within assigned company: ACTIVE or INACTIVE

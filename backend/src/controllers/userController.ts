@@ -40,7 +40,6 @@ export async function register(req: Request, res: Response) {
 				return res.status(409).json({ error: 'User already exists', user: {
 					UserId: existingByName.UserId,
 					UserName: existingByName.UserName,
-					UserStatus: existingByName.UserStatus,
 					LineId: existingByName.LineId,
 					CreatedAt: existingByName.CreatedAt,
 					RoleId: existingByName.RoleId,
@@ -53,7 +52,6 @@ export async function register(req: Request, res: Response) {
 					return res.status(409).json({ error: 'LINE account already registered', user: {
 						UserId: existingByLine.UserId,
 						UserName: existingByLine.UserName,
-						UserStatus: existingByLine.UserStatus,
 						LineId: existingByLine.LineId,
 						CreatedAt: existingByLine.CreatedAt,
 						RoleId: existingByLine.RoleId,
@@ -83,7 +81,6 @@ export async function register(req: Request, res: Response) {
 						TelNumber,
 						LineId,
 						RequestedRoleText: (RequestedRoleText || RoleText || RequestedRole) ?? null,
-						UserStatus: 'PENDING',
 					} as any),
 					select: ({
 						UserId: true,
@@ -197,7 +194,6 @@ export async function registerPublic(req: Request, res: Response) {
 				LineId: LineId ?? null,
 				TempCompanyId: tempId,
 				RequestedRoleText: (RequestedRoleText || RoleText || RequestedRole) ?? null,
-				UserStatus: 'PENDING',
 				UserStatusApprove: 'PENDING',
 				UserStatusActive: 'ACTIVE',
 			} as any),
@@ -301,7 +297,8 @@ export async function registerCompany(req: Request, res: Response) {
 				UserPassword: hashed,
 				Email: AdminEmail ?? null,
 				TelNumber: AdminTelNumber ?? null,
-				UserStatus: 'ACTIVE',
+				UserStatusApprove: 'APPROVED',
+				UserStatusActive: 'ACTIVE',
 			},
 			include: { Role: true },
 		});
@@ -334,7 +331,8 @@ export async function registerCompany(req: Request, res: Response) {
 				BranchId: adminUser.BranchId,
 				CompanyId: adminUser.CompanyId,
 				Email: adminUser.Email,
-				UserStatus: adminUser.UserStatus,
+				UserStatusApprove: (adminUser as any).UserStatusApprove ?? 'APPROVED',
+				UserStatusActive: (adminUser as any).UserStatusActive ?? 'ACTIVE',
 			},
 		});
 	} catch (e: any) {
@@ -347,7 +345,7 @@ export async function registerCompany(req: Request, res: Response) {
 // Public endpoint variant matching /api/public/company-register with nested body
 export async function registerCompanyPublic(req: Request, res: Response) {
 	try {
-		const { company = {}, adminUser = {}, userStatus } = req.body || {};
+		const { company = {}, adminUser = {} } = req.body || {};
 		const {
 			CompanyName,
 			CompanyAddress,
@@ -413,7 +411,6 @@ export async function registerCompanyPublic(req: Request, res: Response) {
 			if (existed) return { conflict: true, companyRow } as any;
 
 			const hashed = await bcrypt.hash(AdminUserPassword, 10);
-			const status = typeof userStatus === 'string' ? userStatus.toUpperCase() : 'ACTIVE';
 			const userRow = await tx.user.create({
 				data: {
 					CompanyId: companyRow.CompanyId,
@@ -423,7 +420,8 @@ export async function registerCompanyPublic(req: Request, res: Response) {
 					UserPassword: hashed,
 					Email: AdminEmail ?? null,
 					TelNumber: AdminTelNumber ?? null,
-					UserStatus: status,
+					UserStatusApprove: 'APPROVED',
+					UserStatusActive: 'ACTIVE',
 				},
 				include: { Role: true },
 			});
@@ -465,7 +463,8 @@ export async function registerCompanyPublic(req: Request, res: Response) {
 				CompanyId: userRow.CompanyId,
 				BranchId: userRow.BranchId,
 				Email: userRow.Email,
-				UserStatus: userRow.UserStatus,
+				UserStatusApprove: (userRow as any).UserStatusApprove ?? 'APPROVED',
+				UserStatusActive: (userRow as any).UserStatusActive ?? 'ACTIVE',
 			},
 		});
 	} catch (e: any) {
@@ -473,4 +472,14 @@ export async function registerCompanyPublic(req: Request, res: Response) {
 		if (e?.code === 'P2002') return res.status(409).json({ error: 'Unique constraint failed' });
 		return res.status(500).json({ error: 'Internal server error' });
 	}
+}
+
+export async function getAllUsers(req: Request, res: Response) {
+  try {
+    const users = await prisma.user.findMany();
+    res.json(users);
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
 }
