@@ -37,7 +37,7 @@ export async function createBranch(req: Request, res: Response) {
 
 export async function listBranches(req: Request, res: Response) {
   try {
-    const userRole = req.user?.RoleCode; // Assuming `req.user` contains user info
+    const userRole = (req.user?.roleCode || req.user?.RoleCode || '').toUpperCase();
 
     let branches;
     if (userRole === 'PLATFORM_ADMIN') {

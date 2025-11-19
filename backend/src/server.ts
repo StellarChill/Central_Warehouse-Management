@@ -82,6 +82,7 @@ import issueRoute from './routes/issueRoute';
 import warehouseRoute from './routes/warehouseRoute';
 import companyRoute from './routes/companyRoute';
 import platformUserRoute from './routes/platformUserRoute';
+import roleRoute from './routes/roleRoute';
 
 // Health check endpoint สำหรับ Render
 app.get('/', (req, res) => {
@@ -126,6 +127,7 @@ app.use('/api/issue', issueRoute);
 app.use('/api/warehouse', warehouseRoute);
 app.use('/api/company', companyRoute);
 app.use('/api/platform', platformUserRoute);
+app.use('/api/role', roleRoute);
 
 // เริ่มรันเซิร์ฟเวอร์
 app.listen(PORT, async () => {

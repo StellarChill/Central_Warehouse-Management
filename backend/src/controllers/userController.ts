@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../prisma';
+import { getCompanyId } from '../utils/context';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
@@ -482,4 +483,49 @@ export async function getAllUsers(req: Request, res: Response) {
     console.error('Error fetching users:', error);
     res.status(500).json({ error: 'Failed to fetch users' });
   }
+}
+
+// Company-scoped users: platform admin can override via ?companyId= or x-company-id header
+export async function getCompanyUsers(req: Request, res: Response) {
+	try {
+		const roleCode = (req as any).user?.roleCode?.toUpperCase?.() || '';
+		const overrideRawHeader = req.headers['x-company-id'];
+		const overrideRaw = (Array.isArray(overrideRawHeader) ? overrideRawHeader[0] : overrideRawHeader) ?? (req.query.companyId as any) ?? (req.body?.CompanyId ?? req.body?.companyId);
+
+		// PLATFORM_ADMIN: if no override provided, return all users; else filter by the override
+		let whereClause: any = undefined;
+		if (roleCode === 'PLATFORM_ADMIN') {
+			if (overrideRaw !== undefined) {
+				const cid = Number(overrideRaw);
+				if (!Number.isFinite(cid) || cid <= 0) return res.status(400).json({ error: 'Invalid companyId' });
+				whereClause = { CompanyId: cid };
+			}
+		} else {
+			// Company users: always scope to their own company
+			const CompanyId = getCompanyId(req, true)!;
+			whereClause = { CompanyId };
+		}
+
+		const users = await prisma.user.findMany({
+			where: whereClause,
+			select: {
+				UserId: true,
+				UserName: true,
+				RoleId: true,
+				BranchId: true,
+				Email: true,
+				TelNumber: true,
+				LineId: true,
+				CreatedAt: true,
+				UserStatusApprove: true,
+				UserStatusActive: true,
+			},
+			orderBy: { CreatedAt: 'desc' },
+		});
+		res.json(users);
+	} catch (error: any) {
+		console.error('Error fetching company users:', error);
+		const status = error?.status || 500;
+		res.status(status).json({ error: error?.message || 'Failed to fetch users' });
+	}
 }
