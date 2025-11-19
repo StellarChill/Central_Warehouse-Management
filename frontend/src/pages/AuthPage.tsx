@@ -109,6 +109,11 @@ export default function AuthPage() {
     try {
       await login(username, password);
     } catch (err: any) {
+      if (err?.status === 403) {
+        // ถ้ายังไม่อนุมัติ หรือ inactive ให้ไปหน้าแจ้งรออนุมัติ
+        navigate('/awaiting-approval', { replace: true });
+        return;
+      }
       setLoginError(err?.message || "เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่");
     } finally {
       setLoginSubmitting(false);
@@ -135,8 +140,9 @@ export default function AuthPage() {
         Email: formData.Email.trim().toLowerCase(),
         LineId: formData.LineId.trim() || undefined,
       });
-      setRegMsg({ type: "success", text: "สมัครสมาชิกสำเร็จ! รอการอนุมัติจากผู้ดูแลระบบ" });
-      redirectTimerRef.current = window.setTimeout(() => navigate("/awaiting-approval"), 1200);
+      setRegMsg({ type: "success", text: "สมัครสมาชิกสำเร็จ! กรุณาเข้าสู่ระบบ ระบบจะพาไปหน้ารออนุมัติถ้ายังไม่ได้อนุมัติ" });
+      // เปลี่ยนกลับไปแท็บเข้าสู่ระบบ
+      setTab('login');
     } catch (err: any) {
       setRegMsg({ type: "error", text: err?.message || "สมัครไม่สำเร็จ ลองใหม่อีกครั้ง" });
     } finally {

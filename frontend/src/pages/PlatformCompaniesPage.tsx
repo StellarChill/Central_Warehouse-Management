@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Pencil, Power } from 'lucide-react';
+import { Pencil, Power, Check, X } from 'lucide-react';
 
 export default function PlatformCompaniesPage() {
   const [companies, setCompanies] = useState<any[]>([]);
@@ -50,18 +50,46 @@ export default function PlatformCompaniesPage() {
                     <div className="text-sm text-muted-foreground">{c.CompanyCode} • {c.CompanyEmail || '—'}</div>
                   </div>
                   <div className="flex gap-2">
-                    <Badge variant={c.CompanyStatus === 'ACTIVE' ? 'success' as any : 'secondary'}>{c.CompanyStatus}</Badge>
-                    <Button size="sm" variant="outline" onClick={async () => {
-                      const next = c.CompanyStatus === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
-                      try {
-                        const row = await apiPut(`/company/${c.CompanyId}`, { CompanyStatus: next });
-                        setCompanies((prev) => prev.map((x) => x.CompanyId === row.CompanyId ? row : x));
-                      } catch (e: any) {
-                        alert(e?.message || 'Failed to update status');
+                    <Badge
+                      className="uppercase"
+                      variant={
+                        c.CompanyStatus === 'ACTIVE' ? 'success' as any :
+                        c.CompanyStatus === 'PENDING' ? 'outline' :
+                        c.CompanyStatus === 'REJECTED' ? 'destructive' : 'secondary'
                       }
-                    }}>
-                      <Power className="h-4 w-4 mr-1" /> {c.CompanyStatus === 'ACTIVE' ? 'Set Inactive' : 'Set Active'}
-                    </Button>
+                    >{c.CompanyStatus}</Badge>
+                    {c.CompanyStatus === 'PENDING' ? (
+                      <>
+                        <Button size="sm" variant="outline" onClick={async () => {
+                          try {
+                            const row = await apiPut(`/company/${c.CompanyId}`, { CompanyStatus: 'ACTIVE' });
+                            setCompanies((prev) => prev.map((x) => x.CompanyId === row.CompanyId ? row : x));
+                          } catch (e: any) { alert(e?.message || 'Approve failed'); }
+                        }}>
+                          <Check className="h-4 w-4 mr-1" /> Approve
+                        </Button>
+                        <Button size="sm" variant="destructive" onClick={async () => {
+                          try {
+                            const row = await apiPut(`/company/${c.CompanyId}`, { CompanyStatus: 'REJECTED' });
+                            setCompanies((prev) => prev.map((x) => x.CompanyId === row.CompanyId ? row : x));
+                          } catch (e: any) { alert(e?.message || 'Reject failed'); }
+                        }}>
+                          <X className="h-4 w-4 mr-1" /> Reject
+                        </Button>
+                      </>
+                    ) : (
+                      <Button size="sm" variant="outline" onClick={async () => {
+                        const next = c.CompanyStatus === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+                        try {
+                          const row = await apiPut(`/company/${c.CompanyId}`, { CompanyStatus: next });
+                          setCompanies((prev) => prev.map((x) => x.CompanyId === row.CompanyId ? row : x));
+                        } catch (e: any) {
+                          alert(e?.message || 'Failed to update status');
+                        }
+                      }}>
+                        <Power className="h-4 w-4 mr-1" /> {c.CompanyStatus === 'ACTIVE' ? 'Set Inactive' : 'Set Active'}
+                      </Button>
+                    )}
                     <Button size="icon" variant="ghost" onClick={() => { setEditing(c); setName(c.CompanyName || ''); setCode(c.CompanyCode || ''); setEditOpen(true); }}>
                       <Pencil className="h-4 w-4" />
                     </Button>

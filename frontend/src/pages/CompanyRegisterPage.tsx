@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,6 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export default function CompanyRegisterPage() {
   const { registerCompany } = useAuth();
+  const navigate = useNavigate();
   const [state, setState] = useState({
     CompanyName: '',
     CompanyAddress: '',
@@ -28,9 +30,9 @@ export default function CompanyRegisterPage() {
     setError(null);
     setLoading(true);
     try {
-      await registerCompany(state as any);
-      // After registration, redirect to awaiting approval or login
-      window.location.href = '/awaiting-approval';
+      const resp = await registerCompany(state as any);
+      // Company now pending; redirect to waiting approval page
+      navigate('/awaiting-approval', { replace: true });
     } catch (e: any) {
       setError(e?.message || 'Registration failed');
     } finally {

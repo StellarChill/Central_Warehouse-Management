@@ -3,14 +3,26 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { platformListUsers, platformApproveUser, platformRejectUser, platformSetUserActive, type PlatformSignupUser } from '@/lib/api';
-import { Check, X, Ban } from 'lucide-react';
+import { platformListUsers, platformApproveUser, platformRejectUser, platformSetUserActive, type PlatformSignupUser, getRoles, getBranches, platformAssignUser, apiGet } from '@/lib/api';
+import { Check, X, Ban, UserCog } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 
 export default function PlatformApprovalsPage() {
   const [status, setStatus] = useState<'PENDING' | 'APPROVED' | 'REJECTED'>('PENDING');
   const [rows, setRows] = useState<PlatformSignupUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [assignUser, setAssignUser] = useState<PlatformSignupUser | null>(null);
+  const [companies, setCompanies] = useState<any[]>([]);
+  const [branches, setBranches] = useState<any[]>([]);
+  const [roles, setRoles] = useState<any[]>([]);
+  const [companyId, setCompanyId] = useState<string>('');
+  const [branchId, setBranchId] = useState<string>('');
+  const [roleId, setRoleId] = useState<string>('');
+  const [saving, setSaving] = useState(false);
 
   async function load(s: typeof status) {
     try {
@@ -26,6 +38,33 @@ export default function PlatformApprovalsPage() {
   }
 
   useEffect(() => { load(status); }, [status]);
+  useEffect(() => {
+    // Preload companies and roles for assignment form
+    (async () => {
+      try {
+        const [co, rl] = await Promise.all([
+          apiGet('/company'),
+          getRoles(),
+        ]);
+        setCompanies(co);
+        // Restrict role options to warehouse-access roles only
+        const allow = new Set(['COMPANY_ADMIN', 'WAREHOUSE_ADMIN', 'BRANCH_USER']);
+        const filtered = (rl || []).filter((r: any) => allow.has(String(r.RoleCode).toUpperCase()));
+        setRoles(filtered);
+      } catch {}
+    })();
+  }, []);
+
+  // Load branches when company changes
+  useEffect(() => {
+    (async () => {
+      if (!companyId) { setBranches([]); setBranchId(''); return; }
+      try {
+        const all = await getBranches();
+        setBranches(all.filter((b: any) => String(b.CompanyId) === String(companyId)));
+      } catch {}
+    })();
+  }, [companyId]);
 
   return (
     <div className="px-6 py-8 space-y-4">
@@ -81,13 +120,18 @@ export default function PlatformApprovalsPage() {
                           </>
                         )}
                         {status === 'APPROVED' && (
-                          <Button size="sm" variant="outline" onClick={async () => {
-                            const next = u.UserStatusActive === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
-                            await platformSetUserActive(u.UserId, next);
-                            await load(status);
-                          }}>
-                            <Ban className="h-4 w-4 mr-1" /> {u.UserStatusActive === 'ACTIVE' ? 'Set Inactive' : 'Set Active'}
-                          </Button>
+                          <>
+                            <Button size="sm" variant="outline" onClick={async () => {
+                              const next = u.UserStatusActive === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+                              await platformSetUserActive(u.UserId, next);
+                              await load(status);
+                            }}>
+                              <Ban className="h-4 w-4 mr-1" /> {u.UserStatusActive === 'ACTIVE' ? 'Set Inactive' : 'Set Active'}
+                            </Button>
+                            <Button size="sm" onClick={() => { setAssignUser(u); setAssignOpen(true); }}>
+                              <UserCog className="h-4 w-4 mr-1" /> Assign
+                            </Button>
+                          </>
                         )}
                       </div>
                     </div>
@@ -101,6 +145,77 @@ export default function PlatformApprovalsPage() {
           </Tabs>
         </CardContent>
       </Card>
+
+      <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Assign Company / Branch / Role</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1">
+              <Label>Company</Label>
+              <Select value={companyId} onValueChange={(v) => setCompanyId(v)}>
+                <SelectTrigger><SelectValue placeholder="Select company" /></SelectTrigger>
+                <SelectContent>
+                  {companies.map((c) => (
+                    <SelectItem key={c.CompanyId} value={String(c.CompanyId)}>{c.CompanyName}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Branch</Label>
+              <Select value={branchId} onValueChange={setBranchId}>
+                <SelectTrigger><SelectValue placeholder="Select branch" /></SelectTrigger>
+                <SelectContent>
+                  {branches.map((b) => (
+                    <SelectItem key={b.BranchId} value={String(b.BranchId)}>{b.BranchName}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Role</Label>
+              <Select value={roleId} onValueChange={setRoleId}>
+                <SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger>
+                <SelectContent>
+                  {roles.map((r) => {
+                    const code = String(r.RoleCode).toUpperCase();
+                    const label = code === 'WAREHOUSE_ADMIN' ? 'Warehouse Manager'
+                                : code === 'BRANCH_USER' ? 'Warehouse Staff'
+                                : code === 'COMPANY_ADMIN' ? 'Company Admin'
+                                : r.RoleName;
+                    return (
+                      <SelectItem key={r.RoleId} value={String(r.RoleId)}>{label}</SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setAssignOpen(false)}>Cancel</Button>
+            <Button disabled={saving || !assignUser || !companyId || !branchId || !roleId} onClick={async () => {
+              if (!assignUser) return;
+              setSaving(true);
+              try {
+                await platformAssignUser(assignUser.UserId, {
+                  CompanyId: Number(companyId),
+                  BranchId: Number(branchId),
+                  RoleId: Number(roleId),
+                });
+                setAssignOpen(false);
+                setCompanyId(''); setBranchId(''); setRoleId('');
+                await load(status);
+              } catch (e: any) {
+                alert(e?.message || 'Failed to assign');
+              } finally {
+                setSaving(false);
+              }
+            }}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

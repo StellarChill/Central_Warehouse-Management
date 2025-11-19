@@ -36,6 +36,13 @@ export async function login(req: Request, res: Response) {
   if (user.UserStatusActive && user.UserStatusActive !== 'ACTIVE') {
     return res.status(403).json({ error: `User inactive (${user.UserStatusActive})` });
   }
+  // Block if company not yet active/approved
+  if (user.CompanyId) {
+    const co = await prisma.company.findUnique({ where: { CompanyId: user.CompanyId }, select: { CompanyStatus: true } });
+    if (co && co.CompanyStatus && co.CompanyStatus !== 'ACTIVE') {
+      return res.status(403).json({ error: `Company not approved (${co.CompanyStatus})` });
+    }
+  }
 
   const token = jwt.sign(
     {
@@ -158,6 +165,12 @@ export async function loginWithLine(req: Request, res: Response) {
   }
   if (user.UserStatusActive && user.UserStatusActive !== 'ACTIVE') {
     return res.status(403).json({ error: 'User inactive', status: user.UserStatusActive });
+  }
+  if (user.CompanyId) {
+    const co = await prisma.company.findUnique({ where: { CompanyId: user.CompanyId }, select: { CompanyStatus: true } });
+    if (co && co.CompanyStatus && co.CompanyStatus !== 'ACTIVE') {
+      return res.status(403).json({ error: 'Company not approved', status: co.CompanyStatus });
+    }
   }
 
   const token = jwt.sign(

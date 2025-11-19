@@ -135,7 +135,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      throw new Error(data.error || `Login failed (HTTP ${res.status})`);
+      const err: any = new Error(data.error || `Login failed (HTTP ${res.status})`);
+      err.status = res.status;
+      throw err;
     }
 
     const data = await res.json();
@@ -265,11 +267,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(data?.error || `Register company failed (HTTP ${res.status})`);
     }
     const data = await res.json();
-    // Auto-login new company admin
-    localStorage.setItem('auth_token', data.token);
-    localStorage.setItem('auth_user', JSON.stringify(data.user));
-    setToken(data.token);
-    setUser({ ...data.user, role: roleFromPayload(data.user) });
+    // Do NOT auto-login when company is pending approval
     return data;
   };
 

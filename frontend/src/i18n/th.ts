@@ -48,6 +48,12 @@ export const th = {
   // User Roles
   roles: {
     PLATFORM_ADMIN: "ผู้ดูแลแพลตฟอร์ม",
+    PLATFORM_STAFF: "เจ้าหน้าที่แพลตฟอร์ม",
+    COMPANY_ADMIN: "ผู้ดูแลบริษัท",
+    WAREHOUSE_ADMIN: "ผู้จัดการคลัง (Warehouse Manager)",
+    BRANCH_MANAGER: "ผู้จัดการสาขา",
+    BRANCH_USER: "พนักงานคลัง (Warehouse Staff)",
+    VIEWER: "ผู้ชม (Viewer)",
     ADMIN: "ผู้ดูแลระบบ",
     CENTER: "คลังสินค้าศูนย์",
     BRANCH: "สาขา",

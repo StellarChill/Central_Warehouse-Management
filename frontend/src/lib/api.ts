@@ -149,6 +149,18 @@ export async function platformSetUserActive(id: number, status: 'ACTIVE' | 'INAC
   return apiPost(`/platform/users/${id}/active`, { status });
 }
 
+// List roles (platform admin sees all)
+export async function getRoles() {
+  return apiGet('/role');
+}
+
+// Branches helper already exists: getBranches()
+
+// Assign company/branch/role to a user
+export async function platformAssignUser(id: number, data: { CompanyId?: number; BranchId?: number; RoleId?: number }) {
+  return apiPost(`/platform/users/${id}/assign`, data);
+}
+
 // ==========================================
 // Requisitions (Withdrawn Requests)
 // ==========================================

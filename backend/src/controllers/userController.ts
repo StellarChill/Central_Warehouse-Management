@@ -255,6 +255,7 @@ export async function registerCompany(req: Request, res: Response) {
 				CompanyEmail: CompanyEmail ?? null,
 				CompanyTelNumber: CompanyTelNumber ?? null,
 				CompanyCode: companyCode,
+				CompanyStatus: 'PENDING', // require platform approval before login
 			},
 		});
 
@@ -298,42 +299,24 @@ export async function registerCompany(req: Request, res: Response) {
 				UserPassword: hashed,
 				Email: AdminEmail ?? null,
 				TelNumber: AdminTelNumber ?? null,
-				UserStatusApprove: 'APPROVED',
+				UserStatusApprove: 'PENDING', // require approval
 				UserStatusActive: 'ACTIVE',
 			},
 			include: { Role: true },
 		});
 
-		// Issue JWT
-		const token = jwt.sign(
-			{
-				UserId: adminUser.UserId,
-				RoleId: adminUser.RoleId,
-				roleCode: (adminUser as any).Role?.RoleCode,
-				CompanyId: adminUser.CompanyId,
-				BranchId: adminUser.BranchId,
-			},
-			JWT_SECRET,
-			{ expiresIn: '1d' },
-		);
-
 		return res.status(201).json({
-			token,
+			message: 'Company registration submitted. Waiting for platform approval.',
 			company: {
 				CompanyId: company.CompanyId,
 				CompanyName: company.CompanyName,
 				CompanyCode: company.CompanyCode,
+				CompanyStatus: company.CompanyStatus,
 			},
-			user: {
+			adminUser: {
 				UserId: adminUser.UserId,
 				UserName: adminUser.UserName,
-				RoleId: adminUser.RoleId,
-				roleCode: (adminUser as any).Role?.RoleCode ?? 'ADMIN',
-				BranchId: adminUser.BranchId,
-				CompanyId: adminUser.CompanyId,
-				Email: adminUser.Email,
-				UserStatusApprove: (adminUser as any).UserStatusApprove ?? 'APPROVED',
-				UserStatusActive: (adminUser as any).UserStatusActive ?? 'ACTIVE',
+				UserStatusApprove: adminUser.UserStatusApprove,
 			},
 		});
 	} catch (e: any) {
@@ -382,6 +365,7 @@ export async function registerCompanyPublic(req: Request, res: Response) {
 					CompanyEmail: CompanyEmail ?? null,
 					CompanyTelNumber: CompanyTelNumber ?? null,
 					CompanyCode: companyCode,
+					CompanyStatus: 'PENDING',
 				},
 			});
 
@@ -421,7 +405,7 @@ export async function registerCompanyPublic(req: Request, res: Response) {
 					UserPassword: hashed,
 					Email: AdminEmail ?? null,
 					TelNumber: AdminTelNumber ?? null,
-					UserStatusApprove: 'APPROVED',
+					UserStatusApprove: 'PENDING',
 					UserStatusActive: 'ACTIVE',
 				},
 				include: { Role: true },
@@ -436,36 +420,18 @@ export async function registerCompanyPublic(req: Request, res: Response) {
 
 		const { companyRow, userRow } = result as any;
 
-		// Issue token so the new company admin can access immediately
-		const token = jwt.sign(
-			{
-				UserId: userRow.UserId,
-				RoleId: userRow.RoleId,
-				roleCode: (userRow as any)?.Role?.RoleCode || 'COMPANY_ADMIN',
-				CompanyId: userRow.CompanyId,
-				BranchId: userRow.BranchId,
-			},
-			JWT_SECRET,
-			{ expiresIn: '1d' },
-		);
-
 		return res.status(201).json({
-			token,
+			message: 'Company registration submitted. Waiting for platform approval.',
 			company: {
 				CompanyId: companyRow.CompanyId,
 				CompanyName: companyRow.CompanyName,
 				CompanyCode: companyRow.CompanyCode,
+				CompanyStatus: companyRow.CompanyStatus,
 			},
-			user: {
+			adminUser: {
 				UserId: userRow.UserId,
 				UserName: userRow.UserName,
-				RoleId: userRow.RoleId,
-				roleCode: (userRow as any)?.Role?.RoleCode || 'COMPANY_ADMIN',
-				CompanyId: userRow.CompanyId,
-				BranchId: userRow.BranchId,
-				Email: userRow.Email,
-				UserStatusApprove: (userRow as any).UserStatusApprove ?? 'APPROVED',
-				UserStatusActive: (userRow as any).UserStatusActive ?? 'ACTIVE',
+				UserStatusApprove: userRow.UserStatusApprove,
 			},
 		});
 	} catch (e: any) {
