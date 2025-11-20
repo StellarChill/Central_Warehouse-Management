@@ -11,38 +11,38 @@ import { StockProvider } from "./context/StockContext";
 
 // ---- Code-split pages (improves first-load perf) ----
 // Legacy dashboard kept but not used as root; routing now uses role landing
-const DashboardPage = lazy(() => import("./pages/DashboardPage"));
-const PurchaseOrdersPage = lazy(() => import("./pages/PurchaseOrdersPage"));
-const InventoryPage = lazy(() => import("./pages/InventoryPage"));
-const SuppliersPage = lazy(() => import("./pages/SuppliersPage"));
-const RequisitionsPage = lazy(() => import("./pages/RequisitionsPage"));
-const ReceivingPage = lazy(() => import("./pages/ReceivingPage"));
-const ProductsPage = lazy(() => import("./pages/ProductsPage"));
-const CategoriesManagePage = lazy(() => import("./pages/CategoriesManagePage"));
+const DashboardPage = lazy(() => import("./pages/shared/DashboardPage"));
+const PurchaseOrdersPage = lazy(() => import("./pages/inventory/PurchaseOrdersPage"));
+const InventoryPage = lazy(() => import("./pages/inventory/InventoryPage"));
+const SuppliersPage = lazy(() => import("./pages/inventory/SuppliersPage"));
+const RequisitionsPage = lazy(() => import("./pages/branch/RequisitionsPage"));
+const ReceivingPage = lazy(() => import("./pages/inventory/ReceivingPage"));
+const ProductsPage = lazy(() => import("./pages/inventory/ProductsPage"));
+const CategoriesManagePage = lazy(() => import("./pages/inventory/CategoriesManagePage"));
 const BranchRequisitionCreatePage = lazy(
-  () => import("./pages/BranchRequisitionCreatePage")
+  () => import("./pages/branch/BranchRequisitionCreatePage")
 );
-const AdminUsersPage = lazy(() => import("./pages/AdminUsersPage"));
-const AdminBranchesPage = lazy(() => import("./pages/AdminBranchesPage"));
-const AdminReportsPage = lazy(() => import("./pages/AdminReportsPage"));
-const AdminHomePage = lazy(() => import("./pages/AdminHomePage"));
-const AuthPage = lazy(() => import("./pages/AuthPage"));
-const RegisterLandingPage = lazy(() => import("./pages/RegisterLandingPage"));
-const RegisterPage = lazy(() => import("./pages/RegisterPage"));
-const LiffRegisterPage = lazy(() => import("./pages/LiffRegisterPage"));
-const WaitingApprovalPage = lazy(() => import("./pages/WaitingApprovalPage"));
-const UserStatusPage = lazy(() => import("./pages/UserStatusPage"));
-const NotFound = lazy(() => import("./pages/NotFound"));
-const PlatformDashboardPage = lazy(() => import("./pages/PlatformDashboardPage"));
-const PlatformCompaniesPage = lazy(() => import("./pages/PlatformCompaniesPage"));
-const PlatformApprovalsPage = lazy(() => import("./pages/PlatformApprovalsPage"));
-const CompanyDashboardPage = lazy(() => import("./pages/CompanyDashboardPage"));
-const BranchDashboardPage = lazy(() => import("./pages/BranchDashboardPage"));
-const CompanyRegisterPage = lazy(() => import("./pages/CompanyRegisterPage"));
-const HomePage = lazy(() => import("./pages/HomePage"));
-const WarehouseManagementPage = lazy(() => import("./pages/WarehouseManagementPage"));
-const WarehouseDetailPage = lazy(() => import("./pages/WarehouseDetailPage"));
-const WarehouseDashboardPage = lazy(() => import("./pages/WarehouseDashboardPage"));
+const AdminUsersPage = lazy(() => import("./pages/admin/AdminUsersPage"));
+const AdminBranchesPage = lazy(() => import("./pages/admin/AdminBranchesPage"));
+const AdminReportsPage = lazy(() => import("./pages/admin/AdminReportsPage"));
+const AdminHomePage = lazy(() => import("./pages/admin/AdminHomePage"));
+const AuthPage = lazy(() => import("./pages/auth/AuthPage"));
+const RegisterLandingPage = lazy(() => import("./pages/auth/RegisterLandingPage"));
+const RegisterPage = lazy(() => import("./pages/auth/RegisterPage"));
+const LiffRegisterPage = lazy(() => import("./pages/auth/LiffRegisterPage"));
+const WaitingApprovalPage = lazy(() => import("./pages/company/WaitingApprovalPage"));
+const UserStatusPage = lazy(() => import("./pages/company/UserStatusPage"));
+const NotFound = lazy(() => import("./pages/shared/NotFound"));
+const PlatformDashboardPage = lazy(() => import("./pages/platform/PlatformDashboardPage"));
+const PlatformCompaniesPage = lazy(() => import("./pages/platform/PlatformCompaniesPage"));
+const PlatformApprovalsPage = lazy(() => import("./pages/platform/PlatformApprovalsPage"));
+const CompanyDashboardPage = lazy(() => import("./pages/company/CompanyDashboardPage"));
+const BranchDashboardPage = lazy(() => import("./pages/branch/BranchDashboardPage"));
+const CompanyRegisterPage = lazy(() => import("./pages/auth/CompanyRegisterPage"));
+const HomePage = lazy(() => import("./pages/shared/HomePage"));
+const WarehouseManagementPage = lazy(() => import("./pages/warehouse/WarehouseManagementPage"));
+const WarehouseDetailPage = lazy(() => import("./pages/warehouse/WarehouseDetailPage"));
+const WarehouseDashboardPage = lazy(() => import("./pages/warehouse/WarehouseDashboardPage"));
 
 // ---- React Query sane defaults ----
 const queryClient = new QueryClient({
