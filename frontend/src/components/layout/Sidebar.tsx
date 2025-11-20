@@ -72,6 +72,12 @@ const navigation = [
     icon: FileText,
     premiumIcon: FileText,
   },
+  {
+    name: "จัดการคลังสินค้า",
+    href: "/warehouse-management",
+    icon: Warehouse,
+    premiumIcon: Warehouse,
+  },
   { 
     name: "ผู้ดูแลระบบ", 
     href: "/admin", 
@@ -86,6 +92,7 @@ export function Sidebar({ onClose }: SidebarProps) {
   const filteredNav = navigation.filter((item) => {
     const adminPaths = ["/admin", "/admin/users", "/admin/branches", "/admin/reports"];
     if (adminPaths.includes(item.href)) return role === "ADMIN";
+      if (item.href === "/warehouse-management") return role === "COMPANY_ADMIN" || role === "ADMIN" || role === "WAREHOUSE_ADMIN";
     if (item.href === "/purchase-orders" || item.href === "/receiving") return role !== "BRANCH";
     return true;
   });

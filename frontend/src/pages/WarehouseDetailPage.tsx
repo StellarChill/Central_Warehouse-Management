@@ -38,6 +38,9 @@ const WarehouseDetailPage: React.FC = () => {
         </div>
         <h2 className="text-xl font-medium text-slate-800">กำลังนำทางไปหน้าที่เหมาะสม...</h2>
         {id && <p className="text-sm text-slate-500">คลัง: <span className="font-medium">{id}</span></p>}
+        {user?.CompanyName && (
+          <p className="text-xs text-slate-500">บริษัท: <span className="font-medium">{user.CompanyName}</span>{user.CompanyCode ? ` (${user.CompanyCode})` : ''}</p>
+        )}
         <Button variant="ghost" onClick={() => navigate(-1)} className="gap-2">
           <ArrowLeft className="h-4 w-4" /> กลับ
         </Button>

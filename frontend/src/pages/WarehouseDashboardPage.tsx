@@ -54,10 +54,18 @@ const WarehouseDashboardPage: React.FC = () => {
             <div>
               <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-slate-900">ภาพรวมคลัง</h1>
               <p className="text-slate-500 text-sm">แดชบอร์ดสรุปข้อมูลจำลองก่อนเชื่อมระบบจริง</p>
+              {user?.CompanyName && (
+                <div className="mt-1 flex flex-wrap gap-2">
+                  <span className="text-xs px-2 py-1 rounded-full bg-primary/10 text-primary font-medium">บริษัท: {user.CompanyName}</span>
+                  {user.CompanyCode && (
+                    <span className="text-xs px-2 py-1 rounded-full bg-secondary/10 text-secondary-foreground font-medium">รหัส: {user.CompanyCode}</span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
           {id && (
-            <Badge variant="secondary" className="w-fit">ID: {id}</Badge>
+            <Badge variant="secondary" className="w-fit">คลัง ID: {id}</Badge>
           )}
           <div className="flex gap-2">
             <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="gap-1">

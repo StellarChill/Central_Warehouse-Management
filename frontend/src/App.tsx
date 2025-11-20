@@ -41,7 +41,6 @@ const BranchDashboardPage = lazy(() => import("./pages/BranchDashboardPage"));
 const CompanyRegisterPage = lazy(() => import("./pages/CompanyRegisterPage"));
 const HomePage = lazy(() => import("./pages/HomePage"));
 const WarehouseManagementPage = lazy(() => import("./pages/WarehouseManagementPage"));
-const WarehouseOverviewPage = lazy(() => import("./pages/WarehouseOverviewPage"));
 const WarehouseDetailPage = lazy(() => import("./pages/WarehouseDetailPage"));
 const WarehouseDashboardPage = lazy(() => import("./pages/WarehouseDashboardPage"));
 
@@ -180,8 +179,14 @@ const App = () => (
                       </Guard>
                     }
                   />
-                  <Route path="/warehouse-management" element={<WarehouseManagementPage />} />
-                  <Route path="/warehouse-overview" element={<WarehouseOverviewPage />} />
+                  <Route
+                    path="/warehouse-management"
+                    element={
+                      <Guard allow={["COMPANY_ADMIN", "ADMIN"]}>
+                        <WarehouseManagementPage />
+                      </Guard>
+                    }
+                  />
                   <Route path="/warehouse/:id" element={<WarehouseDetailPage />} />
                   <Route path="/warehouse/:id/dashboard" element={<WarehouseDashboardPage />} />
                 </Route>
@@ -266,7 +271,6 @@ export default App;
 function RoleLanding() {
   const { user } = useAuth();
   if (user?.role === 'PLATFORM_ADMIN') return <Navigate to="/platform" replace />;
-  if (user?.role === 'COMPANY_ADMIN' || user?.role === 'ADMIN') return <Navigate to="/admin" replace />;
-  return <Navigate to="/warehouse-overview" replace />;
+  if (user?.role === 'COMPANY_ADMIN' || user?.role === 'ADMIN' || user?.role === 'WAREHOUSE_ADMIN') return <Navigate to="/warehouse-management" replace />;
 }
 

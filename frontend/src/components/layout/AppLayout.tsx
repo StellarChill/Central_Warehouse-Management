@@ -15,7 +15,10 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   const { user } = useAuth();
   const location = useLocation();
-  const routeHidesSidebar = location.pathname === "/warehouse-overview" || location.pathname.startsWith("/platform");
+  const routeHidesSidebar =
+    location.pathname === "/warehouse-overview" ||
+    location.pathname === "/warehouse-management" ||
+    location.pathname.startsWith("/platform");
 
   // Re-evaluate liff-only mode whenever auth user changes (so login via LIFF updates layout immediately)
   useEffect(() => {

@@ -17,6 +17,8 @@ type User = {
   RoleId: number;
   BranchId: number;
   CompanyId?: number;
+  CompanyName?: string | null;
+  CompanyCode?: string | null;
   Email?: string;
   UserStatus?: string; // 👈 เพิ่มสถานะ user
   role: Role; // from roleCode or RoleId

@@ -258,6 +258,52 @@ export async function deleteBranch(id: number): Promise<void> {
 }
 
 // ==========================================
+// Warehouse API
+// ==========================================
+
+export type Warehouse = {
+  WarehouseId: number;
+  WarehouseName: string;
+  WarehouseCode: string;
+  WarehouseAddress?: string | null;
+  CreatedAt: string;
+  UpdatedAt: string;
+  CreatedBy?: number;
+  UpdatedBy?: number;
+};
+
+export type CreateWarehouseData = {
+  WarehouseName: string;
+  WarehouseCode: string;
+  WarehouseAddress?: string;
+  CreatedBy?: number;
+};
+
+export type UpdateWarehouseData = Partial<CreateWarehouseData>;
+
+export async function getWarehouses(): Promise<Warehouse[]> {
+  return apiGet('/warehouse');
+}
+
+export async function getWarehouse(id: number): Promise<Warehouse> {
+  return apiGet(`/warehouse/${id}`);
+}
+
+export async function createWarehouse(data: CreateWarehouseData): Promise<Warehouse> {
+  const user = getUser();
+  return apiPost('/warehouse', { ...data, CreatedBy: user?.UserId || undefined });
+}
+
+export async function updateWarehouse(id: number, data: UpdateWarehouseData): Promise<Warehouse> {
+  const user = getUser();
+  return apiPut(`/warehouse/${id}`, { ...data, UpdatedBy: user?.UserId || undefined });
+}
+
+export async function deleteWarehouse(id: number): Promise<void> {
+  return apiDelete(`/warehouse/${id}`);
+}
+
+// ==========================================
 // Category API
 // ==========================================
 
