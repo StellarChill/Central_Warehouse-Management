@@ -52,7 +52,7 @@ export async function updateCompany(req: Request, res: Response) {
   try {
     const id = Number(req.params.id);
     if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid id' });
-    const { CompanyName, CompanyAddress, TaxId, CompanyCode, CompanyTelNumber, CompanyEmail, UpdatedBy } = req.body;
+    const { CompanyName, CompanyAddress, TaxId, CompanyCode, CompanyTelNumber, CompanyEmail, CompanyStatus, UpdatedBy } = req.body;
     const data: any = {};
     if (CompanyName !== undefined) data.CompanyName = CompanyName;
     if (CompanyAddress !== undefined) data.CompanyAddress = CompanyAddress;
@@ -60,6 +60,7 @@ export async function updateCompany(req: Request, res: Response) {
     if (CompanyCode !== undefined) data.CompanyCode = CompanyCode;
     if (CompanyTelNumber !== undefined) data.CompanyTelNumber = CompanyTelNumber;
     if (CompanyEmail !== undefined) data.CompanyEmail = CompanyEmail;
+    if (CompanyStatus !== undefined) data.CompanyStatus = CompanyStatus;
     if (UpdatedBy !== undefined) data.UpdatedBy = UpdatedBy;
     const row = await prisma.company.update({ where: { CompanyId: id }, data });
     return res.json(row);
