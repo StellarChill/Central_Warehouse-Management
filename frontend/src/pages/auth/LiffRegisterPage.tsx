@@ -7,8 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { UserPlus, Warehouse } from "lucide-react";
-import { th } from "../i18n/th";
-import { useAuth } from "../context/AuthContext";
+import { th } from "../../i18n/th";
+import { useAuth } from "../../context/AuthContext";
 
 interface LiffRegisterFormData {
   UserName: string;

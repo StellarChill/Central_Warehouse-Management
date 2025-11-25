@@ -16,7 +16,6 @@ export function AppLayout({ children }: AppLayoutProps) {
   const { user } = useAuth();
   const location = useLocation();
   const routeHidesSidebar =
-    location.pathname === "/warehouse-overview" ||
     location.pathname === "/warehouse-management" ||
     location.pathname.startsWith("/platform");
 

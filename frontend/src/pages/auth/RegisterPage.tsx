@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Warehouse, UserPlus, Eye, EyeOff, CheckCircle, Shield } from "lucide-react";
 import { th } from "../i18n/th";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../../context/AuthContext";
 
 interface RegisterFormData {
   UserName: string;

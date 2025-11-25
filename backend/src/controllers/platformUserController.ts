@@ -6,7 +6,16 @@ export async function listPendingUsers(req: Request, res: Response) {
   try {
     const status = String(req.query.status || 'PENDING').toUpperCase();
     const users = await prisma.user.findMany({
-      where: { UserStatusApprove: status },
+      where: {
+        UserStatusApprove: status,
+        NOT: {
+          Role: {
+            RoleCode: {
+              in: ['PLATFORM_ADMIN', 'PLATFORM_STAFF'],
+            },
+          },
+        },
+      },
       select: ({
         UserId: true,
         UserName: true,
