@@ -3,11 +3,12 @@ import React, { Suspense, lazy } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AppLayout } from "./components/layout/AppLayout";
 import { AuthProvider, useAuth, Role } from "./context/AuthContext";
 import { StockProvider } from "./context/StockContext";
+import { getWarehouses, type Warehouse } from "./lib/api";
 
 // ---- Code-split pages (improves first-load perf) ----
 // Legacy dashboard kept but not used as root; routing now uses role landing
@@ -270,7 +271,32 @@ export default App;
 // Role-based landing at index path only
 function RoleLanding() {
   const { user } = useAuth();
-  if (user?.role === 'PLATFORM_ADMIN') return <Navigate to="/platform" replace />;
-  if (user?.role === 'COMPANY_ADMIN' || user?.role === 'ADMIN' || user?.role === 'WAREHOUSE_ADMIN') return <Navigate to="/warehouse-management" replace />;
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role === 'PLATFORM_ADMIN') return <Navigate to="/platform" replace />;
+  if (['COMPANY_ADMIN', 'ADMIN', 'WAREHOUSE_ADMIN'].includes(user.role)) {
+    return <CompanyWarehouseLanding />;
+  }
+  return <Navigate to="/inventory" replace />;
+}
+
+function CompanyWarehouseLanding() {
+  const { data, isLoading, isError } = useQuery<Warehouse[]>({
+    queryKey: ['warehouses', 'landing'],
+    queryFn: getWarehouses,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  if (isLoading) return <LoadingScreen />;
+
+  if (isError || !data || data.length === 0) {
+    return <Navigate to="/warehouse-management" replace />;
+  }
+
+  const preferred =
+    data.find((w) => w.WarehouseName?.toLowerCase().includes('main')) ||
+    data.find((w) => w.WarehouseCode?.toLowerCase().includes('main')) ||
+    data[0];
+
+  return <Navigate to={`/warehouse/${preferred.WarehouseId}/dashboard`} replace />;
 }
 
