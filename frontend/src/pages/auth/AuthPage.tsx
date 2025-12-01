@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,28 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Eye, EyeOff } from "lucide-react";
 
 type SubmitMsg = { type: "success" | "error"; text: string } | null;
-
-const roles = [
-  { id: "1", label: "ผู้ดูแล (Admin)" },
-  { id: "2", label: "คลังกลาง (Center)" },
-  { id: "3", label: "สาขา (Branch)" },
-];
-
-const branches = [
-  { id: "1", name: "สาขากลาง (Center A)" },
-  { id: "2", name: "สาขา B" },
-  { id: "3", name: "สาขา C" },
-];
-
-const companies = [
-  { id: "c1", name: "บริษัท เอ จำกัด" },
-  { id: "c2", name: "บริษัท บี เทคโนโลยี" },
-  { id: "c3", name: "องค์กรซี โซลูชั่นส์" },
-];
 
 export default function AuthPage() {
   const { user, login, register: registerUser } = useAuth();
@@ -59,14 +40,11 @@ export default function AuthPage() {
     UserName: "",
     UserPassword: "",
     confirmPassword: "",
-    RoleId: "",
-    BranchId: "",
+    RequestedRole: "",
     TelNumber: "",
     Email: "",
-    LineId: "",
     Company: "",
   });
-  const [companySelect, setCompanySelect] = useState<string>("");
   const [regErrors, setRegErrors] = useState<Partial<Record<keyof typeof formData, string>>>({});
   const [regSubmitting, setRegSubmitting] = useState(false);
   const [regMsg, setRegMsg] = useState<SubmitMsg>(null);
@@ -90,10 +68,8 @@ export default function AuthPage() {
     else if (!/^\d{9,10}$/.test(formData.TelNumber)) next.TelNumber = "กรอกเป็นตัวเลข 9-10 หลัก";
     if (!formData.UserPassword || formData.UserPassword.length < 6) next.UserPassword = "รหัสผ่านอย่างน้อย 6 ตัวอักษร";
     if (formData.confirmPassword !== formData.UserPassword) next.confirmPassword = "รหัสผ่านยืนยันไม่ตรงกัน";
-    if (!formData.RoleId) next.RoleId = "เลือกบทบาท";
-    if (!formData.BranchId) next.BranchId = "เลือกสาขา";
-    if (!companySelect) next.Company = "เลือกบริษัท หรือเลือก 'อื่นๆ' แล้วกรอกชื่อ";
-    if (companySelect === "other" && !formData.Company.trim()) next.Company = "กรอกชื่อบริษัท/หน่วยงาน";
+    if (!formData.RequestedRole.trim()) next.RequestedRole = "กรอกบทบาทที่ต้องการ";
+    if (!formData.Company.trim()) next.Company = "กรอกชื่อบริษัท/หน่วยงาน";
     setRegErrors(next);
     return Object.keys(next).length === 0;
   };
@@ -126,23 +102,18 @@ export default function AuthPage() {
     if (!validateRegister()) return;
     setRegSubmitting(true);
     try {
-      if (companySelect && companySelect !== "other") {
-        const found = companies.find((c) => c.id === companySelect);
-        if (found) formData.Company = found.name;
-      }
       await registerUser({
         UserName: formData.UserName.trim(),
         UserPassword: formData.UserPassword,
         Company: formData.Company.trim() || undefined,
-        RoleId: Number(formData.RoleId),
-        BranchId: Number(formData.BranchId),
         TelNumber: formData.TelNumber.trim(),
         Email: formData.Email.trim().toLowerCase(),
-        LineId: formData.LineId.trim() || undefined,
+        RequestedRoleText: formData.RequestedRole.trim(),
       });
-      setRegMsg({ type: "success", text: "สมัครสมาชิกสำเร็จ! กรุณาเข้าสู่ระบบ ระบบจะพาไปหน้ารออนุมัติถ้ายังไม่ได้อนุมัติ" });
-      // เปลี่ยนกลับไปแท็บเข้าสู่ระบบ
-      setTab('login');
+      setRegMsg({ type: "success", text: "ส่งคำขอสำเร็จ! ระบบจะพาไปหน้ารอตรวจสอบ" });
+      redirectTimerRef.current = window.setTimeout(() => {
+        navigate('/awaiting-approval', { replace: true });
+      }, 1200);
     } catch (err: any) {
       setRegMsg({ type: "error", text: err?.message || "สมัครไม่สำเร็จ ลองใหม่อีกครั้ง" });
     } finally {
@@ -218,20 +189,14 @@ export default function AuthPage() {
                       {regErrors.TelNumber && <p className="text-xs text-red-500">{regErrors.TelNumber}</p>}
                     </div>
                     <div className="space-y-1">
-                      <Label>บริษัท / หน่วยงาน</Label>
-                      <Select value={companySelect} onValueChange={setCompanySelect}>
-                        <SelectTrigger><SelectValue placeholder="เลือกบริษัทที่มีอยู่ หรือเลือก 'อื่นๆ'" /></SelectTrigger>
-                        <SelectContent>
-                          {companies.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                          <SelectItem value="other">อื่นๆ (พิมพ์ชื่อเอง)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {companySelect === "other" && (
-                        <div className="mt-2">
-                          <Label htmlFor="reg-company" className="text-xs">พิมพ์ชื่อบริษัท / หน่วยงาน</Label>
-                          <Input id="reg-company" value={formData.Company} onChange={onRegChange("Company")} placeholder="เช่น บริษัท เอ จำกัด" />
-                        </div>
-                      )}
+                      <Label htmlFor="reg-company">บริษัท / หน่วยงาน</Label>
+                      <Input
+                        id="reg-company"
+                        value={formData.Company}
+                        onChange={onRegChange("Company")}
+                        placeholder="กรอกชื่อบริษัทหรือหน่วยงาน"
+                      />
+                      <p className="text-xs text-muted-foreground">ตัวอย่าง: บริษัท เอ จำกัด หรือชื่อหน่วยงานของคุณ</p>
                       {regErrors.Company && <p className="text-xs text-red-500">{regErrors.Company}</p>}
                     </div>
 
@@ -253,31 +218,19 @@ export default function AuthPage() {
                     </div>
 
                     <div className="space-y-1">
-                      <Label>บทบาท</Label>
-                      <Select value={formData.RoleId} onValueChange={(v) => setFormData(s => ({ ...s, RoleId: v }))}>
-                        <SelectTrigger><SelectValue placeholder="เลือกบทบาท" /></SelectTrigger>
-                        <SelectContent>
-                          {roles.map(r => <SelectItem key={r.id} value={r.id}>{r.label}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                      {regErrors.RoleId && <p className="text-xs text-red-500">{regErrors.RoleId}</p>}
+                      <Label htmlFor="reg-role">บทบาท</Label>
+                      <Input
+                        id="reg-role"
+                        value={formData.RequestedRole}
+                        onChange={onRegChange("RequestedRole")}
+                        placeholder="กรอกบทบาทหรือหน้าที่ที่ต้องการ" 
+                      />
+                      <p className="text-xs text-muted-foreground">ตัวอย่าง: Admin, Center, Branch หรือคำอธิบายบทบาทที่ต้องการ</p>
+                      {regErrors.RequestedRole && <p className="text-xs text-red-500">{regErrors.RequestedRole}</p>}
                     </div>
 
-                    <div className="space-y-1">
-                      <Label>สาขา</Label>
-                      <Select value={formData.BranchId} onValueChange={(v) => setFormData(s => ({ ...s, BranchId: v }))}>
-                        <SelectTrigger><SelectValue placeholder="เลือกสาขา" /></SelectTrigger>
-                        <SelectContent>
-                          {branches.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                      {regErrors.BranchId && <p className="text-xs text-red-500">{regErrors.BranchId}</p>}
-                    </div>
+                  
 
-                    <div className="space-y-1">
-                      <Label htmlFor="reg-line">LINE ID (ถ้ามี)</Label>
-                      <Input id="reg-line" value={formData.LineId} onChange={onRegChange("LineId")} placeholder="เชื่อมภายหลังได้ (ออปชันนัล)" />
-                    </div>
 
                     <Button type="submit" disabled={regSubmitting} className="w-full h-12 text-lg mt-1">
                       {regSubmitting ? <div className="flex items-center gap-2"><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />กำลังสมัครสมาชิก...</div> : "สร้างบัญชีใหม่"}

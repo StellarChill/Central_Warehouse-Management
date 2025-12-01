@@ -51,12 +51,10 @@ type RegisterData = {
   UserName: string;
   UserPassword: string;
   Company?: string;
-  BranchName?: string;
-  RoleId: number;
-  BranchId: number;
   Email: string;
   TelNumber: string;
   LineId?: string;
+  RequestedRoleText?: string;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -193,11 +191,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const register = async (registerData: RegisterData) => {
-    const res = await fetch(`${API_BASE}/register`, {
+    const payload: Record<string, any> = {
+      UserName: registerData.UserName,
+      UserPassword: registerData.UserPassword,
+      Email: registerData.Email,
+      TelNumber: registerData.TelNumber,
+      LineId: registerData.LineId,
+      RequestedRoleText: registerData.RequestedRoleText?.trim() || undefined,
+    };
+
+    if (registerData.Company?.trim()) {
+      payload.tempCompany = {
+        TempCompanyName: registerData.Company.trim(),
+      };
+    }
+
+    const res = await fetch(`${API_BASE}/public/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify(registerData),
+      body: JSON.stringify(payload),
     });
 
     if (!res.ok) {

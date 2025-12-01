@@ -136,11 +136,15 @@ export default function RegisterPage() {
         UserName: formData.UserName.trim(),
         UserPassword: formData.UserPassword,
         Company: formData.Company.trim() || undefined,
-        RoleId: Number(formData.RoleId),
-        BranchId: Number(formData.BranchId),
         TelNumber: formData.TelNumber.trim(),
         Email: formData.Email.trim().toLowerCase(),
         LineId: formData.LineId.trim() || undefined, // optional
+        RequestedRoleText: [
+          roles.find((r) => r.id === formData.RoleId)?.label,
+          branches.find((b) => b.id === formData.BranchId)?.name,
+        ]
+          .filter(Boolean)
+          .join(" • ") || undefined,
       });
 
       setSubmitMsg({ type: "success", text: "สมัครสมาชิกสำเร็จ! รอการอนุมัติจากผู้ดูแลระบบ" });
