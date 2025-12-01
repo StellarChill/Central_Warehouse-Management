@@ -71,9 +71,7 @@ const WarehouseDashboardPage: React.FC = () => {
             <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="gap-1">
               <ArrowLeft className="h-4 w-4" /> กลับ
             </Button>
-            <Button size="sm" onClick={enterOperations} className="gap-1">
-              เข้าสู่การทำงาน <ArrowRight className="h-4 w-4" />
-            </Button>
+          
           </div>
         </div>
 

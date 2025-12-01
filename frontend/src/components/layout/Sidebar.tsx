@@ -1,5 +1,5 @@
-import { NavLink } from "react-router-dom";
-import { 
+import { NavLink, useLocation } from "react-router-dom";
+import {
   LayoutDashboard, 
   Users, 
   Package, 
@@ -18,6 +18,8 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { th } from "../../i18n/th";
 import { useAuth } from "@/context/AuthContext";
+import { useEffect, useMemo, useState } from "react";
+import { getWarehouses, type Warehouse as WarehouseType } from "@/lib/api";
 
 interface SidebarProps {
   onClose?: () => void;
@@ -89,6 +91,45 @@ const navigation = [
 export function Sidebar({ onClose }: SidebarProps) {
   const { user } = useAuth();
   const role = user?.role || "BRANCH";
+  const location = useLocation();
+  const allowWarehouseNav = ["COMPANY_ADMIN", "ADMIN", "WAREHOUSE_ADMIN"].includes(role);
+  const [warehouses, setWarehouses] = useState<WarehouseType[]>([]);
+  const [loadingWarehouses, setLoadingWarehouses] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!allowWarehouseNav) {
+      setWarehouses([]);
+      return;
+    }
+    setLoadingWarehouses(true);
+    getWarehouses()
+      .then((list) => {
+        if (!cancelled) setWarehouses(list || []);
+      })
+      .catch(() => {
+        if (!cancelled) setWarehouses([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingWarehouses(false);
+      });
+    return () => { cancelled = true; };
+  }, [role]);
+
+  const warehouseNavItems = useMemo(() => {
+    return warehouses.map((w, idx) => ({
+      ...w,
+      label: w.WarehouseName || `คลัง ${idx + 1}`,
+      href: `/warehouse/${w.WarehouseId}/dashboard`,
+      isPrimary: idx === 0,
+    }));
+  }, [warehouses]);
+
+  const activeWarehouseId = useMemo(() => {
+    const match = location.pathname.match(/^\/warehouse\/(\d+)/);
+    return match ? Number(match[1]) : null;
+  }, [location.pathname]);
+
   const filteredNav = navigation.filter((item) => {
     const adminPaths = ["/admin", "/admin/users", "/admin/branches", "/admin/reports"];
     if (adminPaths.includes(item.href)) return role === "ADMIN";
@@ -148,6 +189,53 @@ export function Sidebar({ onClose }: SidebarProps) {
             </NavLink>
           );
         })}
+
+        {allowWarehouseNav && (
+          <div className="pt-4 mt-4 border-t">
+            <p className="text-xs font-semibold text-muted-foreground mb-2">
+              คลังของบริษัท
+            </p>
+            {loadingWarehouses && (
+              <div className="text-xs text-muted-foreground">กำลังโหลดคลัง...</div>
+            )}
+            {!loadingWarehouses && warehouseNavItems.length === 0 && (
+              <div className="text-xs text-muted-foreground">ยังไม่มีคลังที่ถูกสร้าง</div>
+            )}
+            {!loadingWarehouses && warehouseNavItems.map((item) => {
+              const isActive = activeWarehouseId === item.WarehouseId;
+              return (
+                <NavLink
+                  key={item.WarehouseId}
+                  to={item.href}
+                  onClick={onClose}
+                  className={({ isActive: navActive }) =>
+                    cn(
+                      "flex items-center justify-between gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
+                      navActive || isActive
+                        ? "bg-primary/10 text-primary"
+                        : "text-foreground hover:bg-accent hover:text-accent-foreground"
+                    )
+                  }
+                >
+                  <div className="flex items-center gap-3">
+                    <Warehouse className="h-4 w-4 text-primary" />
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium">{item.label}</span>
+                      {item.WarehouseCode && (
+                        <span className="text-xs text-muted-foreground">รหัส {item.WarehouseCode}</span>
+                      )}
+                    </div>
+                  </div>
+                  {item.isPrimary && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/20 text-primary font-semibold">
+                      คลังหลัก
+                    </span>
+                  )}
+                </NavLink>
+              );
+            })}
+          </div>
+        )}
       </nav>
 
       {/* Footer */}
