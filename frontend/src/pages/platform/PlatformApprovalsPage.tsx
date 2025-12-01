@@ -19,6 +19,7 @@ export default function PlatformApprovalsPage() {
   const [error, setError] = useState<string | null>(null);
   const [assignOpen, setAssignOpen] = useState(false);
   const [assignUser, setAssignUser] = useState<PlatformSignupUser | null>(null);
+  const [assignMode, setAssignMode] = useState<'ASSIGN' | 'APPROVE'>('ASSIGN');
   const [companies, setCompanies] = useState<any[]>([]);
   const [branches, setBranches] = useState<any[]>([]);
   const [roles, setRoles] = useState<any[]>([]);
@@ -82,6 +83,16 @@ export default function PlatformApprovalsPage() {
     return '—';
   };
 
+  const resolveRoleName = (u: PlatformSignupUser) => {
+    if (u.Role?.RoleName) return u.Role.RoleName;
+    return '—';
+  };
+
+  const resolveBranchName = (u: PlatformSignupUser) => {
+    if (u.Branch?.BranchName) return u.Branch.BranchName;
+    return '—';
+  };
+
   return (
     <PlatformLayout>
       <div className="px-6 py-8 space-y-4">
@@ -111,15 +122,11 @@ export default function PlatformApprovalsPage() {
                     <div key={u.UserId} className="py-3 flex items-center justify-between gap-3">
                       <div className="min-w-0">
                         <div className="font-medium truncate">{u.UserName}</div>
-                        <div className="text-sm text-muted-foreground truncate">
-                          {u.Email || '—'} • {u.TelNumber || '—'} • {u.RequestedRoleText || 'No requested role'}
-                        </div>
+                      
                         <div className="text-xs text-muted-foreground">Company: {resolveCompanyName(u)}</div>
-                        {u.TempCompany && (
-                          <div className="text-xs text-muted-foreground truncate">
-                            Temp Company: {u.TempCompany.TempCompanyName} ({u.TempCompany.TempCompanyCode})
-                          </div>
-                        )}
+                        <div className="text-xs text-muted-foreground">Assigned Role: {resolveRoleName(u)}</div>
+                        <div className="text-xs text-muted-foreground">Assigned Branch: {resolveBranchName(u)}</div>
+                       
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         <Badge variant={u.UserStatusActive === 'ACTIVE' ? 'success' as any : 'secondary'}>
@@ -127,11 +134,15 @@ export default function PlatformApprovalsPage() {
                         </Badge>
                         {isPending && (
                           <>
-                            <Button size="sm" onClick={async () => {
-                              await platformApproveUser(u.UserId);
-                              await load(status);
+                            <Button size="sm" onClick={() => {
+                              setAssignUser(u);
+                              setAssignMode('APPROVE');
+                              setAssignOpen(true);
+                              setCompanyId('');
+                              setBranchId('');
+                              setRoleId('');
                             }}>
-                              <Check className="h-4 w-4 mr-1" /> Approve
+                              <Check className="h-4 w-4 mr-1" /> Assign & Approve
                             </Button>
                             <Button size="sm" variant="destructive" onClick={async () => {
                               await platformRejectUser(u.UserId);
@@ -150,7 +161,14 @@ export default function PlatformApprovalsPage() {
                             }}>
                               <Ban className="h-4 w-4 mr-1" /> {u.UserStatusActive === 'ACTIVE' ? 'Set Inactive' : 'Set Active'}
                             </Button>
-                            <Button size="sm" onClick={() => { setAssignUser(u); setAssignOpen(true); }}>
+                            <Button size="sm" onClick={() => {
+                              setAssignUser(u);
+                              setAssignMode('ASSIGN');
+                              setAssignOpen(true);
+                              setCompanyId('');
+                              setBranchId('');
+                              setRoleId('');
+                            }}>
                               <UserCog className="h-4 w-4 mr-1" /> Assign
                             </Button>
                           </>
@@ -171,7 +189,9 @@ export default function PlatformApprovalsPage() {
       <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Assign Company / Branch / Role</DialogTitle>
+            <DialogTitle>
+              {assignMode === 'APPROVE' ? 'เลือกบริษัทและบทบาทก่อนอนุมัติ' : 'Assign Company / Branch / Role'}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div className="space-y-1">
@@ -217,15 +237,18 @@ export default function PlatformApprovalsPage() {
           </div>
           <DialogFooter>
             <Button variant="secondary" onClick={() => setAssignOpen(false)}>Cancel</Button>
-            <Button disabled={saving || !assignUser || !companyId || !branchId || !roleId} onClick={async () => {
+            <Button disabled={saving || !assignUser || !companyId || !roleId} onClick={async () => {
               if (!assignUser) return;
               setSaving(true);
               try {
                 await platformAssignUser(assignUser.UserId, {
                   CompanyId: Number(companyId),
-                  BranchId: Number(branchId),
+                  BranchId: branchId ? Number(branchId) : undefined,
                   RoleId: Number(roleId),
                 });
+                if (assignMode === 'APPROVE') {
+                  await platformApproveUser(assignUser.UserId);
+                }
                 setAssignOpen(false);
                 setCompanyId(''); setBranchId(''); setRoleId('');
                 await load(status);
@@ -234,7 +257,7 @@ export default function PlatformApprovalsPage() {
               } finally {
                 setSaving(false);
               }
-            }}>Save</Button>
+            }}>{assignMode === 'APPROVE' ? 'Assign & Approve' : 'Save'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -27,6 +27,27 @@ export async function listPendingUsers(req: Request, res: Response) {
         UserStatusApprove: true,
         UserStatusActive: true,
         CreatedAt: true,
+        Company: {
+          select: {
+            CompanyId: true,
+            CompanyName: true,
+            CompanyCode: true,
+          },
+        },
+        Branch: {
+          select: {
+            BranchId: true,
+            BranchName: true,
+            BranchCode: true,
+          },
+        },
+        Role: {
+          select: {
+            RoleId: true,
+            RoleName: true,
+            RoleCode: true,
+          },
+        },
         TempCompany: {
           select: {
             TempCompanyId: true,

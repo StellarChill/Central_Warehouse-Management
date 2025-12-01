@@ -121,6 +121,21 @@ export type PlatformSignupUser = {
   UserStatusApprove: 'PENDING' | 'APPROVED' | 'REJECTED';
   UserStatusActive: 'ACTIVE' | 'INACTIVE';
   CreatedAt: string;
+  Company?: {
+    CompanyId: number;
+    CompanyName: string;
+    CompanyCode: string;
+  } | null;
+  Branch?: {
+    BranchId: number;
+    BranchName: string;
+    BranchCode: string;
+  } | null;
+  Role?: {
+    RoleId: number;
+    RoleName: string;
+    RoleCode: string;
+  } | null;
   TempCompany?: {
     TempCompanyId: number;
     TempCompanyName: string;
