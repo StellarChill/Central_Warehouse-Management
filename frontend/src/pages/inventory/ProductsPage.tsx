@@ -227,8 +227,8 @@ export default function ProductsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold">วัตถุดิบขนมหวาน</h1>
-          <p className="text-muted-foreground mt-1">จัดการวัตถุดิบสำหรับทำขนมและของหวาน</p>
+          <h1 className="text-2xl sm:text-3xl font-bold">วัตถุดิบคลังสินค้า</h1>
+          <p className="text-muted-foreground mt-1">จัดการฐานข้อมูลวัตถุดิบสำหรับคลังกลางและทุกสาขา</p>
         </div>
         {canEditProducts && (
           <Button className="gap-2 w-full sm:w-auto" onClick={startCreate}>

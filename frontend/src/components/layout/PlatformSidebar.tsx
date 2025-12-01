@@ -2,7 +2,7 @@ import { NavLink } from "react-router-dom";
 import {
   Warehouse,
   Factory,
-  HardHat,
+  UserRound,
   X,
   ScanBarcode,
 } from "lucide-react";
@@ -27,7 +27,7 @@ const navigation = [
   {
     name: "Manage Users",
     href: "/platform/users",
-    icon: HardHat,
+    icon: UserRound,
   },
 ];
 

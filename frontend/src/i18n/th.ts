@@ -34,7 +34,7 @@ export const th = {
   nav: {
     dashboard: "หน้าหลัก",
     suppliers: "ผู้จำหน่ายวัตถุดิบ",
-    products: "วัตถุดิบขนมหวาน",
+    products: "วัตถุดิบคลังสินค้า",
     inventory: "คลังวัตถุดิบ",
     purchasing: "สั่งวัตถุดิบ",
     receiving: "รับวัตถุดิบ",
@@ -83,8 +83,8 @@ export const th = {
 
   // Dashboard
   dashboard: {
-    title: "ระบบจัดการร้านขนม",
-    subtitle: "จัดการร้านขนมครบวงจร",
+    title: "แพลตฟอร์มจัดการคลังสินค้า",
+    subtitle: "ควบคุมคลังกลางและสาขาแบบครบวงจร",
     stats: {
       totalPOs: "ใบสั่งซื้อทั้งหมด",
       pendingPOs: "รอการอนุมัติ",
@@ -138,7 +138,7 @@ export const th = {
 
   // Products
   products: {
-    title: "วัตถุดิบขนมหวาน",
+    title: "วัตถุดิบคลังสินค้า",
     create: "เพิ่มวัตถุดิบ",
     list: "รายการวัตถุดิบ",
     sku: "รหัสวัตถุดิบ",
