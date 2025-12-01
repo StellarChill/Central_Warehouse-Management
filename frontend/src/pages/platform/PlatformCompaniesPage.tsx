@@ -144,6 +144,23 @@ export default function PlatformCompaniesPage() {
             <p className="text-sm text-muted-foreground">ดูสถานะบริษัททั้งหมด ค้นหา และอนุมัติอย่างมั่นใจก่อนเปิดใช้งาน</p>
           </div>
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+            <div className="flex w-full flex-col gap-2 xl:max-w-sm">
+              <Label htmlFor="company-search" className="text-xs uppercase tracking-wide text-muted-foreground">ค้นหา</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="company-search"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="ค้นหาบริษัท อีเมล หรือรหัส"
+                  className="flex-1"
+                />
+                {query && (
+                  <Button variant="ghost" size="icon" aria-label="Clear search" onClick={() => setQuery('')}>
+                    X
+                  </Button>
+                )}
+              </div>
+            </div>
           
             <div className="flex flex-wrap gap-2">
               {statusFilterOptions.map((option) => (

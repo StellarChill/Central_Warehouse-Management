@@ -78,12 +78,10 @@ export default function PlatformDashboardPage() {
            
             <div className="p-4 rounded border">
               <div className="font-medium mb-2 flex items-center gap-2"><Building2 className="h-4 w-4 text-blue-600" /> Manage Companies</div>
-              <p className="text-sm text-muted-foreground mb-3">แก้ชื่อ TEMP → ชื่อจริง ตั้ง Active/Inactive</p>
               <Button className="w-full" onClick={() => navigate('/platform/companies')}>Open</Button>
             </div>
             <div className="p-4 rounded border">
               <div className="font-medium mb-2 flex items-center gap-2"><Users className="h-4 w-4 text-green-600" /> Manage Users</div>
-              <p className="text-sm text-muted-foreground mb-3">ดูผู้ใช้ทั้งระบบ เปลี่ยน role/สถานะ แก้ข้อมูล</p>
               <Button className="w-full" onClick={() => navigate('/platform/users')}>Open</Button>
             </div>
          
