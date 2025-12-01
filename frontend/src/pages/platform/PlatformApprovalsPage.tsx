@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Label } from '@/components/ui/label';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import { PlatformLayout } from '@/components/layout/PlatformLayout';
+import { Input } from '@/components/ui/input';
 
 type TabStatus = 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED';
 
@@ -27,6 +28,9 @@ export default function PlatformApprovalsPage() {
   const [branchId, setBranchId] = useState<string>('');
   const [roleId, setRoleId] = useState<string>('');
   const [saving, setSaving] = useState(false);
+  const [filterQuery, setFilterQuery] = useState('');
+  const [filterCompany, setFilterCompany] = useState('');
+  const [filterRole, setFilterRole] = useState('');
 
   async function load(s: TabStatus) {
     try {
@@ -93,6 +97,17 @@ export default function PlatformApprovalsPage() {
     return '—';
   };
 
+  const filteredRows = useMemo(() => {
+    return rows.filter((u) => {
+      const search = filterQuery.trim().toLowerCase();
+      const matchesSearch = !search || [u.UserName, u.Email, u.TelNumber, resolveCompanyName(u)]
+        .some((field) => field?.toLowerCase().includes(search));
+      const matchesCompany = !filterCompany || String(u.Company?.CompanyId ?? '') === filterCompany;
+      const matchesRole = !filterRole || String(u.Role?.RoleId ?? '') === filterRole;
+      return matchesSearch && matchesCompany && matchesRole;
+    });
+  }, [rows, filterQuery, filterCompany, filterRole]);
+
   return (
     <PlatformLayout>
       <div className="px-6 py-8 space-y-4">
@@ -101,6 +116,39 @@ export default function PlatformApprovalsPage() {
           <CardTitle>Approvals & Users</CardTitle>
         </CardHeader>
         <CardContent>
+          <div className="grid gap-3 md:grid-cols-4 mb-4">
+            <div>
+              <Label htmlFor="filter-search" className="text-xs uppercase tracking-wide text-muted-foreground">Search</Label>
+              <Input id="filter-search" value={filterQuery} onChange={(e) => setFilterQuery(e.target.value)} placeholder="ชื่อผู้ใช้ / อีเมล / เบอร์" className="mt-1" />
+            </div>
+            <div>
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Company</Label>
+              <Select value={filterCompany} onValueChange={(v) => setFilterCompany(v === 'ALL' ? '' : v)}>
+                <SelectTrigger className="mt-1"><SelectValue placeholder="All companies" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All companies</SelectItem>
+                  {companies.map((c) => (
+                    <SelectItem key={c.CompanyId} value={String(c.CompanyId)}>{c.CompanyName}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Role</Label>
+              <Select value={filterRole} onValueChange={(v) => setFilterRole(v === 'ALL' ? '' : v)}>
+                <SelectTrigger className="mt-1"><SelectValue placeholder="All roles" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All roles</SelectItem>
+                  {roles.map((r) => (
+                    <SelectItem key={r.RoleId} value={String(r.RoleId)}>{r.RoleName}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-end justify-end">
+              <Button variant="ghost" size="sm" onClick={() => { setFilterQuery(''); setFilterCompany(''); setFilterRole(''); }}>Clear Filters</Button>
+            </div>
+          </div>
           <Tabs value={status} onValueChange={(v) => setStatus(v as TabStatus)}>
             <TabsList>
               <TabsTrigger value="ALL">All</TabsTrigger>
@@ -115,7 +163,7 @@ export default function PlatformApprovalsPage() {
                 <div className="p-4 text-red-600">{error}</div>
               ) : (
                 <div className="divide-y">
-                  {rows.map((u) => {
+                  {filteredRows.map((u) => {
                     const isPending = u.UserStatusApprove === 'PENDING';
                     const isApproved = u.UserStatusApprove === 'APPROVED';
                     return (
@@ -176,7 +224,7 @@ export default function PlatformApprovalsPage() {
                       </div>
                     </div>
                   );})}
-                  {rows.length === 0 && (
+                  {filteredRows.length === 0 && (
                     <div className="p-4 text-sm text-muted-foreground">No users in this state.</div>
                   )}
                 </div>
