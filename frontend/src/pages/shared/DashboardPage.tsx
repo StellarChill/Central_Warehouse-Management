@@ -1,16 +1,15 @@
-import { 
-  ShoppingCart, 
-  Users, 
-  Package, 
-  AlertTriangle,
-  FileText,
-  TrendingUp,
-  Plus,
-  Eye,
-  BarChart3,
+import {
+  ClipboardSignature,
+  Factory,
+  ShieldAlert,
+  ClipboardPlus,
+  Truck,
+  FileBox,
+  ChartBar,
   Calendar,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  ClipboardList,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -99,7 +98,7 @@ export default function DashboardPage() {
     {
       title: th.dashboard.stats.totalPOs,
       value: String(totalPOs),
-      icon: ShoppingCart,
+      icon: ClipboardSignature,
       trend: "+12%",
       color: "text-primary",
       bgColor: "bg-primary/10",
@@ -107,7 +106,7 @@ export default function DashboardPage() {
     {
       title: th.dashboard.stats.totalSuppliers,
       value: String(totalSuppliers),
-      icon: Users,
+      icon: Factory,
       trend: "+2%",
       color: "text-info",
       bgColor: "bg-info/10",
@@ -115,7 +114,7 @@ export default function DashboardPage() {
     {
       title: th.dashboard.stats.lowStock,
       value: String(lowStockCount),
-      icon: AlertTriangle,
+      icon: ShieldAlert,
       trend: "-3%",
       color: "text-destructive",
       bgColor: "bg-destructive/10",
@@ -129,7 +128,7 @@ export default function DashboardPage() {
       id: "createPO",
       title: th.dashboard.actions.createPO,
       description: "สร้างใบสั่งซื้อใหม่",
-      icon: Plus,
+      icon: ClipboardPlus,
       color: "primary",
       href: "/purchase-orders",
     },
@@ -137,7 +136,7 @@ export default function DashboardPage() {
       id: "receiveGoods",
       title: th.dashboard.actions.receiveGoods,
       description: "บันทึกการรับสินค้า",
-      icon: Package,
+      icon: Truck,
       color: "success",
       href: "/receiving",
     },
@@ -145,7 +144,7 @@ export default function DashboardPage() {
       id: "createRequisition",
       title: th.dashboard.actions.createRequisition,
       description: "สร้างใบเบิกสินค้า",
-      icon: FileText,
+      icon: FileBox,
       color: "info",
       href: "/requisitions/create",
     },
@@ -153,7 +152,7 @@ export default function DashboardPage() {
       id: "viewReports",
       title: th.dashboard.actions.viewReports,
       description: "ดูรายงานประจำเดือน",
-      icon: Eye,
+      icon: ChartBar,
       color: "accent",
       href: "/admin/reports",
     },
@@ -251,7 +250,7 @@ export default function DashboardPage() {
         <Card className="shadow-premium">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
+              <ClipboardList className="h-5 w-5" />
               {th.dashboard.recentActivity}
             </CardTitle>
           </CardHeader>
@@ -276,7 +275,7 @@ export default function DashboardPage() {
         <Card className="shadow-premium">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Plus className="h-5 w-5" />
+              <ClipboardPlus className="h-5 w-5" />
               {th.dashboard.quickActions}
             </CardTitle>
           </CardHeader>

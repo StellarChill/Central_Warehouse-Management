@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useNavigate } from 'react-router-dom';
-import { Building2, CheckSquare, Users, LayoutDashboard, ShieldCheck, Timer } from 'lucide-react';
+import { Warehouse as WarehouseIcon, Factory, HardHat, RadioTower, ClipboardList } from 'lucide-react';
 import { PlatformLayout } from '@/components/layout/PlatformLayout';
 
 export default function PlatformDashboardPage() {
@@ -43,7 +43,7 @@ export default function PlatformDashboardPage() {
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-3">
           <span className="inline-flex h-12 w-12 rounded-lg bg-blue-50 text-blue-600 items-center justify-center shadow-sm">
-            <LayoutDashboard className="h-6 w-6" />
+            <WarehouseIcon className="h-6 w-6" />
           </span>
           <div>
             <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">Platform Admin — Home</h1>
@@ -51,19 +51,19 @@ export default function PlatformDashboardPage() {
           </div>
         </div>
         <div className="flex gap-2">
-          <Badge variant="secondary" className="flex items-center gap-1"><ShieldCheck className="h-3 w-3" /> Super Admin</Badge>
-          <Badge variant="outline" className="flex items-center gap-1"><Timer className="h-3 w-3" /> Real-time (mock)</Badge>
+          <Badge variant="secondary" className="flex items-center gap-1"><ClipboardList className="h-3 w-3" /> Super Admin</Badge>
+          <Badge variant="outline" className="flex items-center gap-1"><RadioTower className="h-3 w-3" /> Real-time (mock)</Badge>
         </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
        
         <Card className="hover:shadow-sm transition">
-          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Building2 className="h-4 w-4 text-blue-600" />Companies</CardTitle></CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Factory className="h-4 w-4 text-blue-600" />Companies</CardTitle></CardHeader>
           <CardContent className="pt-0"><div className="text-2xl font-semibold">{stats.companyCount}</div></CardContent>
         </Card>
         <Card className="hover:shadow-sm transition">
-          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Users className="h-4 w-4 text-green-600" />Users</CardTitle></CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><HardHat className="h-4 w-4 text-green-600" />Users</CardTitle></CardHeader>
           <CardContent className="pt-0"><div className="text-2xl font-semibold">{stats.totalUsers}</div></CardContent>
         </Card>
      
@@ -77,11 +77,11 @@ export default function PlatformDashboardPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
            
             <div className="p-4 rounded border">
-              <div className="font-medium mb-2 flex items-center gap-2"><Building2 className="h-4 w-4 text-blue-600" /> Manage Companies</div>
+              <div className="font-medium mb-2 flex items-center gap-2"><Factory className="h-4 w-4 text-blue-600" /> Manage Companies</div>
               <Button className="w-full" onClick={() => navigate('/platform/companies')}>Open</Button>
             </div>
             <div className="p-4 rounded border">
-              <div className="font-medium mb-2 flex items-center gap-2"><Users className="h-4 w-4 text-green-600" /> Manage Users</div>
+              <div className="font-medium mb-2 flex items-center gap-2"><HardHat className="h-4 w-4 text-green-600" /> Manage Users</div>
               <Button className="w-full" onClick={() => navigate('/platform/users')}>Open</Button>
             </div>
          

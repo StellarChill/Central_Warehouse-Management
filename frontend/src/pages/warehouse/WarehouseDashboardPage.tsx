@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getWarehouse, getStockSummary, getStocks, type Warehouse, type StockSummaryRow, type Stock } from "@/lib/api";
-import { Building2, Package, AlertTriangle, Truck, Activity, ArrowRight, ArrowLeft, RefreshCcw, AlertCircle, PieChart } from "lucide-react";
+import { Warehouse as WarehouseIcon, Boxes, ShieldAlert, Truck, Route, ArrowLeft, RefreshCcw, TriangleAlert, Gauge } from "lucide-react";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip } from "recharts";
 
 const LOW_STOCK_THRESHOLD = 10;
@@ -175,7 +175,7 @@ const WarehouseDashboardPage: React.FC = () => {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
             <span className="inline-flex h-12 w-12 rounded-lg bg-blue-50 text-blue-600 items-center justify-center shadow-sm">
-              <Building2 className="h-6 w-6" />
+              <WarehouseIcon className="h-6 w-6" />
             </span>
             <div>
               <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-slate-900">ภาพรวมคลัง</h1>
@@ -209,7 +209,7 @@ const WarehouseDashboardPage: React.FC = () => {
           <Card className="border-red-200 bg-red-50">
             <CardContent className="py-5 flex flex-col gap-3 text-sm text-red-700">
               <div className="flex items-center gap-2 font-semibold">
-                <AlertCircle className="h-4 w-4" /> โหลดข้อมูลไม่สำเร็จ
+                <TriangleAlert className="h-4 w-4" /> โหลดข้อมูลไม่สำเร็จ
               </div>
               <p>กรุณาลองรีเฟรชอีกครั้ง หรือกลับไปหลังบ้าน</p>
               <Button variant="outline" size="sm" onClick={handleRefresh} className="w-fit">ลองใหม่</Button>
@@ -230,9 +230,9 @@ const WarehouseDashboardPage: React.FC = () => {
             ))
           ) : (
             <>
-              <StatCard icon={Package} label="จำนวนวัตถุดิบ" value={formatNumber(metrics.totalSku)} helper="SKU ทั้งหมดในคลัง" />
-              <StatCard icon={PieChart} label="ปริมาณคงเหลือรวม" value={formatNumber(metrics.totalRemain)} helper="รวมทุกหน่วย" />
-              <StatCard icon={AlertTriangle} label="ใกล้หมดสต๊อก" value={formatNumber(metrics.lowStockCount)} helper={`ต่ำกว่า ${LOW_STOCK_THRESHOLD} หน่วย`} />
+              <StatCard icon={Boxes} label="จำนวนวัตถุดิบ" value={formatNumber(metrics.totalSku)} helper="SKU ทั้งหมดในคลัง" />
+              <StatCard icon={Gauge} label="ปริมาณคงเหลือรวม" value={formatNumber(metrics.totalRemain)} helper="รวมทุกหน่วย" />
+              <StatCard icon={ShieldAlert} label="ใกล้หมดสต๊อก" value={formatNumber(metrics.lowStockCount)} helper={`ต่ำกว่า ${LOW_STOCK_THRESHOLD} หน่วย`} />
               <StatCard icon={Truck} label="รับเข้าใน 7 วัน" value={formatNumber(metrics.inboundReceipts)} helper="นับตามใบรับเข้า" />
             </>
           )}
@@ -242,7 +242,7 @@ const WarehouseDashboardPage: React.FC = () => {
           <Card className="lg:col-span-2">
             <CardHeader>
               <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Activity className="h-4 w-4 text-slate-500" /> การเคลื่อนไหว 7 วันล่าสุด
+                <Route className="h-4 w-4 text-slate-500" /> การเคลื่อนไหว 7 วันล่าสุด
               </CardTitle>
               <CardDescription>ปริมาณนำเข้า / ใช้งานแยกตามวัน</CardDescription>
             </CardHeader>
@@ -290,7 +290,7 @@ const WarehouseDashboardPage: React.FC = () => {
           <Card>
             <CardHeader>
               <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-amber-500" /> วัสดุที่ใกล้หมด
+                <ShieldAlert className="h-4 w-4 text-amber-500" /> วัสดุที่ใกล้หมด
               </CardTitle>
               <CardDescription>เรียงจากคงเหลือน้อยสุด</CardDescription>
             </CardHeader>

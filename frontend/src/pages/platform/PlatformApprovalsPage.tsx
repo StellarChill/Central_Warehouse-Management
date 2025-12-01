@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { platformListUsers, platformApproveUser, platformRejectUser, platformSetUserActive, type PlatformSignupUser, getRoles, getBranches, platformAssignUser, apiGet } from '@/lib/api';
-import { Check, X, Ban, UserCog } from 'lucide-react';
+import { ClipboardCheck, ShieldX, ShieldBan, HardHat } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
@@ -190,13 +190,13 @@ export default function PlatformApprovalsPage() {
                               setBranchId('');
                               setRoleId('');
                             }}>
-                              <Check className="h-4 w-4 mr-1" /> Assign & Approve
+                              <ClipboardCheck className="h-4 w-4 mr-1" /> Assign & Approve
                             </Button>
                             <Button size="sm" variant="destructive" onClick={async () => {
                               await platformRejectUser(u.UserId);
                               await load(status);
                             }}>
-                              <X className="h-4 w-4 mr-1" /> Reject
+                              <ShieldX className="h-4 w-4 mr-1" /> Reject
                             </Button>
                           </>
                         )}
@@ -207,7 +207,7 @@ export default function PlatformApprovalsPage() {
                               await platformSetUserActive(u.UserId, next);
                               await load(status);
                             }}>
-                              <Ban className="h-4 w-4 mr-1" /> {u.UserStatusActive === 'ACTIVE' ? 'Set Inactive' : 'Set Active'}
+                              <ShieldBan className="h-4 w-4 mr-1" /> {u.UserStatusActive === 'ACTIVE' ? 'Set Inactive' : 'Set Active'}
                             </Button>
                             <Button size="sm" onClick={() => {
                               setAssignUser(u);
@@ -217,7 +217,7 @@ export default function PlatformApprovalsPage() {
                               setBranchId('');
                               setRoleId('');
                             }}>
-                              <UserCog className="h-4 w-4 mr-1" /> Assign
+                              <HardHat className="h-4 w-4 mr-1" /> Assign
                             </Button>
                           </>
                         )}

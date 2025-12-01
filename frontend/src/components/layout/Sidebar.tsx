@@ -1,18 +1,18 @@
 import { NavLink, useLocation } from "react-router-dom";
 import {
-  LayoutDashboard, 
-  Users, 
-  Package, 
-  Warehouse, 
-  ShoppingCart, 
+  Warehouse,
   Truck,
-  FileText,
-  BarChart3,
-  Settings,
+  Boxes,
+  PackageSearch,
+  Factory,
+  ClipboardCheck,
+  FolderKanban,
+  FileBox,
+  BriefcaseConveyorBelt,
+  ShieldCheck,
   X,
-  Cookie,
-  ChefHat,
-  FolderKanban
+  ScanBarcode,
+  ClipboardList,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -29,8 +29,8 @@ const navigation = [
   {
     name: th.nav.dashboard,
     href: "/",
-    icon: LayoutDashboard,
-    premiumIcon: ChefHat,
+    icon: Warehouse,
+    premiumIcon: ClipboardList,
   },
   {
     name: th.nav.receiving,
@@ -41,26 +41,26 @@ const navigation = [
   {
     name: th.nav.inventory,
     href: "/inventory",
-    icon: Warehouse,
-    premiumIcon: Warehouse,
+    icon: Boxes,
+    premiumIcon: Boxes,
   },
   {
     name: th.nav.products,
     href: "/ingredients",
-    icon: Package,
-    premiumIcon: Cookie,
+    icon: PackageSearch,
+    premiumIcon: PackageSearch,
   },
   {
     name: th.nav.suppliers,
     href: "/suppliers",
-    icon: Users,
-    premiumIcon: Users,
+    icon: Factory,
+    premiumIcon: Factory,
   },
   {
     name: th.nav.purchasing,
     href: "/purchase-orders",
-    icon: ShoppingCart,
-    premiumIcon: ShoppingCart,
+    icon: ClipboardCheck,
+    premiumIcon: ClipboardCheck,
   },
   {
     name: "จัดการหมวดหมู่",
@@ -71,20 +71,20 @@ const navigation = [
   {
     name: th.nav.requisitions,
     href: "/requisitions",
-    icon: FileText,
-    premiumIcon: FileText,
+    icon: FileBox,
+    premiumIcon: FileBox,
   },
   {
     name: "จัดการคลังสินค้า",
     href: "/warehouse-management",
-    icon: Warehouse,
-    premiumIcon: Warehouse,
+    icon: BriefcaseConveyorBelt,
+    premiumIcon: BriefcaseConveyorBelt,
   },
   { 
     name: "ผู้ดูแลระบบ", 
     href: "/admin", 
-    icon: Settings,
-    premiumIcon: Settings,
+    icon: ShieldCheck,
+    premiumIcon: ShieldCheck,
   },
 ];
 
@@ -241,7 +241,7 @@ export function Sidebar({ onClose }: SidebarProps) {
       {/* Footer */}
       <div className="p-4 border-t">
         <div className="flex items-center justify-center gap-2 mb-2">
-          <Cookie className="h-4 w-4 text-primary" />
+          <ScanBarcode className="h-4 w-4 text-primary" />
           <span className="text-xs font-medium">{th.dashboard.title}</span>
         </div>
        

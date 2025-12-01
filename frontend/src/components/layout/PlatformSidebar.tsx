@@ -1,10 +1,10 @@
 import { NavLink } from "react-router-dom";
-import { 
-  LayoutDashboard, 
-  Building2,
-  Users,
+import {
+  Warehouse,
+  Factory,
+  HardHat,
   X,
-  ShieldCheck
+  ScanBarcode,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -17,17 +17,17 @@ const navigation = [
   {
     name: "Home",
     href: "/platform",
-    icon: LayoutDashboard,
+    icon: Warehouse,
   },
   {
     name: "Manage Companies",
     href: "/platform/companies",
-    icon: Building2,
+    icon: Factory,
   },
   {
     name: "Manage Users",
     href: "/platform/users",
-    icon: Users,
+    icon: HardHat,
   },
 ];
 
@@ -38,7 +38,7 @@ export function PlatformSidebar({ onClose }: PlatformSidebarProps) {
       <div className="flex items-center justify-between p-4 sm:p-6 border-b">
         <div className="flex items-center gap-2 sm:gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-blue-400 flex items-center justify-center shadow-lg">
-            <ShieldCheck className="h-6 w-6 text-white" />
+            <Warehouse className="h-6 w-6 text-white" />
           </div>
           <div>
             <h1 className="font-bold text-lg">Platform Admin</h1>
@@ -87,7 +87,7 @@ export function PlatformSidebar({ onClose }: PlatformSidebarProps) {
       {/* Footer */}
       <div className="p-4 border-t">
         <div className="flex items-center justify-center gap-2 mb-2">
-          <ShieldCheck className="h-4 w-4 text-blue-600" />
+          <ScanBarcode className="h-4 w-4 text-blue-600" />
           <span className="text-xs font-medium">Super Admin Panel</span>
         </div>
       </div>
