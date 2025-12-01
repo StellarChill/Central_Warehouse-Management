@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Pencil, Power, Check, X } from 'lucide-react';
 import { useMemo } from 'react';
 import { PlatformLayout } from '@/components/layout/PlatformLayout';
@@ -143,10 +144,7 @@ export default function PlatformCompaniesPage() {
             <p className="text-sm text-muted-foreground">ดูสถานะบริษัททั้งหมด ค้นหา และอนุมัติอย่างมั่นใจก่อนเปิดใช้งาน</p>
           </div>
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-            <div className="flex flex-col gap-2 md:flex-row md:items-center">
-              <Input placeholder="Search companies, code or email..." value={query} onChange={(e) => setQuery(e.target.value)} className="w-full md:w-72" />
-              <div className="text-xs text-muted-foreground">แสดง {filtered.length} จาก {stats.total} บริษัท</div>
-            </div>
+          
             <div className="flex flex-wrap gap-2">
               {statusFilterOptions.map((option) => (
                 <Button
@@ -187,99 +185,117 @@ export default function PlatformCompaniesPage() {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {filtered.map((c) => {
-                const statusKey = String(c.CompanyStatus || '').toUpperCase();
-                const badgeMeta = statusBadgeMap[statusKey] || { className: 'bg-slate-100 text-slate-600 border border-slate-200', label: statusKey || 'N/A' };
-                const submitted = formatSubmitted(c.CreatedAt);
-                return (
-                  <div key={c.CompanyId} className="relative flex h-full flex-col gap-4 overflow-hidden rounded-2xl border border-slate-100 bg-white p-5 shadow-[0_15px_45px_-35px_rgba(15,23,42,0.6)] transition duration-150 hover:-translate-y-1 hover:shadow-2xl">
-                    <div className="absolute inset-x-4 top-0 h-1 rounded-full bg-gradient-to-r from-indigo-400/70 via-cyan-400/70 to-emerald-400/70" />
-                    <div className="flex items-start gap-3 pt-2">
-                      <div className="shrink-0">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-emerald-400 text-white font-semibold">
-                          {(c.CompanyName || '').split(' ').map((s: any) => s[0]).slice(0, 2).join('').toUpperCase() || '—'}
-                        </div>
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="text-base font-semibold text-slate-900 truncate" title={c.CompanyName}>{c.CompanyName}</h3>
-                          <Badge variant="outline" className={`uppercase text-[11px] tracking-wide ${badgeMeta.className}`}>
-                            {badgeMeta.label}
-                          </Badge>
-                        </div>
-                        <p className="mt-1 text-sm text-slate-600 truncate" title={c.CompanyEmail || ''}>{c.CompanyCode} • {c.CompanyEmail || '—'}</p>
-                        {c.CompanyAddress && <p className="mt-1 text-sm text-slate-500 line-clamp-2 leading-relaxed">{c.CompanyAddress}</p>}
-                        <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-600">
-                          {submitted && <span className="rounded-full bg-slate-100 px-2 py-0.5">ส่งคำขอ {submitted}</span>}
-                          {c.TaxId && <span className="rounded-full bg-slate-100 px-2 py-0.5">TAX {c.TaxId}</span>}
-                          {c.CompanyTelNumber && <span className="rounded-full bg-slate-100 px-2 py-0.5">{c.CompanyTelNumber}</span>}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="mt-auto flex flex-col gap-3 rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2 text-xs text-slate-600 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-semibold text-slate-700">สายงาน:</span>
-                        <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-600">{c.CompanyCode}</span>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        {c.CompanyStatus === 'PENDING' ? (
-                          <>
-                            <Button size="sm" variant="default" className="flex-1 min-w-[120px] shadow-sm" onClick={() => {
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="min-w-[260px]">บริษัท</TableHead>
+                    <TableHead className="min-w-[220px]">ข้อมูลติดต่อ</TableHead>
+                    <TableHead className="min-w-[160px]">สถานะ / ส่งคำขอ</TableHead>
+                    <TableHead className="min-w-[180px] text-right">การจัดการ</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map((c) => {
+                    const statusKey = String(c.CompanyStatus || '').toUpperCase();
+                    const badgeMeta = statusBadgeMap[statusKey] || { className: 'bg-slate-100 text-slate-600 border border-slate-200', label: statusKey || 'N/A' };
+                    const submitted = formatSubmitted(c.CreatedAt);
+                    const initials = (c.CompanyName || '').split(' ').map((s: any) => s?.[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || '—';
+
+                    return (
+                      <TableRow key={c.CompanyId} className="align-top">
+                        <TableCell>
+                          <div className="flex items-start gap-3">
+                            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-emerald-400 text-white font-semibold">
+                              {initials}
+                            </div>
+                            <div className="min-w-0 space-y-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="font-medium text-slate-900 truncate" title={c.CompanyName}>{c.CompanyName}</span>
+                                <Badge variant="outline" className={`uppercase text-[11px] tracking-wide ${badgeMeta.className}`}>
+                                  {badgeMeta.label}
+                                </Badge>
+                              </div>
+                              <p className="text-sm text-slate-600 truncate" title={c.CompanyEmail || ''}>{c.CompanyCode} • {c.CompanyEmail || '—'}</p>
+                              {c.CompanyAddress && <p className="text-xs text-slate-500 line-clamp-2">{c.CompanyAddress}</p>}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1 text-sm text-slate-600">
+                            {c.CompanyTelNumber && <div>โทร: {c.CompanyTelNumber}</div>}
+                            {c.TaxId && <div>Tax: {c.TaxId}</div>}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-1 text-sm text-slate-600">
+                            <span className="font-medium">{statusKey || 'N/A'}</span>
+                            {submitted && <span className="text-xs text-muted-foreground">ส่งคำขอ {submitted}</span>}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex flex-wrap gap-2 justify-end">
+                            {c.CompanyStatus === 'PENDING' ? (
+                              <>
+                                <Button size="sm" onClick={() => {
+                                  setEditing(c);
+                                  setName('');
+                                  setCode('');
+                                  setAddress('');
+                                  setTaxId('');
+                                  setEmail('');
+                                  setTel('');
+                                  setApproveMode(true);
+                                  setFormError(null);
+                                  setEditOpen(true);
+                                }}>
+                                  <Check className="mr-1 h-4 w-4" /> Approve
+                                </Button>
+                                <Button size="sm" variant="outline" className="text-rose-600 border-rose-200" onClick={async () => {
+                                  try {
+                                    const row = await apiPut(`/company/${c.CompanyId}`, { CompanyStatus: 'REJECTED' });
+                                    setCompanies((prev) => prev.map((x) => x.CompanyId === row.CompanyId ? row : x));
+                                  } catch (e: any) {
+                                    alert(e?.message || 'Reject failed');
+                                  }
+                                }}>
+                                  <X className="mr-1 h-4 w-4" /> Reject
+                                </Button>
+                              </>
+                            ) : (
+                              <Button size="sm" variant="outline" onClick={async () => {
+                                const next = c.CompanyStatus === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+                                try {
+                                  const row = await apiPut(`/company/${c.CompanyId}`, { CompanyStatus: next });
+                                  setCompanies((prev) => prev.map((x) => x.CompanyId === row.CompanyId ? row : x));
+                                } catch (e: any) {
+                                  alert(e?.message || 'Failed to update status');
+                                }
+                              }}>
+                                <Power className="mr-1 h-4 w-4" /> {c.CompanyStatus === 'ACTIVE' ? 'Set Inactive' : 'Set Active'}
+                              </Button>
+                            )}
+                            <Button size="icon" variant="ghost" className="rounded-full" onClick={() => {
                               setEditing(c);
-                              setName('');
-                              setCode('');
-                              setAddress('');
-                              setTaxId('');
-                              setEmail('');
-                              setTel('');
-                              setApproveMode(true);
+                              setName(c.CompanyName || '');
+                              setCode(c.CompanyCode || '');
+                              setAddress(c.CompanyAddress || '');
+                              setTaxId(c.TaxId || '');
+                              setEmail(c.CompanyEmail || '');
+                              setTel(c.CompanyTelNumber || '');
+                              setApproveMode(false);
                               setFormError(null);
                               setEditOpen(true);
                             }}>
-                              <Check className="mr-1 h-4 w-4" /> Approve
+                              <Pencil className="h-4 w-4" />
                             </Button>
-                            <Button size="sm" variant="outline" className="flex-1 min-w-[110px] border-rose-200 text-rose-600" onClick={async () => {
-                              try {
-                                const row = await apiPut(`/company/${c.CompanyId}`, { CompanyStatus: 'REJECTED' });
-                                setCompanies((prev) => prev.map((x) => x.CompanyId === row.CompanyId ? row : x));
-                              } catch (e: any) { alert(e?.message || 'Reject failed'); }
-                            }}>
-                              <X className="mr-1 h-4 w-4" /> Reject
-                            </Button>
-                          </>
-                        ) : (
-                          <Button size="sm" variant="outline" className="flex-1 min-w-[150px]" onClick={async () => {
-                            const next = c.CompanyStatus === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
-                            try {
-                              const row = await apiPut(`/company/${c.CompanyId}`, { CompanyStatus: next });
-                              setCompanies((prev) => prev.map((x) => x.CompanyId === row.CompanyId ? row : x));
-                            } catch (e: any) {
-                              alert(e?.message || 'Failed to update status');
-                            }
-                          }}>
-                            <Power className="mr-1 h-4 w-4" /> {c.CompanyStatus === 'ACTIVE' ? 'Set Inactive' : 'Set Active'}
-                          </Button>
-                        )}
-                        <Button size="icon" variant="ghost" className="rounded-full" onClick={() => {
-                          setEditing(c);
-                          setName(c.CompanyName || '');
-                          setCode(c.CompanyCode || '');
-                          setAddress(c.CompanyAddress || '');
-                          setTaxId(c.TaxId || '');
-                          setEmail(c.CompanyEmail || '');
-                          setTel(c.CompanyTelNumber || '');
-                          setApproveMode(false);
-                          setFormError(null);
-                          setEditOpen(true);
-                        }}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
             </div>
           )}
         </CardContent>

@@ -10,8 +10,10 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import { PlatformLayout } from '@/components/layout/PlatformLayout';
 
+type TabStatus = 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED';
+
 export default function PlatformApprovalsPage() {
-  const [status, setStatus] = useState<'PENDING' | 'APPROVED' | 'REJECTED'>('PENDING');
+  const [status, setStatus] = useState<TabStatus>('PENDING');
   const [rows, setRows] = useState<PlatformSignupUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -25,12 +27,18 @@ export default function PlatformApprovalsPage() {
   const [roleId, setRoleId] = useState<string>('');
   const [saving, setSaving] = useState(false);
 
-  async function load(s: typeof status) {
+  async function load(s: TabStatus) {
     try {
       setLoading(true);
       setError(null);
-      const data = await platformListUsers(s);
-      setRows(data);
+      if (s === 'ALL') {
+        const buckets: Exclude<TabStatus, 'ALL'>[] = ['PENDING', 'APPROVED', 'REJECTED'];
+        const results = await Promise.all(buckets.map((state) => platformListUsers(state)));
+        setRows(results.flat());
+      } else {
+        const data = await platformListUsers(s);
+        setRows(data);
+      }
     } catch (e: any) {
       setError(e?.message || 'Failed to load users');
     } finally {
@@ -67,6 +75,13 @@ export default function PlatformApprovalsPage() {
     })();
   }, [companyId]);
 
+  const resolveCompanyName = (u: PlatformSignupUser) => {
+    const direct = (u as any).CompanyName || (u as any).Company?.CompanyName;
+    if (direct) return direct;
+    if (u.TempCompany) return u.TempCompany.TempCompanyName;
+    return '—';
+  };
+
   return (
     <PlatformLayout>
       <div className="px-6 py-8 space-y-4">
@@ -75,8 +90,9 @@ export default function PlatformApprovalsPage() {
           <CardTitle>Approvals & Users</CardTitle>
         </CardHeader>
         <CardContent>
-          <Tabs value={status} onValueChange={(v) => setStatus(v as any)}>
+          <Tabs value={status} onValueChange={(v) => setStatus(v as TabStatus)}>
             <TabsList>
+              <TabsTrigger value="ALL">All</TabsTrigger>
               <TabsTrigger value="PENDING">Pending</TabsTrigger>
               <TabsTrigger value="APPROVED">Approved</TabsTrigger>
               <TabsTrigger value="REJECTED">Rejected</TabsTrigger>
@@ -88,13 +104,17 @@ export default function PlatformApprovalsPage() {
                 <div className="p-4 text-red-600">{error}</div>
               ) : (
                 <div className="divide-y">
-                  {rows.map((u) => (
+                  {rows.map((u) => {
+                    const isPending = u.UserStatusApprove === 'PENDING';
+                    const isApproved = u.UserStatusApprove === 'APPROVED';
+                    return (
                     <div key={u.UserId} className="py-3 flex items-center justify-between gap-3">
                       <div className="min-w-0">
                         <div className="font-medium truncate">{u.UserName}</div>
                         <div className="text-sm text-muted-foreground truncate">
                           {u.Email || '—'} • {u.TelNumber || '—'} • {u.RequestedRoleText || 'No requested role'}
                         </div>
+                        <div className="text-xs text-muted-foreground">Company: {resolveCompanyName(u)}</div>
                         {u.TempCompany && (
                           <div className="text-xs text-muted-foreground truncate">
                             Temp Company: {u.TempCompany.TempCompanyName} ({u.TempCompany.TempCompanyCode})
@@ -105,7 +125,7 @@ export default function PlatformApprovalsPage() {
                         <Badge variant={u.UserStatusActive === 'ACTIVE' ? 'success' as any : 'secondary'}>
                           {u.UserStatusActive}
                         </Badge>
-                        {status === 'PENDING' && (
+                        {isPending && (
                           <>
                             <Button size="sm" onClick={async () => {
                               await platformApproveUser(u.UserId);
@@ -121,7 +141,7 @@ export default function PlatformApprovalsPage() {
                             </Button>
                           </>
                         )}
-                        {status === 'APPROVED' && (
+                        {isApproved && (
                           <>
                             <Button size="sm" variant="outline" onClick={async () => {
                               const next = u.UserStatusActive === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
@@ -137,7 +157,7 @@ export default function PlatformApprovalsPage() {
                         )}
                       </div>
                     </div>
-                  ))}
+                  );})}
                   {rows.length === 0 && (
                     <div className="p-4 text-sm text-muted-foreground">No users in this state.</div>
                   )}
