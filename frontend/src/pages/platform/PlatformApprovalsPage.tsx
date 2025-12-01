@@ -8,6 +8,7 @@ import { Check, X, Ban, UserCog } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
+import { PlatformLayout } from '@/components/layout/PlatformLayout';
 
 export default function PlatformApprovalsPage() {
   const [status, setStatus] = useState<'PENDING' | 'APPROVED' | 'REJECTED'>('PENDING');
@@ -67,7 +68,8 @@ export default function PlatformApprovalsPage() {
   }, [companyId]);
 
   return (
-    <div className="px-6 py-8 space-y-4">
+    <PlatformLayout>
+      <div className="px-6 py-8 space-y-4">
       <Card>
         <CardHeader>
           <CardTitle>Approvals & Users</CardTitle>
@@ -216,6 +218,7 @@ export default function PlatformApprovalsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </PlatformLayout>
   );
 }

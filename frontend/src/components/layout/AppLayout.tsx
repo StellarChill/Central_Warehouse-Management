@@ -18,6 +18,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const routeHidesSidebar =
     location.pathname === "/warehouse-management" ||
     location.pathname.startsWith("/platform");
+  const standaloneLayout = location.pathname.startsWith("/platform");
 
   // Re-evaluate liff-only mode whenever auth user changes (so login via LIFF updates layout immediately)
   useEffect(() => {
@@ -29,6 +30,10 @@ export function AppLayout({ children }: AppLayoutProps) {
       setHideSidebar(false);
     }
   }, [user]);
+
+  if (standaloneLayout) {
+    return <Outlet />;
+  }
 
   return (
     <div className="flex h-screen bg-gradient-surface font-prompt">

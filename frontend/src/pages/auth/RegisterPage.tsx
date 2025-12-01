@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Warehouse, UserPlus, Eye, EyeOff, CheckCircle, Shield } from "lucide-react";
-import { th } from "../i18n/th";
+import { th } from "@/i18n/th";
 import { useAuth } from "../../context/AuthContext";
 
 interface RegisterFormData {

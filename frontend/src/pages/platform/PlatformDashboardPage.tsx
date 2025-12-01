@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useNavigate } from 'react-router-dom';
 import { Building2, CheckSquare, Users, LayoutDashboard, ShieldCheck, Timer } from 'lucide-react';
+import { PlatformLayout } from '@/components/layout/PlatformLayout';
 
 export default function PlatformDashboardPage() {
   const navigate = useNavigate();
@@ -37,7 +38,8 @@ export default function PlatformDashboardPage() {
   if (error) return <div className="p-6 text-red-600">{error}</div>;
 
   return (
-    <div className="px-6 py-8 space-y-8">
+    <PlatformLayout>
+      <div className="px-6 py-8 space-y-8">
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-3">
           <span className="inline-flex h-12 w-12 rounded-lg bg-blue-50 text-blue-600 items-center justify-center shadow-sm">
@@ -55,10 +57,7 @@ export default function PlatformDashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
-        <Card className="hover:shadow-sm transition">
-          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><CheckSquare className="h-4 w-4 text-amber-600" />Pending Approvals</CardTitle></CardHeader>
-          <CardContent className="pt-0"><div className="text-2xl font-semibold">{stats.pendingApprovals}</div></CardContent>
-        </Card>
+       
         <Card className="hover:shadow-sm transition">
           <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Building2 className="h-4 w-4 text-blue-600" />Companies</CardTitle></CardHeader>
           <CardContent className="pt-0"><div className="text-2xl font-semibold">{stats.companyCount}</div></CardContent>
@@ -67,10 +66,7 @@ export default function PlatformDashboardPage() {
           <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Users className="h-4 w-4 text-green-600" />Users</CardTitle></CardHeader>
           <CardContent className="pt-0"><div className="text-2xl font-semibold">{stats.totalUsers}</div></CardContent>
         </Card>
-        <Card className="hover:shadow-sm transition">
-          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-slate-600" />System</CardTitle></CardHeader>
-          <CardContent className="pt-0"><div className="text-2xl font-semibold">{stats.systemHealthy ? 'Healthy' : 'Degraded'}</div></CardContent>
-        </Card>
+     
       </div>
 
       <Card>
@@ -79,11 +75,7 @@ export default function PlatformDashboardPage() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-            <div className="p-4 rounded border">
-              <div className="font-medium mb-2 flex items-center gap-2"><CheckSquare className="h-4 w-4 text-amber-600" /> Approvals</div>
-              <p className="text-sm text-muted-foreground mb-3">อนุมัติการสมัครบริษัท/ผู้ใช้ ดูเหตุผล reject แก้ role ก่อนอนุมัติ</p>
-              <Button className="w-full" onClick={() => navigate('/platform/approvals')}>Open</Button>
-            </div>
+           
             <div className="p-4 rounded border">
               <div className="font-medium mb-2 flex items-center gap-2"><Building2 className="h-4 w-4 text-blue-600" /> Manage Companies</div>
               <p className="text-sm text-muted-foreground mb-3">แก้ชื่อ TEMP → ชื่อจริง ตั้ง Active/Inactive</p>
@@ -94,11 +86,7 @@ export default function PlatformDashboardPage() {
               <p className="text-sm text-muted-foreground mb-3">ดูผู้ใช้ทั้งระบบ เปลี่ยน role/สถานะ แก้ข้อมูล</p>
               <Button className="w-full" onClick={() => navigate('/platform/users')}>Open</Button>
             </div>
-            <div className="p-4 rounded border">
-              <div className="font-medium mb-2 flex items-center gap-2"><LayoutDashboard className="h-4 w-4 text-slate-600" /> System Overview</div>
-              <p className="text-sm text-muted-foreground mb-3">ภาพรวมสุขภาพระบบและตัวชี้วัดหลัก</p>
-              <Button variant="secondary" className="w-full" onClick={() => navigate('/platform/system')}>Open</Button>
-            </div>
+         
           </div>
 
           <Separator className="my-6" />
@@ -119,6 +107,7 @@ export default function PlatformDashboardPage() {
           </div>
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </PlatformLayout>
   );
 }

@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Pencil, Power, Check, X } from 'lucide-react';
 import { useMemo } from 'react';
+import { PlatformLayout } from '@/components/layout/PlatformLayout';
 
 type StatusFilter = 'ALL' | 'PENDING' | 'ACTIVE' | 'INACTIVE' | 'REJECTED';
 
@@ -116,8 +117,9 @@ export default function PlatformCompaniesPage() {
   };
 
   return (
-    <div className="px-6 py-8 space-y-6 bg-slate-50 min-h-screen">
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <PlatformLayout>
+      <div className="px-6 py-8 space-y-6 bg-slate-50 min-h-screen">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {[
           { label: 'บริษัททั้งหมด', value: stats.total, hint: 'ในระบบทั้งหมด', accent: 'text-slate-900' },
           { label: 'รออนุมัติ', value: stats.pending, hint: 'ต้องตรวจสอบ', accent: 'text-amber-600' },
@@ -423,6 +425,7 @@ export default function PlatformCompaniesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </PlatformLayout>
   );
 }
