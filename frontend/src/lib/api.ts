@@ -643,10 +643,23 @@ export type StockSummaryRow = {
   TotalRemain: number;
 };
 
-export async function getStocks(): Promise<Stock[]> {
-  return apiGet('/stock');
+type WarehouseScopedParams = {
+  warehouseId?: number;
+};
+
+const buildWarehouseQuery = (params?: WarehouseScopedParams) => {
+  if (!params?.warehouseId) return "";
+  const id = Number(params.warehouseId);
+  if (!Number.isFinite(id) || id <= 0) return "";
+  return `?warehouseId=${id}`;
+};
+
+export async function getStocks(params?: WarehouseScopedParams): Promise<Stock[]> {
+  const qs = buildWarehouseQuery(params);
+  return apiGet(`/stock${qs}`);
 }
 
-export async function getStockSummary(): Promise<StockSummaryRow[]> {
-  return apiGet('/stock/summary');
+export async function getStockSummary(params?: WarehouseScopedParams): Promise<StockSummaryRow[]> {
+  const qs = buildWarehouseQuery(params);
+  return apiGet(`/stock/summary${qs}`);
 }
