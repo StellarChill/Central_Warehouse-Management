@@ -10,7 +10,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, Building2, Package, ShoppingCart, CheckCircle, Filter, Plus, X, Edit, Trash2 } from "lucide-react";
 import { useStock } from "@/context/StockContext";
-import { getReceipts as apiGetReceipts, getPurchaseOrders as apiGetPOs, getPurchaseOrder as apiGetPO, createReceipt as apiCreateReceipt, getMaterials as apiGetMaterials, getReceipt as apiGetReceipt, deleteReceipt as apiDeleteReceipt, updateReceipt as apiUpdateReceipt, Receipt as FullReceipt, ReceiptDetail } from "@/lib/api";
+import { getReceipts as apiGetReceipts, getPurchaseOrders as apiGetPOs, getPurchaseOrder as apiGetPO, createReceipt as apiCreateReceipt, getMaterials as apiGetMaterials, getReceipt as apiGetReceipt, deleteReceipt as apiDeleteReceipt, updateReceipt as apiUpdateReceipt, getWarehouses, getUser, Receipt as FullReceipt, ReceiptDetail } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
@@ -41,7 +41,9 @@ type SelectedItem = {
 export default function ReceivingPage() {
   const navigate = useNavigate();
   const [q, setQ] = useState("");
-  const { products, receive } = useStock();
+  const { products, receive, refresh } = useStock();
+
+
   const [open, setOpen] = useState(false);
   const [sku, setSku] = useState(products[0]?.sku || "");
   const [qty, setQty] = useState(0);
@@ -54,7 +56,7 @@ export default function ReceivingPage() {
   const [materialMap, setMaterialMap] = useState<Record<number, { name: string; unit: string }>>({});
   const [receivedByPo, setReceivedByPo] = useState<Record<number, Record<number, number>>>({}); // poId -> materialId -> received qty
   const { toast } = useToast();
-  
+
   // State for PO filtering
   const [poSearchTerms, setPoSearchTerms] = useState<Record<string, string>>({});
   const [expandedPOs, setExpandedPOs] = useState<Record<string, boolean>>({});
@@ -109,10 +111,10 @@ export default function ReceivingPage() {
               if (!controller.signal.aborted) {
                 setPoDetails((prev) => ({ ...prev, [id]: full.PurchaseOrderDetails }));
               }
-            } catch {}
+            } catch { }
           })
         );
-      } catch {}
+      } catch { }
     })();
     return () => controller.abort();
   }, [poDialogOpen, poList]);
@@ -140,7 +142,7 @@ export default function ReceivingPage() {
           perPo[poId] = sumMap;
         }));
         if (!controller.signal.aborted) setReceivedByPo(prev => ({ ...prev, ...perPo }));
-      } catch {}
+      } catch { }
     })();
     return () => controller.abort();
   }, [poDialogOpen, receipts, poList]);
@@ -169,7 +171,7 @@ export default function ReceivingPage() {
         const name = materialMap[entry.MaterialId]?.name || `MAT-${entry.MaterialId}`;
         const unit = materialMap[entry.MaterialId]?.unit || entry.PurchaseOrderUnit;
         // ป้องกันซ้ำ
-if (prev.some(i => i.materialId === entry.MaterialId && i.poId === poId)) return prev;
+        if (prev.some(i => i.materialId === entry.MaterialId && i.poId === poId)) return prev;
         return [...prev, { materialId: entry.MaterialId, name, orderedQty: entry.PurchaseOrderQuantity, unit, poId }];
       });
       setReceivingQuantities(prev => ({ ...prev, [key]: Math.max(0, Math.min(remaining, entry.PurchaseOrderQuantity)) }));
@@ -193,32 +195,53 @@ if (prev.some(i => i.materialId === entry.MaterialId && i.poId === poId)) return
 
     const ts = new Date();
     try {
+      // Robust WarehouseId resolution:
+      let targetWarehouseId = getUser()?.WarehouseId;
+      if (!targetWarehouseId) {
+        const selected = localStorage.getItem('selected_warehouse_id');
+        if (selected) targetWarehouseId = Number(selected);
+      }
+      if (!targetWarehouseId) {
+        try {
+          const whs = await getWarehouses();
+          if (whs && whs.length > 0) targetWarehouseId = whs[0].WarehouseId;
+        } catch { }
+      }
+
       await Promise.all(poIds.map(async (poId) => {
         const pad = (n: number) => String(n).padStart(2, '0');
-        const stamp = `${ts.getFullYear()}${pad(ts.getMonth()+1)}${pad(ts.getDate())}${pad(ts.getHours())}${pad(ts.getMinutes())}${pad(ts.getSeconds())}${String(ts.getMilliseconds()).padStart(3,'0')}`;
+        const stamp = `${ts.getFullYear()}${pad(ts.getMonth() + 1)}${pad(ts.getDate())}${pad(ts.getHours())}${pad(ts.getMinutes())}${pad(ts.getSeconds())}${String(ts.getMilliseconds()).padStart(3, '0')}`;
         const code = `RC-${poList.find(p => p.id === poId)?.code || poId}-${stamp}`;
-        return apiCreateReceipt({ PurchaseOrderId: poId, ReceiptCode: code, details: group[poId] });
+        return apiCreateReceipt({
+          PurchaseOrderId: poId,
+          ReceiptCode: code,
+          details: group[poId],
+          WarehouseId: targetWarehouseId
+        });
       }));
 
       loadReceipts();
 
       toast({ title: 'บันทึกรับสินค้าแล้ว' });
+      refresh();
       setSelectedItems([]);
       setReceivingQuantities({});
       setPoDialogOpen(false);
-      
+
       (async () => {
         try {
           const orows = await apiGetPOs();
           setPoList(orows.map(o => ({ id: o.PurchaseOrderId, code: o.PurchaseOrderCode, supplier: o.Supplier?.SupplierName || String(o.SupplierId), date: o.DateTime, status: o.PurchaseOrderStatus })));
-        } catch {}
+        } catch { }
       })();
-      
-      navigate('/inventory');
+
+      // navigate('/inventory');
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'บันทึกไม่สำเร็จ', description: e.message || '' });
     }
   };
+
+
 
   // Filter PO items based on search term
   const getFilteredPOItems = (po: PurchaseOrder) => {
@@ -251,23 +274,23 @@ if (prev.some(i => i.materialId === entry.MaterialId && i.poId === poId)) return
 
     // Always recalculate received quantities on expand to get the latest data
     try {
-        const relatedReceipts = receipts.filter(r => r.poId === poId);
-        if (relatedReceipts.length > 0) {
-            // This is an expensive network call, but necessary for correctness with the current backend API.
-            const detailLists = await Promise.all(relatedReceipts.map(r => apiGetReceipt(Number(r.id))));
-            const sumMap: Record<number, number> = {};
-            for (const rec of detailLists) {
-                for (const d of rec.ReceiptDetails) {
-                    sumMap[d.MaterialId] = (sumMap[d.MaterialId] || 0) + Number(d.MaterialQuantity || 0);
-                }
-            }
-            setReceivedByPo(prev => ({ ...prev, [poId]: sumMap }));
-        } else {
-            // If there are no receipts, ensure the map is empty for this PO.
-            setReceivedByPo(prev => ({ ...prev, [poId]: {} }));
+      const relatedReceipts = receipts.filter(r => r.poId === poId);
+      if (relatedReceipts.length > 0) {
+        // This is an expensive network call, but necessary for correctness with the current backend API.
+        const detailLists = await Promise.all(relatedReceipts.map(r => apiGetReceipt(Number(r.id))));
+        const sumMap: Record<number, number> = {};
+        for (const rec of detailLists) {
+          for (const d of rec.ReceiptDetails) {
+            sumMap[d.MaterialId] = (sumMap[d.MaterialId] || 0) + Number(d.MaterialQuantity || 0);
+          }
         }
+        setReceivedByPo(prev => ({ ...prev, [poId]: sumMap }));
+      } else {
+        // If there are no receipts, ensure the map is empty for this PO.
+        setReceivedByPo(prev => ({ ...prev, [poId]: {} }));
+      }
     } catch (e: any) {
-        toast({ variant: 'destructive', title: 'คำนวณจำนวนที่รับแล้วไม่สำเร็จ', description: e.message || '' });
+      toast({ variant: 'destructive', title: 'คำนวณจำนวนที่รับแล้วไม่สำเร็จ', description: e.message || '' });
     }
   };
 
@@ -279,7 +302,7 @@ if (prev.some(i => i.materialId === entry.MaterialId && i.poId === poId)) return
       // 1. Delete the receipt on the backend
       await apiDeleteReceipt(Number(receiptToDelete.id));
       toast({ title: 'ลบใบรับสินค้าสำเร็จ' });
-      
+
       // 2. Close the confirmation dialog
       setDeleteDialogOpen(false);
       setReceiptToDelete(null);
@@ -359,7 +382,7 @@ if (prev.some(i => i.materialId === entry.MaterialId && i.poId === poId)) return
                 <Plus className="h-4 w-4 mr-2" />
                 เลือกจาก PO
               </Button>
-              
+
               <div className="relative w-full sm:w-80">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input className="pl-10 w-full" placeholder="ค้นหา เลขที่ใบรับ/PO" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -419,19 +442,19 @@ if (prev.some(i => i.materialId === entry.MaterialId && i.poId === poId)) return
               เลือก PO จากนั้นเลือกรายการสินค้าที่ต้องการรับเข้าคลัง
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4">
             {poList.filter(p => p.status !== 'RECEIVED').map((po) => {
               const itemsInPo = getFilteredPOItems(po);
               const itemsWithRemaining = itemsInPo.map(item => {
-                  const receivedQty = receivedByPo[po.id]?.[item.MaterialId] || 0;
-                  const remaining = Math.max(0, (item.PurchaseOrderQuantity || 0) - receivedQty);
-                  return { ...item, remaining };
+                const receivedQty = receivedByPo[po.id]?.[item.MaterialId] || 0;
+                const remaining = Math.max(0, (item.PurchaseOrderQuantity || 0) - receivedQty);
+                return { ...item, remaining };
               });
 
               const isExpanded = expandedPOs[po.id] ?? true;
               const displayItems = isExpanded ? itemsWithRemaining : itemsWithRemaining.slice(0, 5);
-              
+
               return (
                 <Card key={po.id}>
                   <CardHeader className="pb-3">
@@ -443,7 +466,7 @@ if (prev.some(i => i.materialId === entry.MaterialId && i.poId === poId)) return
                       </div>
                       {getStatusBadge(po.status)}
                     </div>
-                    
+
                     {/* PO Search and Filter */}
                     <div className="flex flex-col sm:flex-row gap-2 mt-3">
                       <div className="relative flex-1">
@@ -459,8 +482,8 @@ if (prev.some(i => i.materialId === entry.MaterialId && i.poId === poId)) return
                         />
                       </div>
                       {itemsWithRemaining.length > 5 && (
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           size="sm"
                           onClick={() => togglePOExpansion(po.id)}
                           className="flex items-center gap-2"
@@ -487,7 +510,7 @@ if (prev.some(i => i.materialId === entry.MaterialId && i.poId === poId)) return
                           {displayItems.map((item) => {
                             const isSelected = selectedItems.some(si => si.materialId === item.MaterialId && si.poId === po.id);
                             const key = `${po.id}-${item.MaterialId}`;
-                            
+
                             return (
                               <TableRow key={item.MaterialId} className={item.remaining <= 0 ? "bg-muted/30 text-muted-foreground" : ""}>
                                 <TableCell>
@@ -526,7 +549,7 @@ if (prev.some(i => i.materialId === entry.MaterialId && i.poId === poId)) return
                               </TableRow>
                             );
                           })}
-                          
+
                           {itemsWithRemaining.length === 0 && (
                             <TableRow>
                               <TableCell colSpan={6} className="text-center text-muted-foreground py-4">
@@ -537,11 +560,11 @@ if (prev.some(i => i.materialId === entry.MaterialId && i.poId === poId)) return
                         </TableBody>
                       </Table>
                     </div>
-                    
+
                     {!isExpanded && itemsWithRemaining.length > 5 && (
                       <div className="mt-2 text-center">
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="sm"
                           onClick={() => togglePOExpansion(po.id)}
                         >

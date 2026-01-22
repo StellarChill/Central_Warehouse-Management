@@ -20,6 +20,7 @@ const RequisitionsPage = lazy(() => import("./pages/branch/RequisitionsPage"));
 const ReceivingPage = lazy(() => import("./pages/inventory/ReceivingPage"));
 const ProductsPage = lazy(() => import("./pages/inventory/ProductsPage"));
 const CategoriesManagePage = lazy(() => import("./pages/inventory/CategoriesManagePage"));
+const InventoryIssuingPage = lazy(() => import("./pages/inventory/InventoryIssuingPage"));
 const BranchRequisitionCreatePage = lazy(
   () => import("./pages/branch/BranchRequisitionCreatePage")
 );
@@ -69,7 +70,7 @@ const App = () => (
               <Routes>
                 {/* Auth (login + register in one page) */}
                 <Route path="/login" element={<AuthPage />} />
-                
+
                 {/* Public routes */}
                 <Route path="/register" element={<RegisterLandingPage />} />
                 <Route path="/register/user" element={<RegisterPage />} />
@@ -87,6 +88,7 @@ const App = () => (
                   <Route path="ingredients" element={<ProductsPage />} />
                   <Route path="categories" element={<CategoriesManagePage />} />
                   <Route path="inventory" element={<InventoryPage />} />
+                  <Route path="inventory/issuing" element={<InventoryIssuingPage />} />
                   <Route path="purchase-orders" element={<PurchaseOrdersPage />} />
                   <Route
                     path="requisitions/create"

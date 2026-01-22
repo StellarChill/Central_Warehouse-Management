@@ -25,7 +25,7 @@ function getToken(): string | null {
 }
 
 // Get user from localStorage
-function getUser() {
+export function getUser() {
   const userStr = localStorage.getItem("auth_user");
   if (!userStr) return null;
   try {
@@ -49,7 +49,16 @@ export async function apiRequest(
 
   // เพิ่ม Authorization header ถ้ามี token
   if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
+    (headers as any)["Authorization"] = `Bearer ${token}`;
+  }
+
+  // Inject WarehouseId if available in user object
+  const user = getUser();
+  if (user?.WarehouseId) {
+    (headers as any)["x-warehouse-id"] = String(user.WarehouseId);
+  } else if (user?.role === 'ADMIN' || user?.role === 'COMPANY_ADMIN') {
+    const selectedWh = localStorage.getItem('selected_warehouse_id');
+    if (selectedWh) (headers as any)["x-warehouse-id"] = selectedWh;
   }
 
   return fetch(`${API_BASE}${endpoint}`, {
@@ -590,6 +599,7 @@ export type CreateReceiptData = {
   ReceiptCode: string;
   ReceiptDateTime?: string;
   details: Array<{ MaterialId: number; MaterialQuantity: number; }>;
+  WarehouseId?: number;
 };
 
 export type UpdateReceiptData = Partial<Omit<CreateReceiptData, 'PurchaseOrderId' | 'ReceiptCode'>> & {

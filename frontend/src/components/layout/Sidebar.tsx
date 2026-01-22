@@ -57,6 +57,12 @@ const navigation = [
     premiumIcon: Factory,
   },
   {
+    name: "การเบิกจ่าย (Issuing)",
+    href: "/inventory/issuing",
+    icon: PackageSearch,
+    premiumIcon: PackageSearch,
+  },
+  {
     name: th.nav.purchasing,
     href: "/purchase-orders",
     icon: ClipboardCheck,
@@ -80,9 +86,9 @@ const navigation = [
   //   icon: BriefcaseConveyorBelt,
   //   premiumIcon: BriefcaseConveyorBelt,
   // },
-  { 
-    name: "ผู้ดูแลระบบ", 
-    href: "/admin", 
+  {
+    name: "ผู้ดูแลระบบ",
+    href: "/admin",
     icon: ShieldCheck,
     premiumIcon: ShieldCheck,
   },
@@ -133,7 +139,7 @@ export function Sidebar({ onClose }: SidebarProps) {
   const filteredNav = navigation.filter((item) => {
     const adminPaths = ["/admin", "/admin/users", "/admin/branches", "/admin/reports"];
     if (adminPaths.includes(item.href)) return role === "ADMIN";
-      if (item.href === "/warehouse-management") return role === "COMPANY_ADMIN" || role === "ADMIN" || role === "WAREHOUSE_ADMIN";
+    if (item.href === "/warehouse-management") return role === "COMPANY_ADMIN" || role === "ADMIN" || role === "WAREHOUSE_ADMIN";
     if (item.href === "/purchase-orders" || item.href === "/receiving") return role !== "BRANCH";
     return true;
   });
@@ -144,15 +150,15 @@ export function Sidebar({ onClose }: SidebarProps) {
       <div className="flex items-center justify-between p-4 sm:p-6 border-b">
         <div className="flex items-center gap-2 sm:gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-lg">
-          
-             <Warehouse className="h-6 w-6 text-primary-foreground" />
+
+            <Warehouse className="h-6 w-6 text-primary-foreground" />
           </div>
           <div>
             <h1 className="font-bold text-lg">{th.dashboard.title}</h1>
             <p className="text-xs text-muted-foreground hidden sm:block">{th.dashboard.subtitle}</p>
           </div>
         </div>
-        
+
         {onClose && (
           <Button
             variant="ghost"
@@ -245,7 +251,7 @@ export function Sidebar({ onClose }: SidebarProps) {
           <ScanBarcode className="h-4 w-4 text-primary" />
           <span className="text-xs font-medium">{th.dashboard.title}</span>
         </div>
-       
+
       </div>
     </div>
   );
