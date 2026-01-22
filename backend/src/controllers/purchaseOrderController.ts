@@ -30,22 +30,29 @@ function validateDetails(details: any[]) {
   }));
 }
 
-// สร้างโค้ดรันนิ่งรายวัน: PO-YYYYMMDD-0001
+// สร้างโค้ดรันนิ่งแบบง่าย: PO-001, PO-002, ...
 async function generatePurchaseOrderCode() {
-  const pad4 = (n: number) => n.toString().padStart(4, '0');
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  const dateStr = `${y}${m}${day}`;
-  const prefix = `PO-${dateStr}-`;
+  const prefix = 'PO-';
+
+  // หาเลข PO ล่าสุด
   const last = await prisma.purchaseOrder.findFirst({
     where: { PurchaseOrderCode: { startsWith: prefix } },
     orderBy: { PurchaseOrderCode: 'desc' },
     select: { PurchaseOrderCode: true },
   });
-  const next = last ? Number(last.PurchaseOrderCode.split('-').pop() || '0') + 1 : 1;
-  return `${prefix}${pad4(next)}`;
+
+  // ดึงตัวเลขจาก PO code (เช่น "PO-001" -> 1)
+  let nextNum = 1;
+  if (last) {
+    const match = last.PurchaseOrderCode.match(/PO-(\d+)/);
+    if (match) {
+      nextNum = parseInt(match[1], 10) + 1;
+    }
+  }
+
+  // Format ด้วย zero-padding 3 หลัก (001, 002, ..., 999, 1000)
+  const paddedNum = nextNum.toString().padStart(3, '0');
+  return `${prefix}${paddedNum}`;
 }
 
 // ✅ สร้างใบสั่งซื้อ
@@ -141,7 +148,7 @@ export async function listPurchaseOrders(_req: Request, res: Response) {
     const pos = await prisma.purchaseOrder.findMany({
       where: { CompanyId },
       orderBy: { DateTime: 'desc' },
-      include: { 
+      include: {
         Supplier: { select: { SupplierName: true } },
         _count: {
           select: { PurchaseOrderDetails: true },
@@ -191,7 +198,7 @@ export async function updatePurchaseOrder(req: Request, res: Response) {
         const normalized = validateDetails(details);
         await tx.purchaseOrderDetail.deleteMany({ where: { PurchaseOrderId: id } });
         await tx.purchaseOrderDetail.createMany({
-            data: normalized.map(d => ({ ...d, PurchaseOrderId: id, CompanyId })),
+          data: normalized.map(d => ({ ...d, PurchaseOrderId: id, CompanyId })),
         });
         data.TotalPrice = normalized.reduce(
           (sum, d) => sum + d.PurchaseOrderQuantity * d.PurchaseOrderPrice,

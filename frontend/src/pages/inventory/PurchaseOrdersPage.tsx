@@ -36,7 +36,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { th } from "../i18n/th";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -168,10 +167,11 @@ export default function PurchaseOrdersPage() {
       const [ss, ms] = await Promise.all([apiGetSuppliers(), apiGetMaterials()]);
       setSuppliers(ss);
       setMaterials(ms);
+
+
       const now = new Date();
-      const rand = Math.floor(Math.random()*9000)+1000;
-      const code = `PO-${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}-${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}-${rand}`;
-      setForm({ SupplierId: ss[0]?.SupplierId || 0, PurchaseOrderCode: code, DateTime: now.toISOString().slice(0,10), PurchaseOrderStatus: 'DRAFT', details: [] });
+      // Backend will auto-generate PO code (PO-001, PO-002, etc.)
+      setForm({ SupplierId: ss[0]?.SupplierId || 0, PurchaseOrderCode: '', DateTime: now.toISOString().slice(0, 10), PurchaseOrderStatus: 'DRAFT', details: [] });
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'โหลดข้อมูลสำหรับสร้าง PO ไม่สำเร็จ', description: e.message || '' });
     }
@@ -200,11 +200,11 @@ export default function PurchaseOrdersPage() {
     setForm(prev => ({ ...prev, details: prev.details.filter((_, i) => i !== idx) }));
   };
 
-  const totalPrice = useMemo(() => form.details.reduce((sum, d) => sum + (Number(d.PurchaseOrderQuantity)||0) * (Number(d.PurchaseOrderPrice)||0), 0), [form.details]);
+  const totalPrice = useMemo(() => form.details.reduce((sum, d) => sum + (Number(d.PurchaseOrderQuantity) || 0) * (Number(d.PurchaseOrderPrice) || 0), 0), [form.details]);
 
   const submitCreate = async () => {
     if (!form.SupplierId) return toast({ variant: 'destructive', title: 'กรุณาเลือกผู้จำหน่าย' });
-    if (!form.PurchaseOrderCode) return toast({ variant: 'destructive', title: 'กรุณากรอกรหัส PO' });
+    // ไม่ต้อง validate PurchaseOrderCode เพราะ backend จะ generate ให้อัตโนมัติ
     if (form.details.length === 0) return toast({ variant: 'destructive', title: 'กรุณาเพิ่มรายการสินค้าอย่างน้อย 1 รายการ' });
     // validate details
     for (const d of form.details) {
@@ -217,7 +217,7 @@ export default function PurchaseOrdersPage() {
     try {
       const newPO = await apiCreatePO({
         SupplierId: form.SupplierId,
-        PurchaseOrderCode: form.PurchaseOrderCode,
+        // ไม่ส่ง PurchaseOrderCode เพราะ backend จะ generate ให้อัตโนมัติ
         DateTime: form.DateTime ? new Date(form.DateTime).toISOString() : undefined,
         PurchaseOrderStatus: form.PurchaseOrderStatus,
         details: form.details.map(d => ({
@@ -264,7 +264,7 @@ export default function PurchaseOrdersPage() {
       setForm({
         SupplierId: full.SupplierId,
         PurchaseOrderCode: full.PurchaseOrderCode,
-        DateTime: (full.DateTime ? new Date(full.DateTime).toISOString().slice(0,10) : ""),
+        DateTime: (full.DateTime ? new Date(full.DateTime).toISOString().slice(0, 10) : ""),
         PurchaseOrderStatus: full.PurchaseOrderStatus as any,
         details: full.PurchaseOrderDetails.map(d => ({
           MaterialId: d.MaterialId,
@@ -331,7 +331,7 @@ export default function PurchaseOrdersPage() {
       toast({ title: 'ลบใบสั่งซื้อแล้ว' });
       // refresh list
       setLoading(true);
-      const rows = await apiGetPOs();
+      const rows = await apiGetPOs(); ไ
       const mapped: PO[] = rows.map((r) => ({
         poId: r.PurchaseOrderId,
         id: r.PurchaseOrderCode,
@@ -397,7 +397,7 @@ export default function PurchaseOrdersPage() {
 
   const filteredPOs = useMemo(() => {
     return poList.filter(po => {
-      const matchesSearch = !searchTerm || 
+      const matchesSearch = !searchTerm ||
         po.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
         po.supplier.toLowerCase().includes(searchTerm.toLowerCase()) ||
         po.requestedBy?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -457,7 +457,7 @@ export default function PurchaseOrdersPage() {
             </div>
           </CardContent>
         </Card>
-      
+
         <Card>
           <CardContent className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
@@ -480,9 +480,9 @@ export default function PurchaseOrdersPage() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full sm:w-auto">
               <div className="relative w-full sm:w-80">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input 
-                  className="pl-10 w-full" 
-                  placeholder="ค้นหา เลขที่ PO / ผู้จำหน่าย / ผู้ขอ" 
+                <Input
+                  className="pl-10 w-full"
+                  placeholder="ค้นหา เลขที่ PO / ผู้จำหน่าย / ผู้ขอ"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -492,23 +492,23 @@ export default function PurchaseOrdersPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-            {loading ? (
-              <div className="text-center py-12 text-muted-foreground">กำลังโหลด...</div>
-            ) : Object.keys(groupedPOs).length > 0 ? (
+          {loading ? (
+            <div className="text-center py-12 text-muted-foreground">กำลังโหลด...</div>
+          ) : Object.keys(groupedPOs).length > 0 ? (
             <div className="space-y-6">
               {Object.entries(groupedPOs).map(([status, pos]) => {
                 const isExpanded = expandedStatus[status] ?? true;
                 const displayPOs = isExpanded ? pos : pos.slice(0, 3);
-                
+
                 return (
                   <div key={status} className="border rounded-lg">
-                    <div 
+                    <div
                       className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50"
                       onClick={() => toggleStatus(status)}
                     >
                       <div className="flex items-center gap-2">
-                        {isExpanded ? 
-                          <ChevronDown className="h-5 w-5 text-muted-foreground" /> : 
+                        {isExpanded ?
+                          <ChevronDown className="h-5 w-5 text-muted-foreground" /> :
                           <ChevronRight className="h-5 w-5 text-muted-foreground" />
                         }
                         <h3 className="font-semibold text-lg">
@@ -517,75 +517,75 @@ export default function PurchaseOrdersPage() {
                       </div>
                       {getStatusBadge(status)}
                     </div>
-                    
+
                     {isExpanded && (
                       <div className="overflow-x-auto border-t">
-                     <Table>
-  <TableHeader>
-    <TableRow>
-      <TableHead className="px-4 whitespace-nowrap">เลขที่ PO</TableHead>
-      <TableHead className="px-4 whitespace-nowrap">ผู้จำหน่าย</TableHead>
-      <TableHead className="px-4 whitespace-nowrap">วันที่</TableHead>
-      <TableHead className="px-4 text-center whitespace-nowrap">จำนวนรายการ</TableHead>
-      <TableHead className="px-4 whitespace-nowrap">ผู้ขอ</TableHead>
-      <TableHead className="px-4 whitespace-nowrap">สถานะ</TableHead>
-      <TableHead className="px-4 text-center whitespace-nowrap">การดำเนินการ</TableHead>
-    </TableRow>
-  </TableHeader>
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="px-4 whitespace-nowrap">เลขที่ PO</TableHead>
+                              <TableHead className="px-4 whitespace-nowrap">ผู้จำหน่าย</TableHead>
+                              <TableHead className="px-4 whitespace-nowrap">วันที่</TableHead>
+                              <TableHead className="px-4 text-center whitespace-nowrap">จำนวนรายการ</TableHead>
+                              <TableHead className="px-4 whitespace-nowrap">ผู้ขอ</TableHead>
+                              <TableHead className="px-4 whitespace-nowrap">สถานะ</TableHead>
+                              <TableHead className="px-4 text-center whitespace-nowrap">การดำเนินการ</TableHead>
+                            </TableRow>
+                          </TableHeader>
 
-  <TableBody>
-    {displayPOs.map((po) => (
-      <TableRow key={po.id} className="hover:bg-muted/50">
-        <TableCell className="px-4 font-medium whitespace-nowrap">{po.id}</TableCell>
-        <TableCell className="px-4 whitespace-nowrap">{po.supplier}</TableCell>
-        <TableCell className="px-4 whitespace-nowrap">
-          {new Date(po.date).toLocaleDateString('th-TH', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric'
-          })}
-        </TableCell>
-        <TableCell className="px-4 text-center whitespace-nowrap">{po.items ?? '-'}</TableCell>
-        <TableCell className="px-4 whitespace-nowrap">{po.requestedBy ?? '-'}</TableCell>
-        <TableCell className="px-4 whitespace-nowrap">
-          {getStatusBadge(po.status)}
-        </TableCell>
-        <TableCell className="px-4">
-          <div className="flex items-center justify-center gap-2">
-            <Button 
-              variant="ghost" 
-              size="sm"
-              className="hover:bg-accent"
-              onClick={() => openView(po)}
-            >
-              <Eye className="h-4 w-4" />
-            </Button>
+                          <TableBody>
+                            {displayPOs.map((po) => (
+                              <TableRow key={po.id} className="hover:bg-muted/50">
+                                <TableCell className="px-4 font-medium whitespace-nowrap">{po.id}</TableCell>
+                                <TableCell className="px-4 whitespace-nowrap">{po.supplier}</TableCell>
+                                <TableCell className="px-4 whitespace-nowrap">
+                                  {new Date(po.date).toLocaleDateString('th-TH', {
+                                    year: 'numeric',
+                                    month: 'short',
+                                    day: 'numeric'
+                                  })}
+                                </TableCell>
+                                <TableCell className="px-4 text-center whitespace-nowrap">{po.items ?? '-'}</TableCell>
+                                <TableCell className="px-4 whitespace-nowrap">{po.requestedBy ?? '-'}</TableCell>
+                                <TableCell className="px-4 whitespace-nowrap">
+                                  {getStatusBadge(po.status)}
+                                </TableCell>
+                                <TableCell className="px-4">
+                                  <div className="flex items-center justify-center gap-2">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="hover:bg-accent"
+                                      onClick={() => openView(po)}
+                                    >
+                                      <Eye className="h-4 w-4" />
+                                    </Button>
 
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="hover:bg-accent"
-              onClick={() => openEdit(po)}
-            >
-              <Edit className="h-4 w-4" />
-            </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="hover:bg-accent"
+                                      onClick={() => openEdit(po)}
+                                    >
+                                      <Edit className="h-4 w-4" />
+                                    </Button>
 
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-destructive hover:bg-destructive/10"
-              onClick={() => handleDelete(po)}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        </TableCell>
-      </TableRow>
-    ))}
-  </TableBody>
-</Table>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="text-destructive hover:bg-destructive/10"
+                                      onClick={() => handleDelete(po)}
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
 
-                        
+
                         {!isExpanded && pos.length > 3 && (
                           <div className="p-4 text-center border-t">
                             <Button variant="ghost" onClick={() => toggleStatus(status)}>
@@ -629,7 +629,12 @@ export default function PurchaseOrdersPage() {
             </div>
             <div>
               <Label>รหัส PO</Label>
-              <Input value={form.PurchaseOrderCode} onChange={(e) => setForm(prev => ({ ...prev, PurchaseOrderCode: e.target.value }))} />
+              <Input
+                value={form.PurchaseOrderCode}
+                placeholder="ระบบจะสร้างให้อัตโนมัติ (เช่น PO-001)"
+                disabled
+                className="bg-muted"
+              />
             </div>
             <div>
               <Label>วันที่</Label>
@@ -682,7 +687,7 @@ export default function PurchaseOrdersPage() {
                         <TableCell className="min-w-[140px]">
                           <Input type="number" min="0" value={d.PurchaseOrderPrice} onChange={(e) => updateDetail(idx, { PurchaseOrderPrice: Number(e.target.value) })} />
                         </TableCell>
-                        <TableCell className="whitespace-nowrap">฿{((Number(d.PurchaseOrderQuantity)||0)*(Number(d.PurchaseOrderPrice)||0)).toLocaleString()}</TableCell>
+                        <TableCell className="whitespace-nowrap">฿{((Number(d.PurchaseOrderQuantity) || 0) * (Number(d.PurchaseOrderPrice) || 0)).toLocaleString()}</TableCell>
                         <TableCell>
                           <Button variant="ghost" size="sm" onClick={() => removeDetail(idx)}>
                             <X className="h-4 w-4" />
@@ -786,7 +791,7 @@ export default function PurchaseOrdersPage() {
                         <TableCell className="min-w-[140px]">
                           <Input type="number" min="0" value={d.PurchaseOrderPrice} onChange={(e) => updateDetail(idx, { PurchaseOrderPrice: Number(e.target.value) })} />
                         </TableCell>
-                        <TableCell className="whitespace-nowrap">฿{((Number(d.PurchaseOrderQuantity)||0)*(Number(d.PurchaseOrderPrice)||0)).toLocaleString()}</TableCell>
+                        <TableCell className="whitespace-nowrap">฿{((Number(d.PurchaseOrderQuantity) || 0) * (Number(d.PurchaseOrderPrice) || 0)).toLocaleString()}</TableCell>
                         <TableCell>
                           <Button variant="ghost" size="sm" onClick={() => removeDetail(idx)}>
                             <X className="h-4 w-4" />

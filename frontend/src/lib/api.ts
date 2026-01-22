@@ -529,7 +529,7 @@ export type PurchaseOrderDetail = {
 
 export type CreatePurchaseOrderData = {
   SupplierId: number;
-  PurchaseOrderCode: string;
+  PurchaseOrderCode?: string; // Optional - backend will auto-generate if not provided
   PurchaseOrderStatus?: PurchaseOrder['PurchaseOrderStatus'];
   DateTime?: string;
   details: Array<{
