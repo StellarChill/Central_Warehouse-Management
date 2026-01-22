@@ -41,7 +41,7 @@ export async function apiRequest(
   options: RequestInit = {}
 ): Promise<Response> {
   const token = getToken();
-  
+
   const headers: HeadersInit = {
     "Content-Type": "application/json",
     ...options.headers,
@@ -539,7 +539,7 @@ export async function getPurchaseOrders(): Promise<PurchaseOrder[]> {
   return apiGet('/po');
 }
 
-export async function getPurchaseOrder(id: number): Promise<PurchaseOrder & { PurchaseOrderDetails: PurchaseOrderDetail[] }>{
+export async function getPurchaseOrder(id: number): Promise<PurchaseOrder & { PurchaseOrderDetails: PurchaseOrderDetail[] }> {
   return apiGet(`/po/${id}`);
 }
 
@@ -572,6 +572,7 @@ export type Receipt = {
   ReceiptTotalPrice: number;
   PurchaseOrderId: number;
   PurchaseOrderCode?: string;
+  WarehouseId?: number; // Added for filtering
   CreatedAt: string;
   UpdatedAt: string;
 };
@@ -618,6 +619,37 @@ export async function deleteReceipt(id: number) {
 }
 
 // ==========================================
+// Issue API (Outbound)
+// ==========================================
+
+export type Issue = {
+  IssueId: number;
+  IssueCode: string;
+  IssueDate: string;
+  IssueStatus: string;
+  CompanyId: number;
+  BranchId: number;
+  WarehouseId: number;
+  WithdrawnRequestId: number;
+  CreatedAt: string;
+};
+
+export type IssueDetail = {
+  IssueDetailId: number;
+  IssueId: number;
+  MaterialId: number;
+  IssueQuantity: number;
+};
+
+export async function getIssues(): Promise<Issue[]> {
+  return apiGet('/issue');
+}
+
+export async function getIssue(id: number): Promise<Issue & { IssueDetails: IssueDetail[] }> {
+  return apiGet(`/issue/${id}`);
+}
+
+// ==========================================
 // Stock API
 // ==========================================
 
@@ -632,6 +664,7 @@ export type Stock = {
   Barcode: string;
   ReceiptId: number;
   PurchaseOrderId: number;
+  WarehouseId: number;
   CreatedAt: string;
 };
 

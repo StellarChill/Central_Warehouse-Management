@@ -180,14 +180,14 @@ const App = () => (
                       </Guard>
                     }
                   />
-                  <Route
+                  {/* <Route
                     path="/warehouse-management"
                     element={
                       <Guard allow={["COMPANY_ADMIN", "ADMIN"]}>
                         <WarehouseManagementPage />
                       </Guard>
                     }
-                  />
+                  /> */}
                   <Route path="/warehouse/:id" element={<WarehouseDetailPage />} />
                   <Route path="/warehouse/:id/dashboard" element={<WarehouseDashboardPage />} />
                 </Route>
@@ -222,9 +222,9 @@ function RootRoute() {
     return <LoadingScreen />;
   }
 
-  // ถ้ายัง login ไม่ได้ แสดง login page
+  // ถ้ายัง login ไม่ได้ redirect ไปหน้า login
   if (!user) {
-    return <HomePage />;
+    return <Navigate to="/login" replace />;
   }
 
   // ถ้า login แล้ว แสดง AppLayout และ nested routes
@@ -280,23 +280,7 @@ function RoleLanding() {
 }
 
 function CompanyWarehouseLanding() {
-  const { data, isLoading, isError } = useQuery<Warehouse[]>({
-    queryKey: ['warehouses', 'landing'],
-    queryFn: getWarehouses,
-    staleTime: 5 * 60 * 1000,
-  });
-
-  if (isLoading) return <LoadingScreen />;
-
-  if (isError || !data || data.length === 0) {
-    return <Navigate to="/warehouse-management" replace />;
-  }
-
-  const preferred =
-    data.find((w) => w.WarehouseName?.toLowerCase().includes('main')) ||
-    data.find((w) => w.WarehouseCode?.toLowerCase().includes('main')) ||
-    data[0];
-
-  return <Navigate to={`/warehouse/${preferred.WarehouseId}/dashboard`} replace />;
+  // ไปหน้า inventory แทนหน้าจัดการคลัง
+  return <Navigate to="/inventory" replace />;
 }
 

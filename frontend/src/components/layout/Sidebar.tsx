@@ -74,12 +74,12 @@ const navigation = [
     icon: FileBox,
     premiumIcon: FileBox,
   },
-  {
-    name: "จัดการคลังสินค้า",
-    href: "/warehouse-management",
-    icon: BriefcaseConveyorBelt,
-    premiumIcon: BriefcaseConveyorBelt,
-  },
+  // {
+  //   name: "จัดการคลังสินค้า",
+  //   href: "/warehouse-management",
+  //   icon: BriefcaseConveyorBelt,
+  //   premiumIcon: BriefcaseConveyorBelt,
+  // },
   { 
     name: "ผู้ดูแลระบบ", 
     href: "/admin", 
@@ -190,7 +190,8 @@ export function Sidebar({ onClose }: SidebarProps) {
           );
         })}
 
-        {allowWarehouseNav && (
+        {/* ซ่อนส่วนแสดงภาพรวมคลัง */}
+        {/* {allowWarehouseNav && (
           <div className="pt-4 mt-4 border-t">
             <p className="text-xs font-semibold text-muted-foreground mb-2">
               คลังของบริษัท
@@ -235,7 +236,7 @@ export function Sidebar({ onClose }: SidebarProps) {
               );
             })}
           </div>
-        )}
+        )} */}
       </nav>
 
       {/* Footer */}
