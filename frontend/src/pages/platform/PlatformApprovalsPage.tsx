@@ -47,18 +47,14 @@ export default function PlatformApprovalsPage() {
   async function getRoles() { return apiGet('/role'); }
   async function getBranches() { return apiGet('/branch'); }
 
-  async function load(s: TabStatus) {
+  async function load() {
     try {
       setLoading(true);
       setError(null);
-      if (s === 'ALL') {
-        const buckets: Exclude<TabStatus, 'ALL'>[] = ['PENDING', 'APPROVED', 'REJECTED'];
-        const results = await Promise.all(buckets.map((state) => platformListUsers(state)));
-        setRows(results.flat());
-      } else {
-        const data = await platformListUsers(s as any);
-        setRows(data);
-      }
+      // Always load ALL data regardless of tab
+      const buckets: Exclude<TabStatus, 'ALL'>[] = ['PENDING', 'APPROVED', 'REJECTED'];
+      const results = await Promise.all(buckets.map((state) => platformListUsers(state)));
+      setRows(results.flat());
     } catch (e: any) {
       setError(e?.message || 'Failed to load users');
     } finally {
@@ -66,7 +62,7 @@ export default function PlatformApprovalsPage() {
     }
   }
 
-  useEffect(() => { load(status); }, [status]);
+  useEffect(() => { load(); }, []);
 
   useEffect(() => {
     (async () => {
@@ -149,12 +145,7 @@ export default function PlatformApprovalsPage() {
               <div className="p-3 rounded-xl bg-blue-50"><Users className="h-5 w-5 text-blue-600" /></div>
             </CardContent>
           </Card>
-          <Card className="border-none shadow-sm bg-white/60 backdrop-blur-sm">
-            <CardContent className="p-5 flex items-center justify-between">
-              <div><p className="text-sm font-medium text-muted-foreground">Detailed Approval</p><h3 className="text-2xl font-bold mt-1 text-slate-800">{stats.pending}</h3></div>
-              <div className="p-3 rounded-xl bg-amber-50"><UserPlus className="h-5 w-5 text-amber-600" /></div>
-            </CardContent>
-          </Card>
+
           <Card className="border-none shadow-sm bg-white/60 backdrop-blur-sm">
             <CardContent className="p-5 flex items-center justify-between">
               <div><p className="text-sm font-medium text-muted-foreground">Approved</p><h3 className="text-2xl font-bold mt-1 text-slate-800">{stats.approved}</h3></div>
@@ -237,7 +228,7 @@ export default function PlatformApprovalsPage() {
                   <div className="p-8 text-center text-red-600">{error}</div>
                 ) : (
                   <div className="divide-y">
-                    {filteredRows.map((u) => {
+                    {paginatedRows.map((u) => {
                       const isPending = u.UserStatusApprove === 'PENDING';
                       const isApproved = u.UserStatusApprove === 'APPROVED';
                       return (
@@ -275,7 +266,7 @@ export default function PlatformApprovalsPage() {
                                 <Button size="sm" variant="destructive" onClick={async () => {
                                   if (!confirm('Are you sure you want to reject this user?')) return;
                                   await platformRejectUser(u.UserId);
-                                  await load(status);
+                                  await load();
                                 }}>
                                   <ShieldX className="h-4 w-4 mr-1" /> Reject
                                 </Button>
@@ -286,7 +277,7 @@ export default function PlatformApprovalsPage() {
                                 <Button size="sm" variant="outline" onClick={async () => {
                                   const next = u.UserStatusActive === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
                                   await platformSetUserActive(u.UserId, next);
-                                  await load(status);
+                                  await load();
                                 }}>
                                   <ShieldBan className="h-4 w-4 mr-1" /> {u.UserStatusActive === 'ACTIVE' ? 'Set Inactive' : 'Set Active'}
                                 </Button>
@@ -306,7 +297,7 @@ export default function PlatformApprovalsPage() {
                         </div>
                       );
                     })}
-                    {filteredRows.length === 0 && (
+                    {paginatedRows.length === 0 && (
                       <div className="p-12 text-center text-muted-foreground">
                         <p>No users found in this category.</p>
                       </div>
@@ -385,7 +376,7 @@ export default function PlatformApprovalsPage() {
 
                   setAssignOpen(false);
                   setCompanyId(''); setBranchId(''); setRoleId('');
-                  await load(status);
+                  await load();
                 } catch (e: any) {
                   alert(e?.message || 'Failed to assign');
                 } finally {

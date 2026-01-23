@@ -116,6 +116,124 @@ export async function apiDelete(endpoint: string) {
 }
 
 // ==========================================
+// Company Management APIs
+// ==========================================
+
+export type Company = {
+  CompanyId: number;
+  CompanyName: string;
+  CompanyCode: string;
+  CompanyAddress?: string | null;
+  TaxId?: string | null;
+  CompanyTelNumber?: string | null;
+  CompanyEmail?: string | null;
+  CompanyStatus?: string | null;
+  CreatedAt: string;
+  UpdatedAt: string;
+  CreatedBy?: number | null;
+  UpdatedBy?: number | null;
+};
+
+export type CreateCompanyData = {
+  CompanyName: string;
+  CompanyCode: string;
+  CompanyAddress?: string;
+  TaxId?: string;
+  CompanyTelNumber?: string;
+  CompanyEmail?: string;
+};
+
+export type UpdateCompanyData = Partial<CreateCompanyData> & {
+  CompanyStatus?: string;
+};
+
+export async function getCompanies(): Promise<Company[]> {
+  return apiGet('/company');
+}
+
+export async function getCompany(id: number): Promise<Company> {
+  return apiGet(`/company/${id}`);
+}
+
+export async function createCompany(data: CreateCompanyData): Promise<Company> {
+  const user = getUser();
+  return apiPost('/company', { ...data, CreatedBy: user?.UserId || undefined });
+}
+
+export async function updateCompany(id: number, data: UpdateCompanyData): Promise<Company> {
+  const user = getUser();
+  return apiPut(`/company/${id}`, { ...data, UpdatedBy: user?.UserId || undefined });
+}
+
+export async function deleteCompany(id: number): Promise<void> {
+  return apiDelete(`/company/${id}`);
+}
+
+// ==========================================
+// Admin User Management APIs
+// ==========================================
+
+export type AdminUser = {
+  UserId: number;
+  UserName: string;
+  Email?: string | null;
+  LineId?: string | null;
+  RoleId?: number | null;
+  BranchId?: number | null;
+  BranchName?: string | null;
+  UserStatusApprove: 'PENDING' | 'APPROVED' | 'REJECTED';
+  UserStatusActive: 'ACTIVE' | 'INACTIVE';
+  CreatedAt: string;
+  status?: string | null; // Derived status for legacy UIs
+};
+
+export type AdminUserFilters = {
+  status?: string;
+  approve?: 'PENDING' | 'APPROVED' | 'REJECTED';
+  active?: 'ACTIVE' | 'INACTIVE';
+};
+
+export type AdminApproveUserData = {
+  RoleId?: number;
+  BranchId?: number;
+  BranchName?: string;
+  UserStatusApprove?: 'PENDING' | 'APPROVED' | 'REJECTED';
+  UserStatusActive?: 'ACTIVE' | 'INACTIVE';
+  status?: string;
+};
+
+export type AdminUpdateUserData = {
+  UserName?: string;
+  Email?: string;
+  LineId?: string;
+  RoleId?: number;
+  BranchId?: number;
+  UserStatusApprove?: 'PENDING' | 'APPROVED' | 'REJECTED';
+  UserStatusActive?: 'ACTIVE' | 'INACTIVE';
+};
+
+export async function adminGetUsers(filters?: AdminUserFilters): Promise<AdminUser[]> {
+  const params = new URLSearchParams();
+  if (filters?.status) params.append('status', filters.status);
+  if (filters?.approve) params.append('approve', filters.approve);
+  if (filters?.active) params.append('active', filters.active);
+  const query = params.toString();
+  return apiGet(`/admin/users${query ? `?${query}` : ''}`);
+}
+
+export async function adminApproveUser(id: number, data: AdminApproveUserData): Promise<AdminUser> {
+  return apiPost(`/admin/users/${id}/approve`, data);
+}
+
+export async function adminUpdateUser(id: number, data: AdminUpdateUserData): Promise<AdminUser> {
+  return apiPut(`/admin/users/${id}`, data);
+}
+
+export async function adminDeleteUser(id: number): Promise<void> {
+  return apiDelete(`/admin/users/${id}`);
+}
+
+// ==========================================
 // Platform Admin APIs
 // ==========================================
 

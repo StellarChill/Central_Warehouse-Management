@@ -5,22 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useMemo, useState, useEffect } from "react";
-import { apiGet, apiPost, apiPut, apiDelete } from "@/lib/api";
+import { adminGetUsers, adminApproveUser, adminUpdateUser, adminDeleteUser, AdminUser } from "@/lib/api";
 import { Search, Plus, Edit, Trash2, ShieldCheck } from "lucide-react";
 
 type Role = "ADMIN" | "CENTER" | "BRANCH";
-type RemoteUser = {
-  UserId: string;
-  UserName: string;
-  RoleId: number;
-  BranchId?: number | null;
-  BranchName?: string | null;
-  Company?: string | null;
-  Email?: string | null;
-  LineId?: string | null;
-  status?: string | null;
-  CreatedAt?: string | null;
-};
 
 type User = { id: string; name: string; branch: string; role: Role; status: "PENDING" | "ACTIVE"; lineId?: string | null; createdAt?: string | null };
 
@@ -48,7 +36,7 @@ export default function AdminUsersPage() {
       setLoading(true);
       try {
         // fetch all users and split by status so admin can view both pending and approved
-        const data: RemoteUser[] = await apiGet('/admin/users');
+        const data: AdminUser[] = await adminGetUsers();
         const mapped: User[] = data.map((u) => ({
           id: String(u.UserId),
           name: u.UserName,
@@ -56,7 +44,7 @@ export default function AdminUsersPage() {
           lineId: u.LineId || null,
           createdAt: u.CreatedAt || null,
           role: u.RoleId === 1 ? "ADMIN" : u.RoleId === 2 ? "CENTER" : "BRANCH",
-          status: (u.status as any) === "ACTIVE" ? "ACTIVE" : "PENDING",
+          status: u.UserStatusActive === "ACTIVE" ? "ACTIVE" : "PENDING",
         }));
         setPendingUsers(mapped.filter((m) => m.status === 'PENDING'));
         setApprovedUsers(mapped.filter((m) => m.status === 'ACTIVE'));
@@ -91,14 +79,11 @@ export default function AdminUsersPage() {
     if (!form.userId) return;
     setActionLoading(true);
     try {
-      // Call backend to approve and assign branch/company
-      const body: any = {
-        BranchId: Number(form.branch) || 0,
+      const result = await adminApproveUser(Number(form.userId), {
+        BranchId: Number(form.branch) || undefined,
         BranchName: isNaN(Number(form.branch)) ? form.branch : undefined,
-        Company: form.company || undefined,
-        status: "ACTIVE",
-      };
-      const result = await apiPost(`/admin/users/${form.userId}/approve`, body);
+        UserStatusActive: "ACTIVE",
+      });
 
       // result is updated user mapped from backend; convert to frontend User
       const updated: User = {
@@ -106,7 +91,7 @@ export default function AdminUsersPage() {
         name: result.UserName,
         branch: result.BranchName || (result.BranchId ? `สาขา ${result.BranchId}` : "-"),
         role: result.RoleId === 1 ? "ADMIN" : result.RoleId === 2 ? "CENTER" : "BRANCH",
-        status: (result.status as any) === "ACTIVE" ? "ACTIVE" : "PENDING",
+        status: result.UserStatusActive === "ACTIVE" ? "ACTIVE" : "PENDING",
         lineId: result.LineId || null,
         createdAt: result.CreatedAt || null,
       };
@@ -125,7 +110,7 @@ export default function AdminUsersPage() {
   const remove = async (id: string) => {
     if (!confirm("ยืนยันการลบผู้ใช้?")) return;
     try {
-      await apiDelete(`/admin/users/${id}`);
+      await adminDeleteUser(Number(id));
       setPendingUsers((prev) => prev.filter((u) => u.id !== id));
       setApprovedUsers((prev) => prev.filter((u) => u.id !== id));
     } catch (err) {
@@ -162,11 +147,11 @@ export default function AdminUsersPage() {
                 <TableRow>
                   <TableHead>รหัส</TableHead>
                   <TableHead>ชื่อ</TableHead>
-                    <TableHead>LineId</TableHead>
+                  <TableHead>LineId</TableHead>
                   <TableHead>สาขา</TableHead>
                   <TableHead>สิทธิ์</TableHead>
                   <TableHead>สถานะ</TableHead>
-                    <TableHead>วันที่สมัคร</TableHead>
+                  <TableHead>วันที่สมัคร</TableHead>
                   <TableHead className="text-center">การดำเนินการ</TableHead>
                 </TableRow>
               </TableHeader>

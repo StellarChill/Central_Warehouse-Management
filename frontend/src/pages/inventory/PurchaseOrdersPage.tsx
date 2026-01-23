@@ -331,7 +331,7 @@ export default function PurchaseOrdersPage() {
       toast({ title: 'ลบใบสั่งซื้อแล้ว' });
       // refresh list
       setLoading(true);
-      const rows = await apiGetPOs(); ไ
+      const rows = await apiGetPOs();
       const mapped: PO[] = rows.map((r) => ({
         poId: r.PurchaseOrderId,
         id: r.PurchaseOrderCode,
