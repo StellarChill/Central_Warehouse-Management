@@ -634,6 +634,7 @@ export type PurchaseOrder = {
   CreatedAt: string;
   UpdatedAt: string;
   Supplier?: { SupplierName: string };
+  PurchaseOrderAddress?: string | null;
 };
 
 export type PurchaseOrderDetail = {
@@ -649,6 +650,7 @@ export type CreatePurchaseOrderData = {
   SupplierId: number;
   PurchaseOrderCode?: string; // Optional - backend will auto-generate if not provided
   PurchaseOrderStatus?: PurchaseOrder['PurchaseOrderStatus'];
+  PurchaseOrderAddress?: string;
   DateTime?: string;
   details: Array<{
     MaterialId: number;

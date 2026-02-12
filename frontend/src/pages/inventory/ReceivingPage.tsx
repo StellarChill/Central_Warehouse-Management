@@ -28,6 +28,7 @@ type PurchaseOrder = {
   supplier: string;
   date: string;
   status: "DRAFT" | "SENT" | "CONFIRMED" | "RECEIVED";
+  targetWarehouse?: string;
 };
 
 type SelectedItem = {
@@ -65,6 +66,8 @@ export default function ReceivingPage() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [receiptToEdit, setReceiptToEdit] = useState<(FullReceipt & { ReceiptDetails: ReceiptDetail[] }) | null>(null);
   const [editingQuantities, setEditingQuantities] = useState<Record<number, number>>({});
+  const [warehouses, setWarehouses] = useState<{ WarehouseId: number; WarehouseName: string }[]>([]);
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>("all");
 
   const loadReceipts = async () => {
     try {
@@ -77,13 +80,29 @@ export default function ReceivingPage() {
 
   useEffect(() => {
     const loadInitialData = async () => {
+      // Check context
+      const stored = localStorage.getItem('selected_warehouse_id');
+      if (stored) setSelectedWarehouseId(stored);
+
       try {
-        const [orows, mats] = await Promise.all([
+        const [orows, mats, whs] = await Promise.all([
           apiGetPOs(),
           apiGetMaterials(),
+          getWarehouses().catch(() => []),
         ]);
-        loadReceipts(); // Load receipts
-        setPoList(orows.map(o => ({ id: o.PurchaseOrderId, code: o.PurchaseOrderCode, supplier: o.Supplier?.SupplierName || String(o.SupplierId), date: o.DateTime, status: o.PurchaseOrderStatus })));
+        setWarehouses(whs || []);
+        loadReceipts();
+
+        // Map POs - include PurchaseOrderAddress as a property we can check later
+        setPoList(orows.map(o => ({
+          id: o.PurchaseOrderId,
+          code: o.PurchaseOrderCode,
+          supplier: o.Supplier?.SupplierName || String(o.SupplierId),
+          date: o.DateTime,
+          status: o.PurchaseOrderStatus,
+          targetWarehouse: o.PurchaseOrderAddress // key addition
+        })));
+
         const m: Record<number, { name: string; unit: string }> = {};
         mats.forEach(mt => { m[mt.MaterialId] = { name: mt.MaterialName, unit: mt.Unit }; });
         setMaterialMap(m);
@@ -444,7 +463,18 @@ export default function ReceivingPage() {
           </DialogHeader>
 
           <div className="space-y-4">
-            {poList.filter(p => p.status !== 'RECEIVED').map((po) => {
+            {poList.filter(p => {
+              // Warehouse Isolation Logic
+              if (selectedWarehouseId !== "all") {
+                const currentWhName = warehouses.find(w => String(w.WarehouseId) === selectedWarehouseId)?.WarehouseName;
+                // If PO has a target warehouse, it must match our current one.
+                // If PO has no target, we assume it's global/legacy and show it.
+                if (currentWhName && p.targetWarehouse && p.targetWarehouse !== currentWhName) {
+                  return false;
+                }
+              }
+              return p.status !== 'RECEIVED';
+            }).map((po) => {
               const itemsInPo = getFilteredPOItems(po);
               const itemsWithRemaining = itemsInPo.map(item => {
                 const receivedQty = receivedByPo[po.id]?.[item.MaterialId] || 0;

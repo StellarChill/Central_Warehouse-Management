@@ -20,6 +20,13 @@ import { th } from "../../i18n/th";
 import { useAuth } from "@/context/AuthContext";
 import { useEffect, useMemo, useState } from "react";
 import { getWarehouses, type Warehouse as WarehouseType } from "@/lib/api";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface SidebarProps {
   onClose?: () => void;
@@ -80,12 +87,12 @@ const navigation = [
     icon: FileBox,
     premiumIcon: FileBox,
   },
-  // {
-  //   name: "จัดการคลังสินค้า",
-  //   href: "/warehouse-management",
-  //   icon: BriefcaseConveyorBelt,
-  //   premiumIcon: BriefcaseConveyorBelt,
-  // },
+  {
+    name: "จัดการคลังสินค้า",
+    href: "/warehouse-management",
+    icon: BriefcaseConveyorBelt,
+    premiumIcon: BriefcaseConveyorBelt,
+  },
   {
     name: "ผู้ดูแลระบบ",
     href: "/admin",
@@ -147,27 +154,62 @@ export function Sidebar({ onClose }: SidebarProps) {
   return (
     <div className="flex flex-col h-full bg-card text-card-foreground shadow-premium border-r">
       {/* Header with Fresh Theme */}
-      <div className="flex items-center justify-between p-4 sm:p-6 border-b">
-        <div className="flex items-center gap-2 sm:gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-lg">
+      <div className="flex flex-col border-b bg-muted/10 p-4 gap-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-lg">
 
-            <Warehouse className="h-6 w-6 text-primary-foreground" />
+              <Warehouse className="h-6 w-6 text-primary-foreground" />
+            </div>
+            <div>
+              <h1 className="font-bold text-lg">{th.dashboard.title}</h1>
+              <p className="text-xs text-muted-foreground hidden sm:block">{th.dashboard.subtitle}</p>
+            </div>
           </div>
-          <div>
-            <h1 className="font-bold text-lg">{th.dashboard.title}</h1>
-            <p className="text-xs text-muted-foreground hidden sm:block">{th.dashboard.subtitle}</p>
-          </div>
+
+          {onClose && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClose}
+              className="lg:hidden hover:bg-accent"
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          )}
         </div>
 
-        {onClose && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onClose}
-            className="lg:hidden hover:bg-accent"
-          >
-            <X className="h-5 w-5" />
-          </Button>
+        {/* Global Warehouse Selector */}
+        {allowWarehouseNav && warehouses.length > 0 && (
+          <div className="w-full">
+            <label className="text-xs text-muted-foreground font-medium mb-1.5 block px-1">
+              Current Warehouse
+            </label>
+            <Select
+              value={localStorage.getItem('selected_warehouse_id') || "all"}
+              onValueChange={(val) => {
+                if (val === "all") {
+                  localStorage.removeItem('selected_warehouse_id');
+                } else {
+                  localStorage.setItem('selected_warehouse_id', val);
+                }
+                // Force reload to apply headers and context
+                window.location.reload();
+              }}
+            >
+              <SelectTrigger className="w-full bg-background border-muted-foreground/20 h-9 text-sm">
+                <SelectValue placeholder="Select Warehouse" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Warehouses (Global)</SelectItem>
+                {warehouses.map(w => (
+                  <SelectItem key={w.WarehouseId} value={String(w.WarehouseId)}>
+                    {w.WarehouseName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         )}
       </div>
 
@@ -197,7 +239,7 @@ export function Sidebar({ onClose }: SidebarProps) {
         })}
 
         {/* ซ่อนส่วนแสดงภาพรวมคลัง */}
-        {/* {allowWarehouseNav && (
+        {allowWarehouseNav && (
           <div className="pt-4 mt-4 border-t">
             <p className="text-xs font-semibold text-muted-foreground mb-2">
               คลังของบริษัท
@@ -242,7 +284,7 @@ export function Sidebar({ onClose }: SidebarProps) {
               );
             })}
           </div>
-        )} */}
+        )}
       </nav>
 
       {/* Footer */}

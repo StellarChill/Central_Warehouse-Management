@@ -40,7 +40,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { getPurchaseOrders as apiGetPOs, getPurchaseOrder as apiGetPO, updatePurchaseOrder as apiUpdatePO, deletePurchaseOrder as apiDeletePO, getSuppliers as apiGetSuppliers, getMaterials as apiGetMaterials, createPurchaseOrder as apiCreatePO, Supplier as ApiSupplier, Material as ApiMaterial } from "@/lib/api";
+import { getPurchaseOrders as apiGetPOs, getPurchaseOrder as apiGetPO, updatePurchaseOrder as apiUpdatePO, deletePurchaseOrder as apiDeletePO, getSuppliers as apiGetSuppliers, getMaterials as apiGetMaterials, createPurchaseOrder as apiCreatePO, Supplier as ApiSupplier, Material as ApiMaterial, getWarehouses } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 
@@ -54,6 +54,7 @@ type PO = {
   requestedBy?: string;
   deliveryDate?: string;
   items?: number;
+  targetWarehouse?: string;
 };
 
 type Product = {
@@ -122,56 +123,62 @@ export default function PurchaseOrdersPage() {
   const [suppliers, setSuppliers] = useState<ApiSupplier[]>([]);
   const [materials, setMaterials] = useState<ApiMaterial[]>([]);
   const [creating, setCreating] = useState(false);
+  const [warehouses, setWarehouses] = useState<{ WarehouseId: number; WarehouseName: string }[]>([]);
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>("all"); // "all" or WarehouseId
   const [form, setForm] = useState({
     SupplierId: 0,
     PurchaseOrderCode: "",
     DateTime: "",
+    PurchaseOrderAddress: "", // Used to store Target Warehouse Name
     PurchaseOrderStatus: "DRAFT" as "DRAFT" | "SENT" | "CONFIRMED" | "RECEIVED",
     details: [] as Array<{ MaterialId: number; PurchaseOrderQuantity: number; PurchaseOrderPrice: number; PurchaseOrderUnit: string }>,
   });
+
   const [editOpen, setEditOpen] = useState(false);
   const [editingPoId, setEditingPoId] = useState<number | null>(null);
-  // View dialog states
   const [viewOpen, setViewOpen] = useState(false);
   const [viewingPo, setViewingPo] = useState<POWithDetails | null>(null);
   const [viewingPoItems, setViewingPoItems] = useState<ApiMaterial[]>([]);
 
+  // Load params or local storage for current warehouse context
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      try {
-        const rows = await apiGetPOs();
-        const mapped: PO[] = rows.map((r: any) => ({
-          poId: r.PurchaseOrderId,
-          id: r.PurchaseOrderCode,
-          supplier: r.Supplier?.SupplierName || String(r.SupplierId),
-          date: r.DateTime,
-          total: r.TotalPrice,
-          status: r.PurchaseOrderStatus,
-          items: r._count?.PurchaseOrderDetails || 0,
-          requestedBy: r.CreatedByUser?.UserName || '-',
-        }));
-        setPoList(mapped);
-      } catch (e: any) {
-        toast({ variant: 'destructive', title: 'โหลดใบสั่งซื้อไม่สำเร็จ', description: e.message || '' });
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
+    // Check if we are in a warehouse context (e.g., from URL or localStorage)
+    // For now, let's simulate a selector or check local storage "selected_warehouse_id"
+    const stored = localStorage.getItem('selected_warehouse_id');
+    if (stored) setSelectedWarehouseId(stored);
   }, []);
 
   const openCreate = async () => {
     setCreateOpen(true);
     try {
-      const [ss, ms] = await Promise.all([apiGetSuppliers(), apiGetMaterials()]);
+      const [ss, ms, whs] = await Promise.all([
+        apiGetSuppliers(),
+        apiGetMaterials(),
+        getWarehouses().catch(() => []) // Handle error if API fails
+      ]);
       setSuppliers(ss);
       setMaterials(ms);
-
+      setWarehouses(whs);
 
       const now = new Date();
-      // Backend will auto-generate PO code (PO-001, PO-002, etc.)
-      setForm({ SupplierId: ss[0]?.SupplierId || 0, PurchaseOrderCode: '', DateTime: now.toISOString().slice(0, 10), PurchaseOrderStatus: 'DRAFT', details: [] });
+      // Default to first warehouse if available, or empty string
+      const defaultWh = whs.length > 0 ? whs[0].WarehouseName : "";
+
+      // Auto-select current warehouse if in context
+      let initialAddress = defaultWh;
+      if (selectedWarehouseId !== "all") {
+        const found = whs.find(w => String(w.WarehouseId) === selectedWarehouseId);
+        if (found) initialAddress = found.WarehouseName;
+      }
+
+      setForm({
+        SupplierId: ss[0]?.SupplierId || 0,
+        PurchaseOrderCode: '',
+        DateTime: now.toISOString().slice(0, 10),
+        PurchaseOrderAddress: initialAddress,
+        PurchaseOrderStatus: 'DRAFT',
+        details: []
+      });
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'โหลดข้อมูลสำหรับสร้าง PO ไม่สำเร็จ', description: e.message || '' });
     }
@@ -204,9 +211,9 @@ export default function PurchaseOrdersPage() {
 
   const submitCreate = async () => {
     if (!form.SupplierId) return toast({ variant: 'destructive', title: 'กรุณาเลือกผู้จำหน่าย' });
-    // ไม่ต้อง validate PurchaseOrderCode เพราะ backend จะ generate ให้อัตโนมัติ
     if (form.details.length === 0) return toast({ variant: 'destructive', title: 'กรุณาเพิ่มรายการสินค้าอย่างน้อย 1 รายการ' });
-    // validate details
+    if (!form.PurchaseOrderAddress) return toast({ variant: 'destructive', title: 'กรุณาเลือกคลังสินค้าที่จะรับของ' });
+
     for (const d of form.details) {
       if (!d.MaterialId || d.MaterialId <= 0) return toast({ variant: 'destructive', title: 'เลือกรายการวัตถุดิบไม่ถูกต้อง' });
       if (!d.PurchaseOrderQuantity || d.PurchaseOrderQuantity <= 0) return toast({ variant: 'destructive', title: 'จำนวนต้องมากกว่า 0' });
@@ -217,9 +224,9 @@ export default function PurchaseOrdersPage() {
     try {
       const newPO = await apiCreatePO({
         SupplierId: form.SupplierId,
-        // ไม่ส่ง PurchaseOrderCode เพราะ backend จะ generate ให้อัตโนมัติ
         DateTime: form.DateTime ? new Date(form.DateTime).toISOString() : undefined,
         PurchaseOrderStatus: form.PurchaseOrderStatus,
+        PurchaseOrderAddress: form.PurchaseOrderAddress, // Save target warehouse name here
         details: form.details.map(d => ({
           MaterialId: Number(d.MaterialId),
           PurchaseOrderQuantity: Number(d.PurchaseOrderQuantity),
@@ -230,7 +237,6 @@ export default function PurchaseOrdersPage() {
       toast({ title: 'สร้างใบสั่งซื้อสำเร็จ' });
       setCreateOpen(false);
 
-      // Add the new PO to the list without re-fetching
       const newMappedPO: PO = {
         poId: newPO.PurchaseOrderId,
         id: newPO.PurchaseOrderCode,
@@ -240,6 +246,7 @@ export default function PurchaseOrdersPage() {
         status: newPO.PurchaseOrderStatus,
         items: newPO._count?.PurchaseOrderDetails || 0,
         requestedBy: newPO.CreatedByUser?.UserName || '-',
+        targetWarehouse: newPO.PurchaseOrderAddress || 'ไม่ระบุ', // Display warehouse
       };
       setPoList(prevList => [newMappedPO, ...prevList]);
 
@@ -265,6 +272,7 @@ export default function PurchaseOrdersPage() {
         SupplierId: full.SupplierId,
         PurchaseOrderCode: full.PurchaseOrderCode,
         DateTime: (full.DateTime ? new Date(full.DateTime).toISOString().slice(0, 10) : ""),
+        PurchaseOrderAddress: full.PurchaseOrderAddress || "",
         PurchaseOrderStatus: full.PurchaseOrderStatus as any,
         details: full.PurchaseOrderDetails.map(d => ({
           MaterialId: d.MaterialId,
@@ -397,13 +405,25 @@ export default function PurchaseOrdersPage() {
 
   const filteredPOs = useMemo(() => {
     return poList.filter(po => {
+      // 1. Warehouse Filter: If a specific warehouse is selected in context, hide others
+      if (selectedWarehouseId !== "all") {
+        // We need to resolve WarehouseId to Name to check against po.targetWarehouse
+        // But here we rely on the PO having the name.
+        // If po.targetWarehouse is empty, we show it (legacy/global PO).
+        // If it is set, it MUST match the current warehouse name.
+        const currentWhName = warehouses.find(w => String(w.WarehouseId) === selectedWarehouseId)?.WarehouseName;
+        if (currentWhName && po.targetWarehouse && po.targetWarehouse !== currentWhName) {
+          return false;
+        }
+      }
+
       const matchesSearch = !searchTerm ||
         po.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
         po.supplier.toLowerCase().includes(searchTerm.toLowerCase()) ||
         po.requestedBy?.toLowerCase().includes(searchTerm.toLowerCase());
       return matchesSearch;
     });
-  }, [poList, searchTerm]);
+  }, [poList, searchTerm, selectedWarehouseId, warehouses]);
 
   const groupedPOs = useMemo(() => {
     const groups: Record<string, PO[]> = {};
