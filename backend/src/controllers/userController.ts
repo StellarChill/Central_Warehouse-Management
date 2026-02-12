@@ -115,6 +115,9 @@ export async function register(req: Request, res: Response) {
 export default {};
 
 // Public signup with TempCompany. User will be approved by platform admin later.
+// ... (imports เดิม)
+
+// Public signup with TempCompany or via LINE
 export async function registerPublic(req: Request, res: Response) {
 	try {
 		const { UserName, UserPassword, LineId, Email, TelNumber, tempCompany = {}, TempCompanyId, RequestedRoleText, RoleText, RequestedRole } = req.body || {};
@@ -135,39 +138,22 @@ export async function registerPublic(req: Request, res: Response) {
 			if (!tmp) return res.status(400).json({ error: 'TempCompanyId not found' });
 			tempId = tmp.TempCompanyId;
 		} else {
-			const {
-				TempCompanyName,
-				TempCompanyCode,
-				TempCompanyAddress,
-				TempCompanyTaxId,
-				TempCompanyTelNumber,
-				TempCompanyEmail,
-			} = tempCompany || {};
+			const { TempCompanyName, TempCompanyCode, TempCompanyAddress, TempCompanyTaxId, TempCompanyTelNumber, TempCompanyEmail } = tempCompany || {};
 			if (!TempCompanyName) return res.status(400).json({ error: 'TempCompanyName is required' });
-			// Generate/ensure TempCompanyCode
-			const base = String(TempCompanyCode || TempCompanyName)
-				.toUpperCase()
-				.replace(/[^A-Z0-9]+/g, '-')
-				.replace(/(^-|-$)/g, '') || 'TEMP-CO';
+			
+            const base = String(TempCompanyCode || TempCompanyName).toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'TEMP-CO';
 			let code = base;
 			let i = 1;
 			while (await prisma.tempCompany.findUnique({ where: { TempCompanyCode: code } })) {
 				code = `${base}-${++i}`;
 			}
 			const created = await prisma.tempCompany.create({
-				data: {
-					TempCompanyName,
-					TempCompanyCode: code,
-					TempCompanyAddress: TempCompanyAddress ?? null,
-					TempCompanyTaxId: TempCompanyTaxId ?? null,
-					TempCompanyTelNumber: TempCompanyTelNumber ?? null,
-					TempCompanyEmail: TempCompanyEmail ?? null,
-				},
+				data: { TempCompanyName, TempCompanyCode: code, TempCompanyAddress: TempCompanyAddress ?? null, TempCompanyTaxId: TempCompanyTaxId ?? null, TempCompanyTelNumber: TempCompanyTelNumber ?? null, TempCompanyEmail: TempCompanyEmail ?? null },
 			});
 			tempId = created.TempCompanyId;
 		}
 
-		// Password handling (allow LIFF-only signup without password)
+		// Password handling
 		let pwd = UserPassword as string | undefined;
 		if (!pwd) {
 			const crypto = await import('crypto');
@@ -175,19 +161,27 @@ export async function registerPublic(req: Request, res: Response) {
 		}
 		const hashed = await bcrypt.hash(pwd, 10);
 
-		// Place the new user under PLATFORM company, minimal role/branch
+		// Place under PLATFORM company temporarily
 		const platform = await prisma.company.findUnique({ where: { CompanyCode: 'PLATFORM' } });
 		if (!platform) return res.status(500).json({ error: 'Platform company not configured' });
-		const platformBranch = await prisma.branch.findUnique({ where: { BranchCode: 'PLATFORM-CENTER' } });
+		
+        // Default branch (Platform HQ or find any)
+        const platformBranch = await prisma.branch.findFirst({ where: { CompanyId: platform.CompanyId } });
 		if (!platformBranch) return res.status(500).json({ error: 'Platform branch not configured' });
-		const viewerRole = await prisma.role.findFirst({ where: { OR: [{ RoleCode: 'VIEWER' }, { RoleCode: 'BRANCH_USER' }] } });
-		if (!viewerRole) return res.status(500).json({ error: 'Viewer role not configured' });
+		
+        // --- แก้ไขจุดนี้: ให้ Default Role เป็น REQUESTER ---
+		const requesterRole = await prisma.role.findFirst({ where: { RoleCode: 'REQUESTER' } });
+		// ถ้าไม่มี REQUESTER ให้ fallback ไป VIEWER
+        const fallbackRole = await prisma.role.findFirst({ where: { RoleCode: 'VIEWER' } });
+        const roleToUse = requesterRole || fallbackRole;
+
+		if (!roleToUse) return res.status(500).json({ error: 'Default role (REQUESTER) not configured' });
 
 		const user = await prisma.user.create({
 			data: ({
 				CompanyId: platform.CompanyId,
 				BranchId: platformBranch.BranchId,
-				RoleId: viewerRole.RoleId,
+				RoleId: roleToUse.RoleId,
 				UserName,
 				UserPassword: hashed,
 				Email: Email ?? null,
@@ -198,15 +192,7 @@ export async function registerPublic(req: Request, res: Response) {
 				UserStatusApprove: 'PENDING',
 				UserStatusActive: 'ACTIVE',
 			} as any),
-			select: ({
-				UserId: true,
-				UserName: true,
-				RequestedRoleText: true,
-				TempCompanyId: true,
-				UserStatusApprove: true,
-				UserStatusActive: true,
-				CreatedAt: true,
-			} as any),
+			select: ({ UserId: true, UserName: true, UserStatusApprove: true, CreatedAt: true } as any),
 		});
 
 		return res.status(201).json({
@@ -219,6 +205,8 @@ export async function registerPublic(req: Request, res: Response) {
 		return res.status(500).json({ error: 'Internal server error' });
 	}
 }
+
+// ... (Functions อื่นๆ ใน userController ให้คงเดิม)
 
 // Self-service company registration: creates Company, default Branch & Warehouse, and a Company Admin user
 export async function registerCompany(req: Request, res: Response) {

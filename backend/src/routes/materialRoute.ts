@@ -1,16 +1,18 @@
 import { Router } from 'express';
 import { createMaterial, listMaterials, getMaterial, updateMaterial, deleteMaterial } from '../controllers/materialController';
 import { authenticateToken } from '../middlewares/authMiddleware';
+import { requireRoles } from '../middlewares/rolesMiddleware';
 
 const router = Router();
-
-// Require authentication for material operations
 router.use(authenticateToken);
 
-router.post('/', createMaterial);
+// ดูรายการสินค้า: ให้ทุกคนดูได้ (รวมถึง Requester เพื่อเลือกของเบิก)
 router.get('/', listMaterials);
 router.get('/:id', getMaterial);
-router.put('/:id', updateMaterial);
-router.delete('/:id', deleteMaterial);
+
+// สร้าง/แก้ไข/ลบ: เฉพาะ Admin + Manager
+router.post('/', requireRoles('PLATFORM_ADMIN', 'COMPANY_ADMIN', 'WH_MANAGER'), createMaterial);
+router.put('/:id', requireRoles('PLATFORM_ADMIN', 'COMPANY_ADMIN', 'WH_MANAGER'), updateMaterial);
+router.delete('/:id', requireRoles('PLATFORM_ADMIN', 'COMPANY_ADMIN', 'WH_MANAGER'), deleteMaterial);
 
 export default router;
