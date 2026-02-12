@@ -5,7 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'; // Keep for now if something still references, but actually we removed usage.
+// Better to clean up imports:
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Check, X, Search, UserCheck, Shield, ChevronLeft, ChevronRight, SlidersHorizontal, UserPlus, Users, Building2, ClipboardCheck, ShieldX, ShieldBan, HardHat } from 'lucide-react';
 import { PlatformLayout } from '@/components/layout/PlatformLayout';
@@ -103,7 +104,8 @@ export default function PlatformApprovalsPage() {
         .some((field) => field?.toLowerCase().includes(search));
       const matchesCompany = !filterCompany || String(u.Company?.CompanyId ?? '') === filterCompany;
       const matchesRole = !filterRole || String(u.Role?.RoleId ?? '') === filterRole;
-      return matchesSearch && matchesCompany && matchesRole;
+      const matchesStatus = status === 'ALL' || u.UserStatusApprove === status;
+      return matchesSearch && matchesCompany && matchesRole && matchesStatus;
     });
 
     return result.sort((a, b) => {
@@ -114,7 +116,7 @@ export default function PlatformApprovalsPage() {
         case 'NEWEST': default: return new Date(b.CreatedAt).getTime() - new Date(a.CreatedAt).getTime();
       }
     });
-  }, [rows, filterQuery, filterCompany, filterRole, sortOrder]);
+  }, [rows, filterQuery, filterCompany, filterRole, sortOrder, status]);
 
   const totalPages = Math.ceil(filteredRows.length / itemsPerPage);
   const paginatedRows = useMemo(() => {
@@ -177,6 +179,16 @@ export default function PlatformApprovalsPage() {
               </div>
 
               <div className="flex flex-wrap gap-2">
+                <Select value={status} onValueChange={(v) => setStatus(v as any)}>
+                  <SelectTrigger className="w-[180px] bg-white"><SelectValue placeholder="Status" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="PENDING">Pending Approval</SelectItem>
+                    <SelectItem value="APPROVED">Approved Custom</SelectItem>
+                    <SelectItem value="REJECTED">Rejected Users</SelectItem>
+                    <SelectItem value="ALL">All Users</SelectItem>
+                  </SelectContent>
+                </Select>
+
                 <Select value={filterCompany} onValueChange={(v) => setFilterCompany(v === 'ALL' ? '' : v)}>
                   <SelectTrigger className="w-[180px] bg-white"><SelectValue placeholder="All Companies" /></SelectTrigger>
                   <SelectContent>
@@ -203,7 +215,7 @@ export default function PlatformApprovalsPage() {
                   </SelectContent>
                 </Select>
 
-                <Button variant="ghost" size="icon" onClick={() => { setFilterQuery(''); setFilterCompany(''); setFilterRole(''); setSortOrder('NEWEST'); }}>
+                <Button variant="ghost" size="icon" onClick={() => { setFilterQuery(''); setFilterCompany(''); setFilterRole(''); setSortOrder('NEWEST'); setStatus('PENDING'); }}>
                   <X className="h-4 w-4" />
                 </Button>
               </div>
@@ -211,101 +223,95 @@ export default function PlatformApprovalsPage() {
           </CardHeader>
 
           <CardContent className="p-0">
-            <Tabs value={status} onValueChange={(v) => setStatus(v as TabStatus)}>
-              <div className="border-b px-6">
-                <TabsList className="bg-transparent h-12 w-full justify-start gap-4">
-                  <TabsTrigger value="PENDING" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none h-full px-0">Pending Approval</TabsTrigger>
-                  <TabsTrigger value="APPROVED" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none h-full px-0">Approved Users</TabsTrigger>
-                  <TabsTrigger value="REJECTED" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none h-full px-0">Rejected Users</TabsTrigger>
-                  <TabsTrigger value="ALL" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none h-full px-0">All Users</TabsTrigger>
-                </TabsList>
-              </div>
-
-              <TabsContent value={status} className="p-0">
-                {loading ? (
-                  <div className="p-8 text-center text-muted-foreground">Loading...</div>
-                ) : error ? (
-                  <div className="p-8 text-center text-red-600">{error}</div>
-                ) : (
-                  <div className="divide-y">
-                    {paginatedRows.map((u) => {
-                      const isPending = u.UserStatusApprove === 'PENDING';
-                      const isApproved = u.UserStatusApprove === 'APPROVED';
-                      return (
-                        <div key={u.UserId} className="p-4 px-6 hover:bg-slate-50 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-colors">
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <div className="font-semibold text-slate-800 truncate">{u.UserName}</div>
-                              <Badge variant="outline" className="text-[10px] h-5">{u.UserStatusApprove}</Badge>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 text-sm text-muted-foreground">
-                              <div className="flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5" /> {resolveCompanyName(u)}</div>
-                              <div className="flex items-center gap-1.5"><Shield className="h-3.5 w-3.5" /> {resolveRoleName(u)}</div>
-                              <div className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5" /> {resolveBranchName(u)}</div>
-                              <div>{u.Email || u.TelNumber}</div>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-2 shrink-0">
-                            <Badge variant={u.UserStatusActive === 'ACTIVE' ? 'success' as any : 'secondary'}>
-                              {u.UserStatusActive}
-                            </Badge>
-                            {isPending && (
-                              <>
-                                <Button size="sm" onClick={() => {
-                                  setAssignUser(u);
-                                  setAssignMode('APPROVE');
-                                  setAssignOpen(true);
-                                  setCompanyId('');
-                                  setBranchId('');
-                                  setRoleId('');
-                                }}>
-                                  <ClipboardCheck className="h-4 w-4 mr-1" /> Assign & Approve
-                                </Button>
-                                <Button size="sm" variant="destructive" onClick={async () => {
-                                  if (!confirm('Are you sure you want to reject this user?')) return;
-                                  await platformRejectUser(u.UserId);
-                                  await load();
-                                }}>
-                                  <ShieldX className="h-4 w-4 mr-1" /> Reject
-                                </Button>
-                              </>
-                            )}
-                            {isApproved && (
-                              <>
-                                <Button size="sm" variant="outline" onClick={async () => {
-                                  const next = u.UserStatusActive === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
-                                  await platformSetUserActive(u.UserId, next);
-                                  await load();
-                                }}>
-                                  <ShieldBan className="h-4 w-4 mr-1" /> {u.UserStatusActive === 'ACTIVE' ? 'Set Inactive' : 'Set Active'}
-                                </Button>
-                                <Button size="sm" onClick={() => {
-                                  setAssignUser(u);
-                                  setAssignMode('ASSIGN');
-                                  setAssignOpen(true);
-                                  setCompanyId('');
-                                  setBranchId('');
-                                  setRoleId('');
-                                }}>
-                                  <HardHat className="h-4 w-4 mr-1" /> Re-Assign
-                                </Button>
-                              </>
-                            )}
-                          </div>
+            {loading ? (
+              <div className="p-8 text-center text-muted-foreground">Loading...</div>
+            ) : error ? (
+              <div className="p-8 text-center text-red-600">{error}</div>
+            ) : (
+              <div className="divide-y">
+                {paginatedRows.map((u) => {
+                  const isPending = u.UserStatusApprove === 'PENDING';
+                  const isApproved = u.UserStatusApprove === 'APPROVED';
+                  return (
+                    <div key={u.UserId} className="p-4 px-6 hover:bg-slate-50 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-colors">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className="font-semibold text-slate-800 truncate">{u.UserName}</div>
+                          <Badge variant="outline" className="text-[10px] h-5">{u.UserStatusApprove}</Badge>
                         </div>
-                      );
-                    })}
-                    {paginatedRows.length === 0 && (
-                      <div className="p-12 text-center text-muted-foreground">
-                        <p>No users found in this category.</p>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 text-sm text-muted-foreground">
+                          <div className="flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5" /> {resolveCompanyName(u)}</div>
+                          <div className="flex items-center gap-1.5"><Shield className="h-3.5 w-3.5" /> {resolveRoleName(u)}</div>
+                          <div className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5" /> {resolveBranchName(u)}</div>
+                          <div>{u.Email || u.TelNumber}</div>
+                        </div>
                       </div>
-                    )}
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Badge
+                          variant="outline"
+                          className={
+                            u.UserStatusActive === 'ACTIVE'
+                              ? "bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                              : "bg-white text-slate-500 border-slate-200"
+                          }
+                        >
+                          {u.UserStatusActive}
+                        </Badge>
+                        {isPending && (
+                          <>
+                            <Button size="sm" onClick={() => {
+                              setAssignUser(u);
+                              setAssignMode('APPROVE');
+                              setAssignOpen(true);
+                              setCompanyId('');
+                              setBranchId('');
+                              setRoleId('');
+                            }}>
+                              <ClipboardCheck className="h-4 w-4 mr-1" /> Assign & Approve
+                            </Button>
+                            <Button size="sm" variant="destructive" onClick={async () => {
+                              if (!confirm('Are you sure you want to reject this user?')) return;
+                              await platformRejectUser(u.UserId);
+                              await load();
+                            }}>
+                              <ShieldX className="h-4 w-4 mr-1" /> Reject
+                            </Button>
+                          </>
+                        )}
+                        {isApproved && (
+                          <>
+                            <Button size="sm" variant="outline" onClick={async () => {
+                              const next = u.UserStatusActive === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+                              await platformSetUserActive(u.UserId, next);
+                              await load();
+                            }}>
+                              <ShieldBan className="h-4 w-4 mr-1" /> {u.UserStatusActive === 'ACTIVE' ? 'Set Inactive' : 'Set Active'}
+                            </Button>
+                            <Button size="sm" onClick={() => {
+                              setAssignUser(u);
+                              setAssignMode('ASSIGN');
+                              setAssignOpen(true);
+                              setCompanyId('');
+                              setBranchId('');
+                              setRoleId('');
+                            }}>
+                              <HardHat className="h-4 w-4 mr-1" /> Re-Assign
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+                {paginatedRows.length === 0 && (
+                  <div className="p-12 text-center text-muted-foreground">
+                    <p>No users found matching filters.</p>
                   </div>
                 )}
-              </TabsContent>
-            </Tabs>
+              </div>
+            )}
           </CardContent>
         </Card>
 

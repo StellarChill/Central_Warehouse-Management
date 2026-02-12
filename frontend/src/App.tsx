@@ -182,14 +182,14 @@ const App = () => (
                       </Guard>
                     }
                   />
-                  {/* <Route
+                  <Route
                     path="/warehouse-management"
                     element={
                       <Guard allow={["COMPANY_ADMIN", "ADMIN"]}>
                         <WarehouseManagementPage />
                       </Guard>
                     }
-                  /> */}
+                  />
                   <Route path="/warehouse/:id" element={<WarehouseDetailPage />} />
                   <Route path="/warehouse/:id/dashboard" element={<WarehouseDashboardPage />} />
                 </Route>
