@@ -14,7 +14,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { th } from "../i18n/th";
+import { th } from "../../i18n/th";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { getStockSummary as apiGetStockSummary, getPurchaseOrders as apiGetPOs, getSuppliers as apiGetSuppliers, getReceipts as apiGetReceipts } from "@/lib/api";
@@ -169,9 +169,9 @@ export default function DashboardPage() {
   };
 
   const formatDate = (date: Date) => {
-    return date.toLocaleDateString('th-TH', { 
-      year: 'numeric', 
-      month: 'long' 
+    return date.toLocaleDateString('th-TH', {
+      year: 'numeric',
+      month: 'long'
     });
   };
 
@@ -199,9 +199,9 @@ export default function DashboardPage() {
             </p>
           </div>
           <div className="flex items-center gap-2 bg-white/20 rounded-lg p-2">
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="ghost"
+              size="sm"
               className="text-white hover:bg-white/20"
               onClick={() => navigateMonth('prev')}
             >
@@ -213,9 +213,9 @@ export default function DashboardPage() {
                 {formatDate(selectedDate)}
               </span>
             </div>
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="ghost"
+              size="sm"
               className="text-white hover:bg-white/20"
               onClick={() => navigateMonth('next')}
             >
@@ -234,7 +234,7 @@ export default function DashboardPage() {
                 <div>
                   <p className="text-sm text-muted-foreground">{stat.title}</p>
                   <p className="text-3xl font-bold mt-2">{stat.value}</p>
-                  
+
                 </div>
                 <div className={`p-3 rounded-lg ${stat.bgColor}`}>
                   <stat.icon className={`h-6 w-6 ${stat.color}`} />
@@ -309,7 +309,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Monthly Summary */}
-    
+
     </div>
   );
 }
