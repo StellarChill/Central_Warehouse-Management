@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "ts-node-dev src/server.ts",
     "start": "node dist/server.js",
-  "build": "npx prisma migrate deploy && npx prisma generate && tsc",
-  "postinstall": "npx prisma migrate deploy && npx prisma generate",
+    "build": "npx prisma migrate deploy && npx prisma generate && tsc",
+    "postinstall": "node scripts/prisma-retry.js",
     "migrate:deploy": "npx prisma migrate deploy",
     "seed": "npx ts-node prisma/seed.ts",
     "db:push": "npx prisma db push",
