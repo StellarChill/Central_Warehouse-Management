@@ -32,14 +32,22 @@ async function allocateFromStock(companyId: number, warehouseId: number, materia
       remain -= take;
     }
   }
-  if (remain > 0) throw httpError(400, `Not enough stock for MaterialId ${materialId}. Need ${needQty}`);
+  if (remain > 0) {
+    throw httpError(400, `สินค้าไม่เพียงพอในคลัง (MaterialId: ${materialId}). ต้องการ ${needQty} แต่ขาดอีก ${remain}`);
+  }
   return picks;
 }
 
 export async function createIssueFromRequest(req: Request, res: Response) {
   try {
     const CompanyId = getCompanyId(req, true)!;
-    const WarehouseId = getWarehouseId(req, true)!;
+
+    // Manual check for nicer error message
+    const WarehouseId = getWarehouseId(req, false);
+    if (!WarehouseId) {
+      throw httpError(400, 'กรุณาเลือกคลังสินค้าที่มุมซ้ายบนก่อนทำรายการ (Warehouse ID missing)');
+    }
+
     const requestId = Number(req.params.requestId || req.body.RequestId);
     if (!Number.isFinite(requestId)) throw httpError(400, 'RequestId is required');
 
@@ -47,18 +55,19 @@ export async function createIssueFromRequest(req: Request, res: Response) {
       where: { RequestId: requestId, CompanyId },
       include: { WithdrawnRequestDetails: true },
     });
-    if (!reqRow) throw httpError(404, 'WithdrawnRequest not found');
+    if (!reqRow) throw httpError(404, 'ไม่พบใบขอเบิก (WithdrawnRequest not found)');
 
     // Only one issue per request
     const existedIssue = await prisma.issue.findFirst({ where: { RequestId: requestId, CompanyId } });
-    if (existedIssue) throw httpError(400, 'Issue already exists for this request');
+    if (existedIssue) throw httpError(400, 'ใบขอเบิกนี้ถูกจ่ายสินค้าไปแล้ว (Issue already exists)');
 
     const details = reqRow.WithdrawnRequestDetails;
-    if (!details || details.length === 0) throw httpError(400, 'Request has no details');
+    if (!details || details.length === 0) throw httpError(400, 'ใบขอเบิกไม่มีรายการสินค้า');
 
     // Validate availability and build allocation plan
     const allocations: { MaterialId: number; plan: { StockId: number; Barcode: string; take: number }[] }[] = [];
     for (const d of details) {
+      if (!d.MaterialId || !d.WithdrawnQuantity) continue; // Skip invalid rows
       const plan = await allocateFromStock(CompanyId, WarehouseId, d.MaterialId, d.WithdrawnQuantity);
       allocations.push({ MaterialId: d.MaterialId, plan });
     }
@@ -71,6 +80,7 @@ export async function createIssueFromRequest(req: Request, res: Response) {
           BranchId: reqRow.BranchId,
           IssueStatus: 'COMPLETED',
           IssueDate: new Date(),
+          WarehouseId, // Save warehouse context
           CreatedBy: reqRow.CreatedBy ?? undefined,
         },
       });
@@ -118,7 +128,18 @@ export async function createIssueFromRequest(req: Request, res: Response) {
 export async function listIssues(_req: Request, res: Response) {
   try {
     const CompanyId = getCompanyId(_req as any, true)!;
-    const rows = await prisma.issue.findMany({ where: { CompanyId }, orderBy: { IssueDate: 'desc' } });
+    const WarehouseId = getWarehouseId(_req as any, false);
+
+    const where: any = { CompanyId };
+    if (WarehouseId) {
+      where.WarehouseId = WarehouseId;
+    }
+
+    const rows = await prisma.issue.findMany({
+      where,
+      orderBy: { IssueDate: 'desc' },
+      include: { WithdrawnRequest: true } // Include related request info
+    });
     return res.json(rows);
   } catch (e) {
     return handleError(res, e);
@@ -130,6 +151,11 @@ export async function getIssue(req: Request, res: Response) {
     const CompanyId = getCompanyId(req, true)!;
     const id = Number(req.params.id);
     if (!Number.isFinite(id)) throw httpError(400, 'Invalid id');
+
+    // Check if user has access to this warehouse issue? 
+    // Usually CompanyId is enough, but maybe restrict if user is WH_MANAGER of another warehouse?
+    // For now, keep it simple with CompanyId.
+
     const row = await prisma.issue.findFirst({
       where: { IssueId: id, CompanyId },
       include: { WithdrawnRequest: true, IssueDetails: true },

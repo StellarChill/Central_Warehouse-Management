@@ -5,22 +5,41 @@ import {
     approveRequisition,
     rejectRequisition,
     shipRequisition,
-    WithdrawnRequest
+    WithdrawnRequest,
+    getBranches,
+    getMaterials,
+    createWithdrawnRequest,
+    Branch,
+    Material
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { toast } from "@/components/ui/use-toast"; // Assuming use-toast is available or similar
-import { Loader2, Check, X, PackageCheck, RefreshCw } from "lucide-react";
+import { toast } from "@/components/ui/use-toast";
+import { Loader2, Check, X, PackageCheck, RefreshCw, Plus, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { useStock } from "@/context/StockContext";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+import { useAuth } from "@/context/AuthContext";
 
 export default function InventoryIssuingPage() {
     const [requests, setRequests] = useState<WithdrawnRequest[]>([]);
     const [loading, setLoading] = useState(true);
     const [processingId, setProcessingId] = useState<number | null>(null);
     const { refresh: refreshStock } = useStock();
+    const [createOpen, setCreateOpen] = useState(false);
+    const { user } = useAuth();
+
+    const getSelectedWarehouseId = () => {
+        if (user?.WarehouseId) return user.WarehouseId;
+        const stored = localStorage.getItem('selected_warehouse_id');
+        return stored && stored !== 'all' ? Number(stored) : null;
+    };
 
     const loadRequests = async () => {
         setLoading(true);
@@ -70,6 +89,12 @@ export default function InventoryIssuingPage() {
     };
 
     const handleIssue = async (id: number) => {
+        const whId = getSelectedWarehouseId();
+        if (!whId) {
+            toast({ variant: "destructive", title: "กรุณาเลือกคลังสินค้าก่อน (มุมซ้ายบน)" });
+            return;
+        }
+
         if (!confirm("ยืนยันการจ่ายสินค้า? สต็อกจะถูกตัดทันที")) return;
         setProcessingId(id);
         try {
@@ -78,7 +103,8 @@ export default function InventoryIssuingPage() {
             await loadRequests();
             refreshStock(); // Refresh global stock context
         } catch (e: any) {
-            toast({ variant: "destructive", title: "เกิดข้อผิดพลาด", description: e.message });
+            // e.message should come from backend (e.g. "สินค้าไม่เพียงพอ...")
+            toast({ variant: "destructive", title: "ทำรายการไม่สำเร็จ", description: e.message });
         } finally {
             setProcessingId(null);
         }
@@ -106,10 +132,16 @@ export default function InventoryIssuingPage() {
                     <h1 className="text-3xl font-bold tracking-tight">การเบิกจ่ายสินค้า (Issuing)</h1>
                     <p className="text-muted-foreground mt-1">จัดการคำขอเบิกสินค้าจากสาขา</p>
                 </div>
-                <Button variant="outline" onClick={loadRequests} disabled={loading}>
-                    <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-                    รีเฟรช
-                </Button>
+                <div className="flex gap-2">
+                    <Button onClick={() => setCreateOpen(true)} className="bg-indigo-600 hover:bg-indigo-700">
+                        <Plus className="h-4 w-4 mr-2" />
+                        จำลองคำขอ (Test)
+                    </Button>
+                    <Button variant="outline" onClick={loadRequests} disabled={loading}>
+                        <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+                        รีเฟรช
+                    </Button>
+                </div>
             </div>
 
             <Card>
@@ -140,7 +172,9 @@ export default function InventoryIssuingPage() {
                                     <TableRow key={req.RequestId}>
                                         <TableCell>{format(new Date(req.RequestDate), "dd/MM/yyyy")}</TableCell>
                                         <TableCell className="font-medium">{req.WithdrawnRequestCode}</TableCell>
-                                        <TableCell>Branch {req.BranchId}</TableCell>
+                                        <TableCell>
+                                            {req.BranchId ? `Branch ${req.BranchId}` : '-'}
+                                        </TableCell>
                                         <TableCell>{getStatusBadge(req.WithdrawnRequestStatus)}</TableCell>
                                         <TableCell className="text-right space-x-2">
                                             {req.WithdrawnRequestStatus === "PENDING" && (
@@ -180,6 +214,125 @@ export default function InventoryIssuingPage() {
                     </div>
                 </CardContent>
             </Card>
+
+            <CreateRequestDialog
+                open={createOpen}
+                onOpenChange={setCreateOpen}
+                onSuccess={() => {
+                    loadRequests();
+                    toast({ title: "สร้างคำขอจำลองเรียบร้อย" });
+                    setCreateOpen(false);
+                }}
+            />
         </div>
+    );
+}
+
+function CreateRequestDialog({ open, onOpenChange, onSuccess }: { open: boolean, onOpenChange: (v: boolean) => void, onSuccess: () => void }) {
+    const [branches, setBranches] = useState<Branch[]>([]);
+    const [materials, setMaterials] = useState<Material[]>([]);
+    const [branchId, setBranchId] = useState<string>("");
+    const [details, setDetails] = useState<{ MaterialId: number; WithdrawnQuantity: number }[]>([]);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (open) {
+            getBranches().then(setBranches);
+            getMaterials().then(setMaterials);
+            setBranchId("");
+            setDetails([]);
+        }
+    }, [open]);
+
+    const addDetail = () => {
+        if (materials.length > 0) {
+            setDetails([...details, { MaterialId: materials[0].MaterialId, WithdrawnQuantity: 1 }]);
+        }
+    };
+
+    const removeDetail = (index: number) => {
+        setDetails(details.filter((_, i) => i !== index));
+    };
+
+    const updateDetail = (index: number, field: keyof typeof details[0], value: number) => {
+        const newDetails = [...details];
+        newDetails[index] = { ...newDetails[index], [field]: value };
+        setDetails(newDetails);
+    };
+
+    const handleSubmit = async () => {
+        if (!branchId) return alert("เลือกสาขาด้วยครับ");
+        if (details.length === 0) return alert("เพิ่มรายการอย่างน้อย 1 รายการ");
+        setLoading(true);
+        try {
+            await createWithdrawnRequest({
+                BranchId: Number(branchId),
+                details
+            });
+            onSuccess();
+        } catch (e) {
+            alert("Error creating request");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                    <DialogTitle>สร้างคำขอเบิก (จำลอง LINE LIFF)</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                    <div>
+                        <Label>สาขาที่ขอเบิก</Label>
+                        <Select value={branchId} onValueChange={setBranchId}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="เลือกสาขา" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {branches.map(b => (
+                                    <SelectItem key={b.BranchId} value={String(b.BranchId)}>{b.BranchName}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div className="border rounded p-4">
+                        <div className="flex justify-between items-center mb-2">
+                            <Label>รายการสินค้า</Label>
+                            <Button size="sm" variant="outline" onClick={addDetail}><Plus className="h-4 w-4 mr-1" /> เพิ่ม</Button>
+                        </div>
+                        {details.map((d, i) => (
+                            <div key={i} className="flex gap-2 mb-2 items-center">
+                                <Select value={String(d.MaterialId)} onValueChange={(v) => updateDetail(i, 'MaterialId', Number(v))}>
+                                    <SelectTrigger className="w-[200px]">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {materials.map(m => (
+                                            <SelectItem key={m.MaterialId} value={String(m.MaterialId)}>{m.MaterialName}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <Input
+                                    type="number"
+                                    className="w-[100px]"
+                                    value={d.WithdrawnQuantity}
+                                    onChange={(e) => updateDetail(i, 'WithdrawnQuantity', Number(e.target.value))}
+                                />
+                                <Button size="icon" variant="ghost" className="text-destructive" onClick={() => removeDetail(i)}>
+                                    <Trash2 className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => onOpenChange(false)}>ยกเลิก</Button>
+                    <Button onClick={handleSubmit} disabled={loading}>บันทึก</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 }

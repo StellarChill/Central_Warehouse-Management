@@ -16,6 +16,7 @@ type User = {
   UserName: string;
   RoleId: number;
   BranchId: number;
+  WarehouseId?: number; // Added
   CompanyId?: number;
   CompanyName?: string | null;
   CompanyCode?: string | null;

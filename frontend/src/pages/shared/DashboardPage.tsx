@@ -140,14 +140,7 @@ export default function DashboardPage() {
       color: "success",
       href: "/receiving",
     },
-    {
-      id: "createRequisition",
-      title: th.dashboard.actions.createRequisition,
-      description: "สร้างใบเบิกสินค้า",
-      icon: FileBox,
-      color: "info",
-      href: "/requisitions/create",
-    },
+
     {
       id: "viewReports",
       title: th.dashboard.actions.viewReports,

@@ -97,6 +97,7 @@ model Warehouse {
 
   Stocks         Stock[]
   ReceiptDetails ReceiptDetail[]
+  Issues         Issue[]
 }
 
 model User {
@@ -473,6 +474,7 @@ model Issue {
   IssueId      Int     @id @default(autoincrement())
   RequestId    Int    @unique
   BranchId     Int
+  WarehouseId  Int
   CompanyId    Int
   IssueStatus  String
   IssueDate    DateTime
@@ -484,6 +486,7 @@ model Issue {
   @@index([RequestId])
   @@index([BranchId])
   @@index([CompanyId])
+  @@index([WarehouseId])
 
   CreatedByUser User? @relation("IssueCreatedBy", fields: [CreatedBy], references: [UserId])
   UpdatedByUser User? @relation("IssueUpdatedBy", fields: [UpdatedBy], references: [UserId])
@@ -491,6 +494,7 @@ model Issue {
   WithdrawnRequest WithdrawnRequest @relation(fields: [RequestId], references: [RequestId])
   Branch           Branch           @relation(fields: [BranchId], references: [BranchId])
   Company          Company          @relation(fields: [CompanyId], references: [CompanyId])
+  Warehouse        Warehouse        @relation(fields: [WarehouseId], references: [WarehouseId])
   IssueDetails     IssueDetail[]
 }
 

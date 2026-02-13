@@ -371,6 +371,17 @@ export async function shipRequisition(id: number) {
   return apiPost(`/issue/from-request/${id}`, {});
 }
 
+export type CreateWithdrawnRequestData = {
+  BranchId: number;
+  RequestDate?: string;
+  details: { MaterialId: number; WithdrawnQuantity: number }[];
+};
+
+export async function createWithdrawnRequest(data: CreateWithdrawnRequestData) {
+  const user = getUser();
+  return apiPost('/request', { ...data, CreatedBy: user?.UserId });
+}
+
 // ==========================================
 // Branch API
 // ==========================================

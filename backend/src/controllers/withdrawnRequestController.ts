@@ -34,18 +34,52 @@ function handleError(res: Response, e: any) {
   return res.status(500).json({ error: 'Internal server error' });
 }
 
+// Helper to generate running number: WR-YYYYMMDD-XXXX
+async function generateWithdrawnRequestCode(companyId: number, date: Date) {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  const prefix = `WR-${yyyy}${mm}${dd}`;
+
+  // Find last code of this day
+  const lastRecord = await prisma.withdrawnRequest.findFirst({
+    where: {
+      CompanyId: companyId,
+      WithdrawnRequestCode: { startsWith: prefix }
+    },
+    orderBy: { WithdrawnRequestCode: 'desc' }
+  });
+
+  let nextSeq = 1;
+  if (lastRecord) {
+    const parts = lastRecord.WithdrawnRequestCode.split('-');
+    if (parts.length === 3) {
+      const seq = parseInt(parts[2]);
+      if (!isNaN(seq)) nextSeq = seq + 1;
+    }
+  }
+
+  return `${prefix}-${String(nextSeq).padStart(4, '0')}`;
+}
+
 // Create Withdrawn Request
 export async function createWithdrawnRequest(req: Request, res: Response) {
   try {
     const CompanyId = getCompanyId(req, true)!;
-    const { WithdrawnRequestCode, BranchId, RequestDate, WithdrawnRequestStatus, details, CreatedBy } = req.body;
-    if (!WithdrawnRequestCode) throw httpError(400, 'WithdrawnRequestCode is required');
+    let { WithdrawnRequestCode, BranchId, RequestDate, WithdrawnRequestStatus, details, CreatedBy } = req.body;
+
+    // Auto-generate code if missing
+    const date = RequestDate ? new Date(RequestDate) : new Date();
+    if (!WithdrawnRequestCode) {
+      WithdrawnRequestCode = await generateWithdrawnRequestCode(CompanyId, date);
+    }
+
     if (!BranchId) throw httpError(400, 'BranchId is required');
     const parsed = parseDetails(details);
 
-    // Check duplicate code
+    // Check duplicate code (retry logic could be added here similar to receipt)
     const dup = await prisma.withdrawnRequest.findFirst({ where: { WithdrawnRequestCode, CompanyId } });
-    if (dup) throw httpError(409, 'WithdrawnRequestCode already exists');
+    if (dup) throw httpError(409, `WithdrawnRequestCode ${WithdrawnRequestCode} already exists. Please try again.`);
 
     // Optional: Validate materials exist
     const mats = await prisma.material.findMany({ where: { MaterialId: { in: parsed.map(d => d.MaterialId) } }, select: { MaterialId: true } });
@@ -57,8 +91,8 @@ export async function createWithdrawnRequest(req: Request, res: Response) {
           CompanyId,
           WithdrawnRequestCode,
           BranchId: Number(BranchId),
-          RequestDate: RequestDate ? new Date(RequestDate) : new Date(),
-          WithdrawnRequestStatus: WithdrawnRequestStatus || 'REQUESTED',
+          RequestDate: date,
+          WithdrawnRequestStatus: WithdrawnRequestStatus || 'PENDING', // Default to PENDING (REQUESTED is old status?)
           CreatedBy,
         },
       });

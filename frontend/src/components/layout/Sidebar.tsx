@@ -81,12 +81,7 @@ const navigation = [
     icon: FolderKanban,
     premiumIcon: FolderKanban,
   },
-  {
-    name: th.nav.requisitions,
-    href: "/requisitions",
-    icon: FileBox,
-    premiumIcon: FileBox,
-  },
+
   {
     name: "จัดการคลังสินค้า",
     href: "/warehouse-management",
@@ -183,7 +178,7 @@ export function Sidebar({ onClose }: SidebarProps) {
           "/inventory/issuing",
           "/purchase-orders",
           // "/categories", // Hidden (Admin)
-          "/requisitions",
+          // "/requisitions",
           "/select-warehouse"
         ];
         // Check if current item is allowed
