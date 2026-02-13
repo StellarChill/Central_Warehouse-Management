@@ -6,73 +6,59 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Seeding database...');
 
-  // --------------------------------------------------------
-  // 1. SETUP ROLES (4 ROLES REQUIRED)
-  // --------------------------------------------------------
-  // 1.1 Platform Admin (ดูแลระบบทั้งหมด)
-  await prisma.role.upsert({
-    where: { RoleCode: 'PLATFORM_ADMIN' },
-    update: {},
-    create: { RoleName: 'Platform Admin', RoleCode: 'PLATFORM_ADMIN' }
-  });
+  // 1. SETUP ROLES
+  const roles = [
+    { name: 'Platform Admin', code: 'PLATFORM_ADMIN' },
+    { name: 'Company Admin', code: 'COMPANY_ADMIN' },
+    { name: 'Warehouse Manager', code: 'WH_MANAGER' },
+    { name: 'Requester', code: 'REQUESTER' },
+    { name: 'Platform Staff', code: 'PLATFORM_STAFF' },
+    { name: 'Viewer', code: 'VIEWER' },
+  ];
 
-  // 1.2 Company Admin (ดูแลบริษัทตัวเอง)
-  const companyAdminRole = await prisma.role.upsert({
-    where: { RoleCode: 'COMPANY_ADMIN' },
-    update: {},
-    create: { RoleName: 'Company Admin', RoleCode: 'COMPANY_ADMIN' }
-  });
+  for (const role of roles) {
+    await prisma.role.upsert({
+      where: { RoleCode: role.code },
+      update: {},
+      create: { RoleName: role.name, RoleCode: role.code }
+    });
+  }
 
-  // 1.3 Warehouse Manager (ดูแลคลัง/จัดซื้อ/เบิกจ่าย) -> เปลี่ยนจาก WAREHOUSE_ADMIN เป็น WH_MANAGER
-  await prisma.role.upsert({
-    where: { RoleCode: 'WH_MANAGER' },
-    update: {},
-    create: { RoleName: 'Warehouse Manager', RoleCode: 'WH_MANAGER' }
-  });
+  const platformAdminRole = await prisma.role.findUnique({ where: { RoleCode: 'PLATFORM_ADMIN' } });
+  const companyAdminRole = await prisma.role.findUnique({ where: { RoleCode: 'COMPANY_ADMIN' } });
+  // const whManagerRole = await prisma.role.findUnique({ where: { RoleCode: 'WH_MANAGER' } });
+  // const requesterRole = await prisma.role.findUnique({ where: { RoleCode: 'REQUESTER' } });
 
-  // 1.4 Requester (คนขอเบิกของผ่าน LINE)
-  const requesterRole = await prisma.role.upsert({
-    where: { RoleCode: 'REQUESTER' },
-    update: {},
-    create: { RoleName: 'Requester', RoleCode: 'REQUESTER' }
-  });
-
-  // (Optional) Role อื่นๆ เก็บไว้ได้ถ้าต้องการ Backward Compatibility หรือเผื่อใช้
-  await prisma.role.upsert({ where: { RoleCode: 'PLATFORM_STAFF' }, update: {}, create: { RoleName: 'Platform Staff', RoleCode: 'PLATFORM_STAFF' } });
-  await prisma.role.upsert({ where: { RoleCode: 'VIEWER' }, update: {}, create: { RoleName: 'Viewer', RoleCode: 'VIEWER' } });
-
-
-  // --------------------------------------------------------
-  // 2. SETUP BASE COMPANIES (Platform & Demo)
-  // --------------------------------------------------------
+  // 2. SETUP PLATFORM COMPANY
   const platformCo = await prisma.company.upsert({
     where: { CompanyCode: 'PLATFORM' },
     update: {},
-    create: { CompanyName: 'Platform System', CompanyCode: 'PLATFORM', CompanyAddress: 'Cloud', CompanyTelNumber: '-', CompanyEmail: 'admin@platform.com' },
+    create: {
+      CompanyName: 'Platform System',
+      CompanyCode: 'PLATFORM',
+      CompanyAddress: 'Cloud',
+      CompanyTelNumber: '-',
+      CompanyEmail: 'admin@platform.com'
+    },
   });
 
-  // --------------------------------------------------------
-  // 3. SETUP ADMIN USERS
-  // --------------------------------------------------------
-  const password = await bcrypt.hash('admin123', 10);
-
-  // Platform Admin User
   const platformBranch = await prisma.branch.upsert({
     where: { BranchCode: 'PLATFORM-HQ' },
     update: {},
     create: { CompanyId: platformCo.CompanyId, BranchName: 'Platform HQ', BranchCode: 'PLATFORM-HQ' }
   });
 
-  const pfRole = await prisma.role.findUnique({ where: { RoleCode: 'PLATFORM_ADMIN' } });
-  if (pfRole) {
+  const password = await bcrypt.hash('admin123', 10);
+
+  if (platformAdminRole) {
     await prisma.user.upsert({
       where: { UserName: 'platform-admin' },
-      update: { RoleId: pfRole.RoleId }, // ← แก้ role ถ้า user มีอยู่แล้วด้วย
+      update: { RoleId: platformAdminRole.RoleId },
       create: {
         CompanyId: platformCo.CompanyId,
         UserName: 'platform-admin',
         UserPassword: password,
-        RoleId: pfRole.RoleId,
+        RoleId: platformAdminRole.RoleId,
         BranchId: platformBranch.BranchId,
         Email: 'admin@platform.com',
         UserStatusApprove: 'APPROVED',
@@ -81,34 +67,142 @@ async function main() {
     });
   }
 
-  // --------------------------------------------------------
-  // 4. FIX COMPANY ADMIN USERS ที่ได้ role ผิด
-  // --------------------------------------------------------
-  // หา role เก่า (ADMIN, WAREHOUSE_ADMIN ฯลฯ) ที่ถูก assign ผิดให้ company admin users
-  const oldRoles = await prisma.role.findMany({
-    where: { RoleCode: { in: ['ADMIN', 'WAREHOUSE_ADMIN'] } }
-  });
-  const oldRoleIds = oldRoles.map(r => r.RoleId);
+  // 3. SEED COMPANIES (McDonald's, KFC, MK Suki)
+  const companiesData = [
+    { name: "McDonald's", code: 'MCD', email: 'admin@mcd.co.th' },
+    { name: 'KFC', code: 'KFC', email: 'admin@kfc.co.th' },
+    { name: 'MK Suki', code: 'MK', email: 'admin@mk.co.th' },
+  ];
 
-  if (oldRoleIds.length > 0 && companyAdminRole) {
-    // หา users ที่มี CompanyId ไม่ใช่ Platform company แต่ได้ role ผิด
-    const wrongRoleUsers = await prisma.user.findMany({
-      where: {
-        RoleId: { in: oldRoleIds },
-        CompanyId: { not: platformCo.CompanyId },
+  for (const co of companiesData) {
+    const company = await prisma.company.upsert({
+      where: { CompanyCode: co.code },
+      update: {},
+      create: {
+        CompanyName: co.name,
+        CompanyCode: co.code,
+        CompanyEmail: co.email,
+        CompanyAddress: `Headquarters of ${co.name}`,
       }
     });
 
-    for (const u of wrongRoleUsers) {
-      await prisma.user.update({
-        where: { UserId: u.UserId },
-        data: { RoleId: companyAdminRole.RoleId },
+    // Branches (2 per company)
+    const branches = [];
+    for (let i = 1; i <= 2; i++) {
+      const branch = await prisma.branch.upsert({
+        where: { BranchCode: `${co.code}-B${i}` },
+        update: {},
+        create: {
+          BranchName: `${co.name} Branch ${i}`,
+          BranchCode: `${co.code}-B${i}`,
+          CompanyId: company.CompanyId,
+          BranchAddress: `Street ${i}, Bangkok`,
+        }
       });
-      console.log(`  🔧 Fixed user "${u.UserName}" (UserId=${u.UserId}): → COMPANY_ADMIN`);
+      branches.push(branch);
     }
+
+    // Warehouses (2 per company)
+    for (let i = 1; i <= 2; i++) {
+      await prisma.warehouse.upsert({
+        where: { WarehouseCode: `${co.code}-WH${i}` },
+        update: {},
+        create: {
+          WarehouseName: `${co.name} Warehouse ${i}`,
+          WarehouseCode: `${co.code}-WH${i}`,
+          CompanyId: company.CompanyId,
+          WarehouseAddress: `Industrial Zone ${i}`,
+        }
+      });
+    }
+
+    // Company Admin User
+    if (companyAdminRole) {
+      await prisma.user.upsert({
+        where: { UserName: `${co.code.toLowerCase()}-admin` },
+        update: { RoleId: companyAdminRole.RoleId },
+        create: {
+          UserName: `${co.code.toLowerCase()}-admin`,
+          UserPassword: password,
+          CompanyId: company.CompanyId,
+          BranchId: branches[0].BranchId,
+          RoleId: companyAdminRole.RoleId,
+          Email: co.email,
+          UserStatusApprove: 'APPROVED',
+          UserStatusActive: 'ACTIVE',
+        }
+      });
+    }
+
+    // Categories
+    const categories = [];
+    const catNames = ['Frozen Food', 'Dry Goods', 'Packaging', 'Beverage'];
+    for (const catName of catNames) {
+      const catCode = `${co.code}-${catName.toUpperCase().replace(' ', '_')}`;
+      const category = await prisma.catagory.upsert({
+        where: { CatagoryCode: catCode },
+        update: {},
+        create: {
+          CatagoryName: catName,
+          CatagoryCode: catCode,
+          CompanyId: company.CompanyId,
+        }
+      });
+      categories.push(category);
+    }
+
+    // Suppliers
+    const suppliers = [];
+    for (let i = 1; i <= 3; i++) {
+      const s = await prisma.supplier.upsert({
+        where: { SupplierCode: `${co.code}-SUP${i}` },
+        update: {},
+        create: {
+          SupplierName: `Supplier ${i} for ${co.name}`,
+          SupplierCode: `${co.code}-SUP${i}`,
+          CompanyId: company.CompanyId,
+          SupplierTelNumber: `02-123-456${i}`,
+        }
+      });
+      suppliers.push(s);
+    }
+
+    // Materials (Ingredients)
+    const materialsData = [
+      { name: 'Beef Patty', unit: 'BOX', price: 1200, cat: 'Frozen Food' },
+      { name: 'Chicken Wings', unit: 'KG', price: 150, cat: 'Frozen Food' },
+      { name: 'Potato Fries', unit: 'BAG', price: 450, cat: 'Frozen Food' },
+      { name: 'Cooking Oil', unit: 'BUCKET', price: 800, cat: 'Dry Goods' },
+      { name: 'Sugar', unit: 'KG', price: 25, cat: 'Dry Goods' },
+      { name: 'Salt', unit: 'KG', price: 15, cat: 'Dry Goods' },
+      { name: 'Paper Cup', unit: 'SLEEVE', price: 300, cat: 'Packaging' },
+      { name: 'Paper Bag', unit: 'PACK', price: 200, cat: 'Packaging' },
+      { name: 'Cola Syrup', unit: 'BIB', price: 2500, cat: 'Beverage' },
+      { name: 'Drinking Water', unit: 'CASE', price: 120, cat: 'Beverage' },
+    ];
+
+    for (const mat of materialsData) {
+      const category = categories.find(c => c.CatagoryName === mat.cat);
+      if (category) {
+        await prisma.material.upsert({
+          where: { MaterialCode: `${co.code}-${mat.name.toUpperCase().replace(' ', '_')}` },
+          update: {},
+          create: {
+            MaterialName: mat.name,
+            MaterialCode: `${co.code}-${mat.name.toUpperCase().replace(' ', '_')}`,
+            Unit: mat.unit,
+            Price: mat.price,
+            CatagoryId: category.CatagoryId,
+            CompanyId: company.CompanyId,
+          }
+        });
+      }
+    }
+
+    console.log(`✅ Seeded ${co.name} company with branches, warehouses, users, materials, and suppliers.`);
   }
 
-  console.log('✅ Seed completed: Roles & Platform Admin created.');
+  console.log('🏁 Seed completed successfully!');
 }
 
 main()

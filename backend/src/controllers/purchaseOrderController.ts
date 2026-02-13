@@ -30,122 +30,116 @@ function validateDetails(details: any[]) {
   }));
 }
 
-// สร้างโค้ดรันนิ่ง: PO-YYYYMM-XXXX (Reset ทุกเดือน, แยกตามบริษัท)
-async function generatePurchaseOrderCode(companyId: number) {
+// สร้างโค้ดรันนิ่ง: PO-YYYYMM-XXXX (หาเลขที่ว่างจริงๆ)
+async function generatePurchaseOrderCode(companyId: number, tx: any = prisma) {
   const date = new Date();
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const prefix = `PO-${year}${month}-`;
 
-  // หาเลข PO ล่าสุดของบริษัทนี้ ในเดือนนี้
-  const last = await prisma.purchaseOrder.findFirst({
+  // ดึง PO Code ทั้งหมดที่ขึ้นต้นด้วย prefix นี้ของบริษัทนี้มาหาตัวเลขที่สูงสุด
+  const existingPOs = await tx.purchaseOrder.findMany({
     where: {
       CompanyId: companyId,
       PurchaseOrderCode: { startsWith: prefix }
     },
-    orderBy: { PurchaseOrderCode: 'desc' },
-    select: { PurchaseOrderCode: true },
+    select: { PurchaseOrderCode: true }
   });
 
-  // ดึงตัวเลขจาก PO code (เช่น "PO-202301-0001" -> 1)
-  let nextNum = 1;
-  if (last) {
-    const parts = last.PurchaseOrderCode.split('-');
-    const lastNum = parseInt(parts[parts.length - 1], 10);
-    if (!isNaN(lastNum)) {
-      nextNum = lastNum + 1;
+  let maxNum = 0;
+  existingPOs.forEach((po: any) => {
+    const parts = po.PurchaseOrderCode.split('-');
+    const num = parseInt(parts[parts.length - 1], 10);
+    if (!isNaN(num) && num > maxNum) {
+      maxNum = num;
     }
-  }
+  });
 
-  // Format ด้วย zero-padding 4 หลัก (0001)
-  const paddedNum = nextNum.toString().padStart(4, '0');
-  return `${prefix}${paddedNum}`;
+  // ลองรันเลขถัดไป และเช็คว่าว่างจริงไหม
+  let nextNum = maxNum + 1;
+  while (true) {
+    const candidateCode = `${prefix}${nextNum.toString().padStart(4, '0')}`;
+
+    // Check uniqueness globally (since schema has @unique on PurchaseOrderCode)
+    // OR scoped by company if the design allows duplicate codes across companies (but schema implies global unique)
+    // Based on schema: PurchaseOrderCode String @unique -> It must be unique globally!
+    const exists = await tx.purchaseOrder.findFirst({
+      where: {
+        PurchaseOrderCode: candidateCode
+      }
+    });
+
+    if (!exists) return candidateCode;
+    nextNum++;
+    if (nextNum > 9999) throw new Error('รหัส PO ในเดือนนี้เต็มแล้ว');
+  }
 }
 
 // ✅ สร้างใบสั่งซื้อ
 export async function createPurchaseOrder(req: Request, res: Response) {
   try {
     const CompanyId = getCompanyId(req, true)!;
-    const { SupplierId, details = [], ...rest } = req.body;
-    if (!SupplierId)
-      return res.status(400).json({ error: 'SupplierId จำเป็น' });
+    const { SupplierId, WarehouseId, details = [], PurchaseOrderCode: bodyCode, ...rest } = req.body;
+
+    if (!SupplierId) return res.status(400).json({ error: 'SupplierId จำเป็น' });
+    if (!WarehouseId) return res.status(400).json({ error: 'WarehouseId จำเป็น' });
 
     const normalized = validateDetails(details);
 
-    const supplier = await prisma.supplier.findFirst({ where: { SupplierId: +SupplierId, CompanyId } });
-    if (!supplier) return res.status(400).json({ error: 'ไม่พบ supplier' });
+    // ใช้ Transaction เพื่อความปลอดภัย
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. ตรวจสอบ Supplier/Warehouse/Material
+      const supplier = await tx.supplier.findFirst({ where: { SupplierId: +SupplierId, CompanyId } });
+      if (!supplier) throw new Error('ไม่พบ supplier');
 
-    const matIds = normalized.map(d => d.MaterialId);
-    const mats = await prisma.material.findMany({ where: { MaterialId: { in: matIds }, CompanyId } });
-    if (mats.length !== matIds.length)
-      return res.status(400).json({ error: 'มี MaterialId ที่ไม่ถูกต้อง' });
+      const matIds = normalized.map(d => d.MaterialId);
+      const mats = await tx.material.findMany({ where: { MaterialId: { in: matIds }, CompanyId } });
+      if (mats.length !== matIds.length) throw new Error('มี MaterialId ที่ไม่ถูกต้อง');
 
-    const total = normalized.reduce(
-      (sum, d) => sum + d.PurchaseOrderQuantity * d.PurchaseOrderPrice,
-      0
-    );
+      const total = normalized.reduce((sum, d) => sum + d.PurchaseOrderQuantity * d.PurchaseOrderPrice, 0);
 
-    // Generate running code (retry once if collision)
-    let code = await generatePurchaseOrderCode(CompanyId);
-    let po;
-    try {
-      po = await prisma.purchaseOrder.create({
+      // 2. รันเลข PO ที่ไม่ซ้ำแน่นอน
+      const code = await generatePurchaseOrderCode(CompanyId, tx);
+
+      // 3. สร้าง PO หลัก
+      const po = await tx.purchaseOrder.create({
         data: {
+          ...rest,
           CompanyId,
           SupplierId: +SupplierId,
+          // WarehouseId: +WarehouseId, // Schema ไม่มี field นี้ ใช้ Address แทน
           PurchaseOrderCode: code,
           TotalPrice: total,
           PurchaseOrderStatus: rest.PurchaseOrderStatus || 'DRAFT',
           DateTime: rest.DateTime ? new Date(rest.DateTime) : new Date(),
-          ...rest,
         },
       });
-    } catch (e: any) {
-      if (e?.code === 'P2002') {
-        // Retry generation
-        code = await generatePurchaseOrderCode(CompanyId);
-        po = await prisma.purchaseOrder.create({
-          data: {
-            CompanyId,
-            SupplierId: +SupplierId,
-            PurchaseOrderCode: code, // Try again with likely new number
-            TotalPrice: total,
-            PurchaseOrderStatus: rest.PurchaseOrderStatus || 'DRAFT',
-            DateTime: rest.DateTime ? new Date(rest.DateTime) : new Date(),
-            ...rest,
-          },
-        });
-      } else {
-        throw e;
-      }
-    }
 
-    await prisma.purchaseOrderDetail.createMany({
-      data: normalized.map(d => ({
-        ...d,
-        PurchaseOrderId: po.PurchaseOrderId,
-        CompanyId,
-        CreatedBy: rest.CreatedBy,
-      })),
-    });
+      // 4. สร้าง PO Details
+      await tx.purchaseOrderDetail.createMany({
+        data: normalized.map(d => ({
+          ...d,
+          PurchaseOrderId: po.PurchaseOrderId,
+          CompanyId,
+          CreatedBy: rest.CreatedBy,
+        })),
+      });
 
-    const result = await prisma.purchaseOrder.findUnique({
-      where: { PurchaseOrderId: po.PurchaseOrderId },
-      include: {
-        Supplier: { select: { SupplierName: true } },
-        _count: {
-          select: { PurchaseOrderDetails: true },
+      // 5. ดึงข้อมูลกลับมาแสดงผล
+      return tx.purchaseOrder.findUnique({
+        where: { PurchaseOrderId: po.PurchaseOrderId },
+        include: {
+          Supplier: { select: { SupplierName: true } },
+          _count: { select: { PurchaseOrderDetails: true } },
+          CreatedByUser: { select: { UserName: true } },
         },
-        CreatedByUser: {
-          select: { UserName: true },
-        },
-      },
+      });
     });
 
     return res.status(201).json(result);
   } catch (e: any) {
-    console.error(e);
-    return res.status(400).json({ error: e.message || 'เกิดข้อผิดพลาด' });
+    console.error('createPurchaseOrder error:', e);
+    return res.status(400).json({ error: e.message || 'เกิดข้อผิดพลาดในการสร้างใบสั่งซื้อ' });
   }
 }
 

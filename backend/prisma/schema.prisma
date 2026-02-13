@@ -50,6 +50,9 @@ model Company {
   IssueDetails            IssueDetail[]
   PurchaseOrderDetails    PurchaseOrderDetail[]
   Warehouses              Warehouse[]
+  StockAdjustments        StockAdjustment[]
+  StockTransfers          StockTransfer[]
+  StockTransferDetails    StockTransferDetail[]
 }
 
 // Temporary company info provided at user signup before system admin approves
@@ -98,6 +101,9 @@ model Warehouse {
   Stocks         Stock[]
   ReceiptDetails ReceiptDetail[]
   Issues         Issue[]
+  StockAdjustments StockAdjustment[]
+  TransfersOut     StockTransfer[] @relation("TransferSource")
+  TransfersIn      StockTransfer[] @relation("TransferTarget")
 }
 
 model User {
@@ -168,6 +174,8 @@ model User {
   WarehouseUpdatedBy            Warehouse[]            @relation("WarehouseUpdatedBy")
   TempCompanyCreatedBy          TempCompany[]          @relation("TempCompanyCreatedBy")
   TempCompanyUpdatedBy          TempCompany[]          @relation("TempCompanyUpdatedBy")
+  StockAdjustmentCreatedBy      StockAdjustment[]      @relation("StockAdjustmentCreatedBy")
+  StockTransferCreatedBy        StockTransfer[]        @relation("StockTransferCreatedBy")
 }
 
 model Branch {
@@ -283,6 +291,8 @@ model Material {
   ReceiptDetails ReceiptDetail[]
   WithdrawnRequestDetails WithdrawnRequestDetail[]
   IssueDetails   IssueDetail[]
+  StockAdjustments StockAdjustment[]
+  StockTransferDetails StockTransferDetail[]
 }
 
 model PurchaseOrder {
@@ -523,4 +533,52 @@ model IssueDetail {
   Company         Company  @relation(fields: [CompanyId], references: [CompanyId])
 
   @@unique([IssueId, MaterialId, Barcode])
+}
+
+model StockAdjustment {
+  AdjustmentId     Int      @id @default(autoincrement())
+  WarehouseId      Int
+  MaterialId       Int
+  CompanyId        Int
+  Quantity         Int      
+  Reason           String?
+  CreatedAt        DateTime @default(now())
+  CreatedBy        Int?
+
+  Warehouse        Warehouse @relation(fields: [WarehouseId], references: [WarehouseId])
+  Material         Material  @relation(fields: [MaterialId], references: [MaterialId])
+  Company          Company   @relation(fields: [CompanyId], references: [CompanyId])
+  CreatedByUser    User?     @relation("StockAdjustmentCreatedBy", fields: [CreatedBy], references: [UserId])
+}
+
+model StockTransfer {
+  TransferId        Int      @id @default(autoincrement())
+  TransferCode      String   @unique
+  SourceWarehouseId Int
+  TargetWarehouseId Int
+  CompanyId         Int
+  TransferDate      DateTime @default(now())
+  Status            String   @default("COMPLETED")
+  Remark            String?
+  CreatedAt         DateTime @default(now())
+  CreatedBy         Int?
+  
+  SourceWarehouse   Warehouse @relation("TransferSource", fields: [SourceWarehouseId], references: [WarehouseId])
+  TargetWarehouse   Warehouse @relation("TransferTarget", fields: [TargetWarehouseId], references: [WarehouseId])
+  Company           Company   @relation(fields: [CompanyId], references: [CompanyId])
+  CreatedByUser     User?     @relation("StockTransferCreatedBy", fields: [CreatedBy], references: [UserId])
+  
+  TransferDetails   StockTransferDetail[]
+}
+
+model StockTransferDetail {
+  TransferDetailId Int @id @default(autoincrement())
+  TransferId       Int
+  MaterialId       Int
+  Quantity         Int
+  CompanyId        Int
+  
+  Transfer         StockTransfer @relation(fields: [TransferId], references: [TransferId])
+  Material         Material      @relation(fields: [MaterialId], references: [MaterialId])
+  Company          Company       @relation(fields: [CompanyId], references: [CompanyId])
 }

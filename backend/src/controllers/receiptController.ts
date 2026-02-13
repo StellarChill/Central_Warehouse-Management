@@ -112,7 +112,8 @@ function genBarcode(receiptCode: string, materialId: number, idx: number) {
 }
 
 // Generate daily running code per Company: RC-YYYYMMDD-XXXX
-async function generateReceiptCode(companyId: number) {
+// Generate daily running code per Company: RC-YYYYMMDD-XXXX (Robust Check)
+async function generateReceiptCode(companyId: number, tx: any = prisma) {
   const pad4 = (n: number) => n.toString().padStart(4, '0');
   const d = new Date();
   const y = d.getFullYear();
@@ -121,18 +122,31 @@ async function generateReceiptCode(companyId: number) {
   const dateStr = `${y}${m}${day}`;
   const prefix = `RC-${dateStr}-`;
 
-  const last = await prisma.receipt.findFirst({
-    where: {
-      CompanyId: companyId,
-      ReceiptCode: { startsWith: prefix }
-    },
-    orderBy: { ReceiptCode: 'desc' },
-    select: { ReceiptCode: true },
+  // Check existing within this prefix
+  const existing = await tx.receipt.findMany({
+    where: { ReceiptCode: { startsWith: prefix } }, // Global Unique Check
+    select: { ReceiptCode: true }
   });
-  const next = last ? Number(last.ReceiptCode.split('-').pop() || '0') + 1 : 1;
-  return `${prefix}${pad4(next)}`;
+
+  let maxNum = 0;
+  for (const r of existing) {
+    const parts = r.ReceiptCode.split('-');
+    const num = parseInt(parts[parts.length - 1], 10);
+    if (!isNaN(num) && num > maxNum) maxNum = num;
+  }
+
+  // Find next available slot
+  let nextNum = maxNum + 1;
+  while (true) {
+    const candidate = `${prefix}${pad4(nextNum)}`;
+    const exists = await tx.receipt.findFirst({ where: { ReceiptCode: candidate } });
+    if (!exists) return candidate;
+    nextNum++;
+    if (nextNum > 9999) throw new Error('Receipt running number exhausted for today');
+  }
 }
 
+// Create Receipt from a PO
 // Create Receipt from a PO
 export async function createReceipt(req: Request, res: Response) {
   try {
@@ -150,80 +164,85 @@ export async function createReceipt(req: Request, res: Response) {
     const { map, total } = await enforceNotExceed(CompanyId, poId, normalized);
     const rdt = ReceiptDateTime ? new Date(ReceiptDateTime) : new Date();
 
-    // Helper to perform transaction with a specific code
-    const doCreate = async (code: string) => {
-      return await prisma.$transaction(async (tx) => {
-        const receipt = await tx.receipt.create({
-          data: { CompanyId, PurchaseOrderId: poId, ReceiptCode: code, ReceiptDateTime: rdt, ReceiptTotalPrice: total, CreatedBy },
-        });
+    // Logic wrapped in retry loop for concurrency safety
+    let receipt;
+    let attempts = 0;
+    while (attempts < 5) {
+      try {
+        receipt = await prisma.$transaction(async (tx) => {
+          // 1. Generate unique code
+          const code = await generateReceiptCode(CompanyId, tx);
 
-        await tx.receiptDetail.createMany({
-          data: normalized.map(d => ({
-            CompanyId,
-            WarehouseId,
-            ReceiptId: receipt.ReceiptId,
-            PurchaseOrderDetailId: map.get(d.MaterialId)!.podId,
-            MaterialId: d.MaterialId,
-            MaterialQuantity: d.MaterialQuantity,
-            CreatedBy,
-          })),
-        });
+          // 2. Create Receipt Header
+          const createdReceipt = await tx.receipt.create({
+            data: { CompanyId, PurchaseOrderId: poId, ReceiptCode: code, ReceiptDateTime: rdt, ReceiptTotalPrice: total, CreatedBy },
+          });
 
-        // Create stock rows per material (batch-level)
-        await tx.stock.createMany({
-          data: normalized.map((d, i) => ({
-            CompanyId,
-            WarehouseId,
-            MaterialId: d.MaterialId,
-            Quantity: d.MaterialQuantity,
-            Barcode: genBarcode(code, d.MaterialId, i + 1),
-            StockPrice: map.get(d.MaterialId)!.price,
-            ReceiptId: receipt.ReceiptId,
-            PurchaseOrderId: poId,
-            Issue: 0,
-            Remain: d.MaterialQuantity,
-            CreatedBy: CreatedBy,
-          })),
-        });
-        return receipt;
-      });
-    };
+          // 3. Create Details
+          await tx.receiptDetail.createMany({
+            data: normalized.map(d => ({
+              CompanyId,
+              WarehouseId,
+              ReceiptId: createdReceipt.ReceiptId,
+              PurchaseOrderDetailId: map.get(d.MaterialId)!.podId,
+              MaterialId: d.MaterialId,
+              MaterialQuantity: d.MaterialQuantity,
+              CreatedBy,
+            })),
+          });
 
-    // Generate running code (retry once on collision)
-    let code = await generateReceiptCode(CompanyId);
-    let created;
-    try {
-      created = await doCreate(code);
-    } catch (e: any) {
-      if (e?.code === 'P2002') {
-        code = await generateReceiptCode(CompanyId);
-        created = await doCreate(code);
-      } else {
+          // 4. Create Stock Rows
+          await tx.stock.createMany({
+            data: normalized.map((d, i) => ({
+              CompanyId,
+              WarehouseId,
+              MaterialId: d.MaterialId,
+              Quantity: d.MaterialQuantity,
+              Barcode: genBarcode(code, d.MaterialId, i + 1),
+              StockPrice: map.get(d.MaterialId)!.price,
+              ReceiptId: createdReceipt.ReceiptId,
+              PurchaseOrderId: poId,
+              Issue: 0,
+              Remain: d.MaterialQuantity,
+              CreatedBy: CreatedBy,
+            })),
+          });
+
+          return createdReceipt;
+        });
+        break; // Success
+      } catch (e: any) {
+        if (e?.code === 'P2002') {
+          console.warn('Receipt Duplicate Code Retry...');
+          attempts++;
+          continue;
+        }
         throw e;
       }
     }
 
-    // After creation, if the PO is fully received, mark it as RECEIVED
+    if (!receipt) throw new Error('Failed to create receipt after multiple attempts');
+
+    // Post-creation: Update PO Status if fully received
     try {
       const allPods = await prisma.purchaseOrderDetail.findMany({
-        where: { CompanyId, PurchaseOrderId: created.PurchaseOrderId },
+        where: { CompanyId, PurchaseOrderId: receipt.PurchaseOrderId },
         select: { MaterialId: true, PurchaseOrderQuantity: true },
       });
       const matIds = allPods.map((p) => p.MaterialId);
       if (matIds.length) {
-        const receivedMap = await getReceivedSumMap(CompanyId, created.PurchaseOrderId, matIds);
+        const receivedMap = await getReceivedSumMap(CompanyId, receipt.PurchaseOrderId, matIds);
         const allDone = allPods.every((p) => (receivedMap.get(p.MaterialId) ?? 0) >= p.PurchaseOrderQuantity);
         if (allDone) {
           await prisma.purchaseOrder.update({
-            where: { PurchaseOrderId: created.PurchaseOrderId },
+            where: { PurchaseOrderId: receipt.PurchaseOrderId },
             data: { PurchaseOrderStatus: 'RECEIVED' },
           });
         }
       }
     } catch { }
 
-    const result = await prisma.receipt.findUnique({ where: { ReceiptId: created.ReceiptId }, include: includeReceipt });
-    if (!result) throw httpError(500, 'Failed to load created receipt');
+    const result = await prisma.receipt.findUnique({ where: { ReceiptId: receipt.ReceiptId }, include: includeReceipt });
     return res.status(201).json(flattenReceipt(result));
   } catch (e: any) {
     return handleError(res, e);

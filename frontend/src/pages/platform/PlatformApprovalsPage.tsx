@@ -69,7 +69,12 @@ export default function PlatformApprovalsPage() {
     (async () => {
       try {
         const [co, rl] = await Promise.all([apiGet('/company'), getRoles()]);
-        setCompanies(co);
+        // Only show ACTIVE (approved) companies in the assign dropdown
+        const activeCompanies = (co || []).filter((c: any) => {
+          const st = String(c.CompanyStatus || '').toUpperCase();
+          return st === 'ACTIVE';
+        });
+        setCompanies(activeCompanies);
         const allow = new Set(['COMPANY_ADMIN', 'WAREHOUSE_ADMIN', 'BRANCH_USER']);
         const filtered = (rl || []).filter((r: any) => allow.has(String(r.RoleCode).toUpperCase()));
         setRoles(filtered);
@@ -322,7 +327,60 @@ export default function PlatformApprovalsPage() {
                 {assignMode === 'APPROVE' ? 'Assign Role & Approve' : 'Assign Company / Branch / Role'}
               </DialogTitle>
             </DialogHeader>
+
+            {/* ===== ข้อมูลที่ User กรอกมาตอนสมัคร ===== */}
+            {assignUser && (
+              <div className="rounded-lg border border-blue-200 bg-blue-50/60 p-4 space-y-2">
+                <p className="text-sm font-semibold text-blue-800 flex items-center gap-1.5">
+                  <UserPlus className="h-4 w-4" />
+                  ข้อมูลที่ผู้สมัครกรอกมา
+                </p>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                  <div className="text-muted-foreground">ชื่อผู้ใช้</div>
+                  <div className="font-medium text-slate-800">{assignUser.UserName}</div>
+
+                  <div className="text-muted-foreground">อีเมล</div>
+                  <div className="font-medium text-slate-800">{assignUser.Email || '—'}</div>
+
+                  <div className="text-muted-foreground">เบอร์โทร</div>
+                  <div className="font-medium text-slate-800">{assignUser.TelNumber || '—'}</div>
+
+                  <div className="text-muted-foreground">บริษัทที่กรอกมา</div>
+                  <div className="font-medium text-slate-800">
+                    {assignUser.TempCompany?.TempCompanyName || resolveCompanyName(assignUser) || '—'}
+                  </div>
+
+                  <div className="text-muted-foreground">บทบาทที่ขอ</div>
+                  <div className="font-medium text-slate-800">
+                    {assignUser.RequestedRoleText || assignUser.Role?.RoleName || '—'}
+                  </div>
+
+                  {assignUser.LineId && (
+                    <>
+                      <div className="text-muted-foreground">LINE ID</div>
+                      <div className="font-medium text-slate-800">{assignUser.LineId}</div>
+                    </>
+                  )}
+
+                  <div className="text-muted-foreground">วันที่สมัคร</div>
+                  <div className="font-medium text-slate-800">
+                    {new Date(assignUser.CreatedAt).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ===== ส่วนที่ Admin กรอกเอง ===== */}
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
+                <ClipboardCheck className="h-4 w-4" />
+                กำหนดข้อมูลจริง (Admin กรอก)
+              </p>
+              <p className="text-xs text-muted-foreground">เลือกบริษัท, Role ที่ถูกต้องสำหรับ user คนนี้</p>
+            </div>
+
             <div className="space-y-4 py-2">
+              {/* 1. Company */}
               <div className="space-y-1.5">
                 <Label>Company</Label>
                 <Select value={companyId} onValueChange={(v) => setCompanyId(v)}>
@@ -334,26 +392,17 @@ export default function PlatformApprovalsPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1.5">
-                <Label>Branch</Label>
-                <Select value={branchId} onValueChange={setBranchId}>
-                  <SelectTrigger><SelectValue placeholder="Select branch" /></SelectTrigger>
-                  <SelectContent>
-                    {branches.map((b) => (
-                      <SelectItem key={b.BranchId} value={String(b.BranchId)}>{b.BranchName}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+
+              {/* 2. Role (moved before Branch) */}
               <div className="space-y-1.5">
                 <Label>Role</Label>
-                <Select value={roleId} onValueChange={setRoleId}>
+                <Select value={roleId} onValueChange={(v) => { setRoleId(v); setBranchId(''); }}>
                   <SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger>
                   <SelectContent>
                     {roles.map((r) => {
                       const code = String(r.RoleCode).toUpperCase();
                       const label = code === 'WAREHOUSE_ADMIN' ? 'Warehouse Manager'
-                        : code === 'BRANCH_USER' ? 'Warehouse Staff'
+                        : code === 'BRANCH_USER' ? 'Branch Staff (ระดับสาขา)'
                           : code === 'COMPANY_ADMIN' ? 'Company Admin'
                             : r.RoleName;
                       return (
@@ -363,10 +412,40 @@ export default function PlatformApprovalsPage() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* 3. Branch — show only for branch-level roles */}
+              {(() => {
+                const selectedRole = roles.find((r) => String(r.RoleId) === roleId);
+                const selectedRoleCode = selectedRole ? String(selectedRole.RoleCode).toUpperCase() : '';
+                const isBranchRole = selectedRoleCode === 'BRANCH_USER';
+                if (!isBranchRole) return null;
+                return (
+                  <div className="space-y-1.5">
+                    <Label>Branch (สาขา)</Label>
+                    <Select value={branchId} onValueChange={setBranchId}>
+                      <SelectTrigger><SelectValue placeholder="Select branch" /></SelectTrigger>
+                      <SelectContent>
+                        {branches.map((b) => (
+                          <SelectItem key={b.BranchId} value={String(b.BranchId)}>{b.BranchName}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">เลือกสาขาที่ user คนนี้สังกัด</p>
+                  </div>
+                );
+              })()}
             </div>
             <DialogFooter>
               <Button variant="secondary" onClick={() => setAssignOpen(false)}>Cancel</Button>
-              <Button disabled={saving || !assignUser || !companyId || !roleId} onClick={async () => {
+              <Button disabled={(() => {
+                if (saving || !assignUser || !companyId || !roleId) return true;
+                // Branch is required only for branch-level roles
+                const selectedRole = roles.find((r) => String(r.RoleId) === roleId);
+                const selectedRoleCode = selectedRole ? String(selectedRole.RoleCode).toUpperCase() : '';
+                const isBranchRole = selectedRoleCode === 'BRANCH_USER';
+                if (isBranchRole && !branchId) return true;
+                return false;
+              })()} onClick={async () => {
                 if (!assignUser) return;
                 setSaving(true);
                 try {

@@ -213,6 +213,7 @@ export async function registerPublic(req: Request, res: Response) {
 // ... (Functions อื่นๆ ใน userController ให้คงเดิม)
 
 // Self-service company registration: creates Company, default Branch & Warehouse, and a Company Admin user
+// Uses $transaction so if username is duplicate, NOTHING gets saved (no orphan companies)
 export async function registerCompany(req: Request, res: Response) {
 	try {
 		const {
@@ -231,94 +232,102 @@ export async function registerCompany(req: Request, res: Response) {
 		if (!AdminUserName) return res.status(400).json({ error: 'AdminUserName is required' });
 		if (!AdminUserPassword) return res.status(400).json({ error: 'AdminUserPassword is required' });
 
-		// Create a CompanyCode slug
-		const baseCode = String(CompanyName).toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'COMPANY';
-		let companyCode = baseCode;
-		let suffix = 1;
-		while (await prisma.company.findUnique({ where: { CompanyCode: companyCode } })) {
-			companyCode = `${baseCode}-${++suffix}`;
-		}
+		// Check username BEFORE transaction to return a clear 409 error
+		const existedUser = await prisma.user.findUnique({ where: { UserName: AdminUserName } });
+		if (existedUser) return res.status(409).json({ error: 'ชื่อผู้ใช้ Admin นี้มีอยู่แล้วในระบบ กรุณาใช้ชื่ออื่น' });
 
-		const company = await prisma.company.create({
-			data: {
-				CompanyName,
-				CompanyAddress: CompanyAddress ?? null,
-				TaxId: TaxId ?? null,
-				CompanyEmail: CompanyEmail ?? null,
-				CompanyTelNumber: CompanyTelNumber ?? null,
-				CompanyCode: companyCode,
-				CompanyStatus: 'PENDING', // require platform approval before login
-			},
-		});
+		const result = await prisma.$transaction(async (tx) => {
+			// Generate unique CompanyCode
+			const baseCode = String(CompanyName).toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'COMPANY';
+			let companyCode = baseCode;
+			let suffix = 1;
+			while (await tx.company.findUnique({ where: { CompanyCode: companyCode } })) {
+				companyCode = `${baseCode}-${++suffix}`;
+			}
 
-		// Default Branch
-		const branchCode = `${companyCode}-HQ`;
-		const branch = await prisma.branch.create({
-			data: {
-				CompanyId: company.CompanyId,
-				BranchName: 'Head Office',
-				BranchAddress: CompanyAddress ?? null,
-				BranchCode: branchCode,
-			},
-		});
+			const company = await tx.company.create({
+				data: {
+					CompanyName,
+					CompanyAddress: CompanyAddress ?? null,
+					TaxId: TaxId ?? null,
+					CompanyEmail: CompanyEmail ?? null,
+					CompanyTelNumber: CompanyTelNumber ?? null,
+					CompanyCode: companyCode,
+					CompanyStatus: 'PENDING',
+				},
+			});
 
-		// Optional: default Warehouse
-		const warehouseCode = `${companyCode}-001`;
-		await prisma.warehouse.create({
-			data: {
-				CompanyId: company.CompanyId,
-				WarehouseName: 'Main Warehouse',
-				WarehouseAddress: CompanyAddress ?? null,
-				WarehouseCode: warehouseCode,
-			},
-		});
+			const branch = await tx.branch.create({
+				data: {
+					CompanyId: company.CompanyId,
+					BranchName: 'Head Office',
+					BranchAddress: CompanyAddress ?? null,
+					BranchCode: `${companyCode}-HQ`,
+				},
+			});
 
-		// Resolve Company Admin role (RoleCode = 'ADMIN')
-		const adminRole = await prisma.role.findUnique({ where: { RoleCode: 'ADMIN' } });
-		if (!adminRole) return res.status(500).json({ error: 'Admin role not configured' });
+			await tx.warehouse.create({
+				data: {
+					CompanyId: company.CompanyId,
+					WarehouseName: 'Main Warehouse',
+					WarehouseAddress: CompanyAddress ?? null,
+					WarehouseCode: `${companyCode}-001`,
+				},
+			});
 
-		// Ensure unique username
-		const existed = await prisma.user.findUnique({ where: { UserName: AdminUserName } });
-		if (existed) return res.status(409).json({ error: 'Admin username already exists' });
+			const adminRole = await tx.role.findFirst({ where: { RoleCode: 'COMPANY_ADMIN' } })
+				?? await tx.role.findFirst({ where: { RoleCode: 'ADMIN' } });
+			if (!adminRole) throw new Error('Admin role not configured');
 
-		const hashed = await bcrypt.hash(AdminUserPassword, 10);
-		const adminUser = await prisma.user.create({
-			data: {
-				CompanyId: company.CompanyId,
-				BranchId: branch.BranchId,
-				RoleId: adminRole.RoleId,
-				UserName: AdminUserName,
-				UserPassword: hashed,
-				Email: AdminEmail ?? null,
-				TelNumber: AdminTelNumber ?? null,
-				UserStatusApprove: 'PENDING', // require approval
-				UserStatusActive: 'ACTIVE',
-			},
-			include: { Role: true },
+			// Double-check inside transaction
+			const existedInTx = await tx.user.findUnique({ where: { UserName: AdminUserName } });
+			if (existedInTx) throw new Error('DUPLICATE_USERNAME');
+
+			const hashed = await bcrypt.hash(AdminUserPassword, 10);
+			const adminUser = await tx.user.create({
+				data: {
+					CompanyId: company.CompanyId,
+					BranchId: branch.BranchId,
+					RoleId: adminRole.RoleId,
+					UserName: AdminUserName,
+					UserPassword: hashed,
+					Email: AdminEmail ?? null,
+					TelNumber: AdminTelNumber ?? null,
+					UserStatusApprove: 'PENDING',
+					UserStatusActive: 'ACTIVE',
+				},
+				include: { Role: true },
+			});
+
+			return { company, adminUser };
 		});
 
 		return res.status(201).json({
 			message: 'Company registration submitted. Waiting for platform approval.',
 			company: {
-				CompanyId: company.CompanyId,
-				CompanyName: company.CompanyName,
-				CompanyCode: company.CompanyCode,
-				CompanyStatus: company.CompanyStatus,
+				CompanyId: result.company.CompanyId,
+				CompanyName: result.company.CompanyName,
+				CompanyCode: result.company.CompanyCode,
+				CompanyStatus: result.company.CompanyStatus,
 			},
 			adminUser: {
-				UserId: adminUser.UserId,
-				UserName: adminUser.UserName,
-				UserStatusApprove: adminUser.UserStatusApprove,
+				UserId: result.adminUser.UserId,
+				UserName: result.adminUser.UserName,
+				UserStatusApprove: result.adminUser.UserStatusApprove,
 			},
 		});
 	} catch (e: any) {
 		console.error('registerCompany failed', e);
+		if (e?.message === 'DUPLICATE_USERNAME') {
+			return res.status(409).json({ error: 'ชื่อผู้ใช้ Admin นี้มีอยู่แล้วในระบบ กรุณาใช้ชื่ออื่น' });
+		}
 		if (e?.code === 'P2002') return res.status(409).json({ error: 'Unique constraint failed' });
 		return res.status(500).json({ error: 'Internal server error' });
 	}
 }
 
 // Public endpoint variant matching /api/public/company-register with nested body
+// Uses $transaction + throw to ensure ALL or NOTHING is saved
 export async function registerCompanyPublic(req: Request, res: Response) {
 	try {
 		const { company = {}, adminUser = {} } = req.body || {};
@@ -340,8 +349,11 @@ export async function registerCompanyPublic(req: Request, res: Response) {
 		if (!AdminUserName) return res.status(400).json({ error: 'AdminUserName is required' });
 		if (!AdminUserPassword) return res.status(400).json({ error: 'AdminUserPassword is required' });
 
+		// Check username BEFORE transaction to return a clear 409 error
+		const existedUser = await prisma.user.findUnique({ where: { UserName: AdminUserName } });
+		if (existedUser) return res.status(409).json({ error: 'ชื่อผู้ใช้ Admin นี้มีอยู่แล้วในระบบ กรุณาใช้ชื่ออื่น' });
+
 		const result = await prisma.$transaction(async (tx) => {
-			// Generate unique CompanyCode
 			const baseCode = String(CompanyName).toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'COMPANY';
 			let companyCode = baseCode;
 			let suffix = 1;
@@ -386,8 +398,9 @@ export async function registerCompanyPublic(req: Request, res: Response) {
 			});
 			if (!companyAdminRole) throw new Error('Company Admin role not configured');
 
-			const existed = await tx.user.findUnique({ where: { UserName: AdminUserName } });
-			if (existed) return { conflict: true, companyRow } as any;
+			// Double-check inside transaction to prevent race condition
+			const existedInTx = await tx.user.findUnique({ where: { UserName: AdminUserName } });
+			if (existedInTx) throw new Error('DUPLICATE_USERNAME');
 
 			const hashed = await bcrypt.hash(AdminUserPassword, 10);
 			const userRow = await tx.user.create({
@@ -408,28 +421,25 @@ export async function registerCompanyPublic(req: Request, res: Response) {
 			return { companyRow, userRow };
 		});
 
-		if ((result as any).conflict) {
-			return res.status(409).json({ error: 'Admin username already exists' });
-		}
-
-		const { companyRow, userRow } = result as any;
-
 		return res.status(201).json({
 			message: 'Company registration submitted. Waiting for platform approval.',
 			company: {
-				CompanyId: companyRow.CompanyId,
-				CompanyName: companyRow.CompanyName,
-				CompanyCode: companyRow.CompanyCode,
-				CompanyStatus: companyRow.CompanyStatus,
+				CompanyId: result.companyRow.CompanyId,
+				CompanyName: result.companyRow.CompanyName,
+				CompanyCode: result.companyRow.CompanyCode,
+				CompanyStatus: result.companyRow.CompanyStatus,
 			},
 			adminUser: {
-				UserId: userRow.UserId,
-				UserName: userRow.UserName,
-				UserStatusApprove: userRow.UserStatusApprove,
+				UserId: result.userRow.UserId,
+				UserName: result.userRow.UserName,
+				UserStatusApprove: result.userRow.UserStatusApprove,
 			},
 		});
 	} catch (e: any) {
 		console.error('registerCompanyPublic failed', e);
+		if (e?.message === 'DUPLICATE_USERNAME') {
+			return res.status(409).json({ error: 'ชื่อผู้ใช้ Admin นี้มีอยู่แล้วในระบบ กรุณาใช้ชื่ออื่น' });
+		}
 		if (e?.code === 'P2002') return res.status(409).json({ error: 'Unique constraint failed' });
 		return res.status(500).json({ error: 'Internal server error' });
 	}

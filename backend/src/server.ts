@@ -20,10 +20,10 @@ app.use(cors({
   origin: (origin, callback) => {
     // อนุญาต requests ที่ไม่มี origin (Postman, Mobile apps)
     if (!origin) return callback(null, true);
-    
+
     // อนุญาต localhost ทุก port
     if (origin.includes('localhost')) return callback(null, true);
-    
+
     // ตรวจสอบ allowed origins
     if (allowedOrigins.includes(origin)) return callback(null, true);
 
@@ -44,14 +44,14 @@ app.get('/health', async (req, res) => {
   try {
     // ทดสอบการเชื่อมต่อ database
     await prisma.$queryRaw`SELECT 1`;
-    res.json({ 
-      status: 'ok', 
+    res.json({
+      status: 'ok',
       database: 'connected',
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    res.status(500).json({ 
-      status: 'error', 
+    res.status(500).json({
+      status: 'error',
       database: 'disconnected',
       error: error instanceof Error ? error.message : 'Unknown error',
       timestamp: new Date().toISOString()
@@ -61,8 +61,8 @@ app.get('/health', async (req, res) => {
 
 // Root endpoint
 app.get('/', (_req, res) => {
-  res.json({ 
-    message: 'Sai Jai Management API', 
+  res.json({
+    message: 'Sai Jai Management API',
     version: '1.0.0',
     endpoints: ['/api', '/health']
   });
@@ -83,13 +83,14 @@ import warehouseRoute from './routes/warehouseRoute';
 import companyRoute from './routes/companyRoute';
 import platformUserRoute from './routes/platformUserRoute';
 import roleRoute from './routes/roleRoute';
+// import stockAdjustmentRoute from './routes/stockAdjustmentRoute';
 
 // Health check endpoint สำหรับ Render
 app.get('/', (req, res) => {
-  res.json({ 
-    status: 'OK', 
+  res.json({
+    status: 'OK',
     message: 'Sai Jai Management API is running',
-    timestamp: new Date().toISOString() 
+    timestamp: new Date().toISOString()
   });
 });
 
@@ -98,17 +99,17 @@ app.get('/health', async (req, res) => {
   try {
     // ทดสอบเชื่อมต่อ database
     await prisma.$queryRaw`SELECT 1`;
-    res.json({ 
-      status: 'OK', 
+    res.json({
+      status: 'OK',
       database: 'Connected',
-      timestamp: new Date().toISOString() 
+      timestamp: new Date().toISOString()
     });
   } catch (error) {
-    res.status(503).json({ 
-      status: 'ERROR', 
+    res.status(503).json({
+      status: 'ERROR',
       database: 'Disconnected',
       error: error instanceof Error ? error.message : 'Unknown error',
-      timestamp: new Date().toISOString() 
+      timestamp: new Date().toISOString()
     });
   }
 });
@@ -128,12 +129,13 @@ app.use('/api/warehouse', warehouseRoute);
 app.use('/api/company', companyRoute);
 app.use('/api/platform', platformUserRoute);
 app.use('/api/role', roleRoute);
+// app.use('/api/stock-adjustments', stockAdjustmentRoute);
 
 // เริ่มรันเซิร์ฟเวอร์
 app.listen(PORT, async () => {
   console.log(`✅ Server running on http://localhost:${PORT}`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  
+
   // ทดสอบเชื่อมต่อ database ตอนเริ่ม server
   try {
     await prisma.$connect();

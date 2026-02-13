@@ -51,7 +51,7 @@ export function Header({ onMenuClick, hideMenu }: HeaderProps) {
     <header className="h-16 bg-card/80 backdrop-blur-xl border-b border-border/50 shadow-premium">
       <div className="flex items-center justify-between h-full px-4">
         {/* Left section */}
-          <div className="flex items-center gap-2 sm:gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
           {!hideMenu && (
             <Button
               variant="ghost"
@@ -67,47 +67,36 @@ export function Header({ onMenuClick, hideMenu }: HeaderProps) {
         {/* Right section */}
         <div className="flex items-center gap-2 sm:gap-4">
           {/* Notifications */}
-        
 
-          {/* User menu */}
+
+          {/* User menu (Darker Contrast) */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="flex items-center gap-2 p-2 hover:bg-accent">
+              <Button variant="ghost" className="relative h-10 w-10 rounded-full md:w-auto md:px-3 md:gap-3 border border-border/40 hover:bg-accent hover:text-accent-foreground data-[state=open]:bg-accent">
                 <Avatar className="h-8 w-8">
-                    <AvatarFallback className="bg-primary text-primary-foreground">
-                      {displayUser.UserName?.charAt(0).toUpperCase()}
-                    </AvatarFallback>
+                  <AvatarFallback className="bg-primary text-primary-foreground text-xs font-bold">
+                    {displayUser.UserName?.charAt(0).toUpperCase()}
+                  </AvatarFallback>
                 </Avatar>
-                <div className="hidden sm:block text-left">
-                    <div className="text-sm font-medium truncate max-w-[120px]">{displayUser.UserName}</div>
-                    <div className="text-xs text-muted-foreground truncate max-w-[120px]">
-                      {th.roles[displayUser.role as any]}
-                    </div>
+                <div className="hidden md:flex flex-col items-start gap-0.5 text-left">
+                  <span className="text-sm font-semibold leading-none text-foreground">{displayUser.UserName}</span>
+                  <span className="text-[11px] font-medium text-muted-foreground">{th.roles[displayUser.role as any]}</span>
                 </div>
               </Button>
             </DropdownMenuTrigger>
-            
-            <DropdownMenuContent align="end" className="w-56 border shadow-premium">
-              <DropdownMenuLabel>
-                <div>
-                  <div className="font-medium">{displayUser.UserName}</div>
-                  <div className="text-sm text-muted-foreground">
-                    {th.roles[displayUser.role as any]} • {displayUser.Email || `สาขา ${displayUser.BranchId}`}
-                  </div>
+            <DropdownMenuContent className="w-56" align="end" forceMount>
+              <DropdownMenuLabel className="font-normal">
+                <div className="flex flex-col space-y-1">
+                  <p className="text-sm font-semibold leading-none">{displayUser.UserName}</p>
+                  <p className="text-xs leading-none text-muted-foreground">
+                    {displayUser.Email || `ID: ${displayUser.UserId}`}
+                  </p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-            
-              
-             
-              <DropdownMenuSeparator />
-              
-              <DropdownMenuItem 
-                onClick={handleLogout}
-                className="cursor-pointer text-destructive focus:text-destructive hover:bg-destructive/10"
-              >
+              <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive cursor-pointer font-medium">
                 <LogOut className="mr-2 h-4 w-4" />
-                {th.nav.logout}
+                <span>{th.nav.logout}</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

@@ -313,6 +313,30 @@ export async function platformSetUserActive(id: number, status: 'ACTIVE' | 'INAC
   return apiPost(`/platform/users/${id}/active`, { status });
 }
 
+// Stock Adjustment
+export async function createStockAdjustment(data: { WarehouseId: number, MaterialId: number, Quantity: number, Reason?: string }) {
+  return apiPost('/stock-adjustments', data);
+}
+
+export interface StockAdjustment {
+  AdjustmentId: number;
+  WarehouseId: number;
+  MaterialId: number;
+  Quantity: number;
+  Reason?: string;
+  CreatedAt: string;
+  Material?: Material;
+  Warehouse?: Warehouse;
+  CreatedByUser?: { UserName: string };
+}
+
+export async function getStockAdjustments(params?: { warehouseId?: number, materialId?: number }) {
+  const ps = new URLSearchParams();
+  if (params?.warehouseId) ps.append('warehouseId', String(params.warehouseId));
+  if (params?.materialId) ps.append('materialId', String(params.materialId));
+  return apiGet(`/stock-adjustments?${ps}`);
+}
+
 // List roles (platform admin sees all)
 export async function getRoles() {
   return apiGet('/role');
@@ -687,6 +711,7 @@ export type PurchaseOrderDetail = {
 
 export type CreatePurchaseOrderData = {
   SupplierId: number;
+  WarehouseId: number; // Required for stock context
   PurchaseOrderCode?: string; // Optional - backend will auto-generate if not provided
   PurchaseOrderStatus?: PurchaseOrder['PurchaseOrderStatus'];
   PurchaseOrderAddress?: string;
@@ -826,6 +851,7 @@ export type Stock = {
   StockId: number;
   MaterialId: number;
   MaterialName: string;
+  MaterialCode?: string;
   Unit: string;
   Quantity: number;
   Remain: number;
@@ -835,6 +861,12 @@ export type Stock = {
   PurchaseOrderId: number;
   WarehouseId: number;
   CreatedAt: string;
+  Material?: {
+    MaterialId: number;
+    MaterialName: string;
+    MaterialCode: string;
+    Unit: string;
+  };
 };
 
 export type StockSummaryRow = {

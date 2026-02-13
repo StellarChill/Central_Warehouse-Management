@@ -222,11 +222,29 @@ export default function PurchaseOrdersPage() {
     }
     setCreating(true);
     try {
+      // Determine the warehouse ID to send
+      let whToSubmit: number | undefined = undefined;
+      if (selectedWarehouseId !== "all") {
+        whToSubmit = Number(selectedWarehouseId);
+      } else if (warehouses.length > 0) {
+        // Fallback to the first warehouse if "all" is selected but we need one for PO
+        whToSubmit = warehouses[0].WarehouseId;
+      }
+
+      if (!whToSubmit) {
+        return toast({
+          variant: 'destructive',
+          title: 'ไม่พบข้อมูลคลังสินค้า',
+          description: 'กรุณาเลือกคลังสำหรับรับของ'
+        });
+      }
+
       const newPO = await apiCreatePO({
         SupplierId: form.SupplierId,
+        WarehouseId: whToSubmit, // MUST send this for the new backend validation
         DateTime: form.DateTime ? new Date(form.DateTime).toISOString() : undefined,
         PurchaseOrderStatus: form.PurchaseOrderStatus,
-        PurchaseOrderAddress: form.PurchaseOrderAddress, // Save target warehouse name here
+        PurchaseOrderAddress: form.PurchaseOrderAddress, // Still keep the address/name for reference
         details: form.details.map(d => ({
           MaterialId: Number(d.MaterialId),
           PurchaseOrderQuantity: Number(d.PurchaseOrderQuantity),

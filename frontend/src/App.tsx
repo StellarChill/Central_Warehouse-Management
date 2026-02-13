@@ -21,6 +21,7 @@ const ReceivingPage = lazy(() => import("./pages/inventory/ReceivingPage"));
 const ProductsPage = lazy(() => import("./pages/inventory/ProductsPage"));
 const CategoriesManagePage = lazy(() => import("./pages/inventory/CategoriesManagePage"));
 const InventoryIssuingPage = lazy(() => import("./pages/inventory/InventoryIssuingPage"));
+// const StockAdjustmentPage = lazy(() => import("./pages/inventory/StockAdjustmentPage"));
 const BranchRequisitionCreatePage = lazy(
   () => import("./pages/branch/BranchRequisitionCreatePage")
 );
@@ -96,6 +97,7 @@ const App = () => (
                     element={<BranchRequisitionCreatePage />}
                   />
                   <Route path="receiving" element={<ReceivingPage />} />
+                  {/* <Route path="inventory/adjustment" element={<StockAdjustmentPage />} /> */}
                   <Route path="requisitions" element={<RequisitionsPage />} />
                   {/* Platform admin portal */}
                   <Route

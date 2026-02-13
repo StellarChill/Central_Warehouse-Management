@@ -69,6 +69,12 @@ const navigation = [
     icon: PackageSearch,
     premiumIcon: PackageSearch,
   },
+  /* {
+    name: "ปรับปรุงสต็อก (Adjustment)",
+    href: "/inventory/adjustment",
+    icon: Boxes,
+    premiumIcon: Boxes,
+  }, */
   {
     name: th.nav.purchasing,
     href: "/purchase-orders",
@@ -173,6 +179,7 @@ export function Sidebar({ onClose }: SidebarProps) {
           "/",
           "/receiving",
           "/inventory",
+          // "/inventory/adjustment",
           "/ingredients",
           // "/suppliers", // Hidden (Purchasing Dept)
           "/inventory/issuing",

@@ -35,31 +35,34 @@ function handleError(res: Response, e: any) {
 }
 
 // Helper to generate running number: WR-YYYYMMDD-XXXX
-async function generateWithdrawnRequestCode(companyId: number, date: Date) {
+// Helper to generate running number: WR-YYYYMMDD-XXXX (Robust Check)
+async function generateWithdrawnRequestCode(companyId: number, date: Date, tx: any = prisma) {
   const yyyy = date.getFullYear();
   const mm = String(date.getMonth() + 1).padStart(2, '0');
   const dd = String(date.getDate()).padStart(2, '0');
   const prefix = `WR-${yyyy}${mm}${dd}`;
 
-  // Find last code of this day
-  const lastRecord = await prisma.withdrawnRequest.findFirst({
-    where: {
-      CompanyId: companyId,
-      WithdrawnRequestCode: { startsWith: prefix }
-    },
-    orderBy: { WithdrawnRequestCode: 'desc' }
+  // Check valid running numbers inside DB
+  const existing = await tx.withdrawnRequest.findMany({
+    where: { WithdrawnRequestCode: { startsWith: prefix } },
+    select: { WithdrawnRequestCode: true }
   });
 
-  let nextSeq = 1;
-  if (lastRecord) {
-    const parts = lastRecord.WithdrawnRequestCode.split('-');
-    if (parts.length === 3) {
-      const seq = parseInt(parts[2]);
-      if (!isNaN(seq)) nextSeq = seq + 1;
-    }
+  let maxNum = 0;
+  for (const r of existing) {
+    const parts = r.WithdrawnRequestCode.split('-');
+    const num = parseInt(parts[parts.length - 1], 10);
+    if (!isNaN(num) && num > maxNum) maxNum = num;
   }
 
-  return `${prefix}-${String(nextSeq).padStart(4, '0')}`;
+  let nextNum = maxNum + 1;
+  while (true) {
+    const candidate = `${prefix}-${String(nextNum).padStart(4, '0')}`;
+    const exists = await tx.withdrawnRequest.findFirst({ where: { WithdrawnRequestCode: candidate } });
+    if (!exists) return candidate;
+    nextNum++;
+    if (nextNum > 9999) throw new Error('Request running number exhausted for today');
+  }
 }
 
 // Create Withdrawn Request
@@ -70,45 +73,65 @@ export async function createWithdrawnRequest(req: Request, res: Response) {
 
     // Auto-generate code if missing
     const date = RequestDate ? new Date(RequestDate) : new Date();
-    if (!WithdrawnRequestCode) {
-      WithdrawnRequestCode = await generateWithdrawnRequestCode(CompanyId, date);
-    }
-
     if (!BranchId) throw httpError(400, 'BranchId is required');
     const parsed = parseDetails(details);
-
-    // Check duplicate code (retry logic could be added here similar to receipt)
-    const dup = await prisma.withdrawnRequest.findFirst({ where: { WithdrawnRequestCode, CompanyId } });
-    if (dup) throw httpError(409, `WithdrawnRequestCode ${WithdrawnRequestCode} already exists. Please try again.`);
 
     // Optional: Validate materials exist
     const mats = await prisma.material.findMany({ where: { MaterialId: { in: parsed.map(d => d.MaterialId) } }, select: { MaterialId: true } });
     if (mats.length !== parsed.length) throw httpError(400, 'One or more materials are invalid');
 
-    const created = await prisma.$transaction(async (tx) => {
-      const request = await tx.withdrawnRequest.create({
-        data: {
-          CompanyId,
-          WithdrawnRequestCode,
-          BranchId: Number(BranchId),
-          RequestDate: date,
-          WithdrawnRequestStatus: WithdrawnRequestStatus || 'PENDING', // Default to PENDING (REQUESTED is old status?)
-          CreatedBy,
-        },
-      });
+    // Retry logic for creation
+    let created;
+    let attempts = 0;
+    while (attempts < 5) {
+      try {
+        created = await prisma.$transaction(async (tx) => {
+          // Auto-generate if missing inside transaction
+          let codeToUse = WithdrawnRequestCode;
+          if (!codeToUse) {
+            codeToUse = await generateWithdrawnRequestCode(CompanyId, date, tx);
+          } else {
+            // If user supplied code, check once
+            const dup = await tx.withdrawnRequest.findFirst({ where: { WithdrawnRequestCode: codeToUse } }); // Global check
+            if (dup) throw httpError(409, `WithdrawnRequestCode ${codeToUse} already exists.`);
+          }
 
-      await tx.withdrawnRequestDetail.createMany({
-        data: parsed.map(d => ({
-          CompanyId,
-          RequestId: request.RequestId,
-          MaterialId: d.MaterialId,
-          WithdrawnQuantity: d.WithdrawnQuantity,
-          CreatedBy,
-        })),
-      });
+          const request = await tx.withdrawnRequest.create({
+            data: {
+              CompanyId,
+              WithdrawnRequestCode: codeToUse,
+              BranchId: Number(BranchId),
+              RequestDate: date,
+              WithdrawnRequestStatus: WithdrawnRequestStatus || 'PENDING',
+              CreatedBy,
+            },
+          });
 
-      return request;
-    });
+          await tx.withdrawnRequestDetail.createMany({
+            data: parsed.map(d => ({
+              CompanyId,
+              RequestId: request.RequestId,
+              MaterialId: d.MaterialId,
+              WithdrawnQuantity: d.WithdrawnQuantity,
+              CreatedBy,
+            })),
+          });
+
+          return request;
+        });
+        break; // Success
+      } catch (e: any) {
+        if (e?.code === 'P2002' && !WithdrawnRequestCode) {
+          // Retry only if we auto-generated the code
+          console.warn('Request Duplicate Code Retry...');
+          attempts++;
+          continue;
+        }
+        throw e;
+      }
+    }
+
+    if (!created) throw new Error('Failed to create request after retries');
 
     const result = await prisma.withdrawnRequest.findUnique({
       where: { RequestId: created.RequestId },
