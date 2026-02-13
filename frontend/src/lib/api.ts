@@ -52,19 +52,41 @@ export async function apiRequest(
     (headers as any)["Authorization"] = `Bearer ${token}`;
   }
 
-  // Inject WarehouseId if available in user object
+  // Inject WarehouseId if available in user object, otherwise check localStorage (for switched context)
   const user = getUser();
   if (user?.WarehouseId) {
     (headers as any)["x-warehouse-id"] = String(user.WarehouseId);
-  } else if (user?.role === 'ADMIN' || user?.role === 'COMPANY_ADMIN') {
+  } else {
+    // Check local storage for selected warehouse context (valid for Admins, Managers, etc.)
     const selectedWh = localStorage.getItem('selected_warehouse_id');
-    if (selectedWh) (headers as any)["x-warehouse-id"] = selectedWh;
+    if (selectedWh && selectedWh !== "all") {
+      (headers as any)["x-warehouse-id"] = selectedWh;
+    }
   }
 
-  return fetch(`${API_BASE}${endpoint}`, {
+  // DEBUG: log request info
+  console.debug(`[API] ${options.method || 'GET'} ${API_BASE}${endpoint} | token=${token ? token.substring(0, 20) + '...' : 'NONE'}`);
+
+  const response = await fetch(`${API_BASE}${endpoint}`, {
     ...options,
     headers,
   });
+
+  // Auto-logout เฉพาะ 401 (token หมดอายุจริงๆ)
+  // ไม่ logout ที่ 403 (token ใช้ได้แต่ role ไม่ถูก)
+  if (response.status === 401) {
+    // ป้องกัน auto-logout ซ้ำจาก API call หลายตัวพร้อมกัน
+    const alreadyLoggingOut = (window as any).__auto_logout_in_progress;
+    if (!alreadyLoggingOut && !window.location.pathname.includes('/login')) {
+      (window as any).__auto_logout_in_progress = true;
+      console.warn(`[API] ❌ 401 on ${endpoint} — token expired, redirecting to login`);
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('auth_user');
+      window.location.href = '/login';
+    }
+  }
+
+  return response;
 }
 
 // GET request

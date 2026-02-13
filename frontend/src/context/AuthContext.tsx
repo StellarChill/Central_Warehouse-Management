@@ -8,7 +8,7 @@ import {
   useEffect,
 } from "react";
 
-export type Role = "PLATFORM_ADMIN" | "PLATFORM_STAFF" | "COMPANY_ADMIN" | "WAREHOUSE_ADMIN" | "BRANCH_MANAGER" | "BRANCH_USER" | "VIEWER" | "ADMIN" | "CENTER" | "BRANCH";
+export type Role = "PLATFORM_ADMIN" | "PLATFORM_STAFF" | "COMPANY_ADMIN" | "WH_MANAGER" | "REQUESTER" | "WAREHOUSE_ADMIN" | "BRANCH_MANAGER" | "BRANCH_USER" | "VIEWER" | "ADMIN" | "CENTER" | "BRANCH";
 
 // User type ที่ได้จาก backend
 type User = {
@@ -87,6 +87,8 @@ function roleFromPayload(u: any): Role {
   if (code === 'PLATFORM_ADMIN') return 'PLATFORM_ADMIN';
   if (code === 'PLATFORM_STAFF') return 'PLATFORM_STAFF';
   if (code === 'COMPANY_ADMIN') return 'COMPANY_ADMIN';
+  if (code === 'WH_MANAGER') return 'WH_MANAGER';
+  if (code === 'REQUESTER') return 'REQUESTER';
   if (code === 'WAREHOUSE_ADMIN') return 'WAREHOUSE_ADMIN';
   if (code === 'BRANCH_MANAGER') return 'BRANCH_MANAGER';
   if (code === 'BRANCH_USER') return 'BRANCH_USER';

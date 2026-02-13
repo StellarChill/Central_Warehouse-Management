@@ -17,7 +17,8 @@ export function AppLayout({ children }: AppLayoutProps) {
   const location = useLocation();
   const routeHidesSidebar =
     location.pathname === "/warehouse-management" ||
-    location.pathname.startsWith("/platform");
+    location.pathname.startsWith("/platform") ||
+    location.pathname === "/select-warehouse";
   const standaloneLayout = location.pathname.startsWith("/platform");
 
   // Re-evaluate liff-only mode whenever auth user changes (so login via LIFF updates layout immediately)
@@ -49,7 +50,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
       {/* Sidebar overlay */}
       {!hideSidebar && !routeHidesSidebar && sidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 z-40 bg-background/20 backdrop-blur-sm lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
@@ -58,7 +59,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header onMenuClick={() => setSidebarOpen(!sidebarOpen)} hideMenu={hideSidebar || routeHidesSidebar} />
-        
+
         <main className="flex-1 overflow-y-auto bg-background/50 backdrop-blur-xl">
           <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-6">
             {children || <Outlet />}

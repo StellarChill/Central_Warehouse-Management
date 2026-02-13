@@ -5,13 +5,13 @@ import { requireRoles } from '../middlewares/rolesMiddleware';
 
 const router = Router();
 router.use(authenticateToken);
-// จัดการคลัง: ให้เฉพาะ Admin
-router.use(requireRoles('PLATFORM_ADMIN', 'COMPANY_ADMIN'));
+// 1. อ่านข้อมูล (List/Get): ให้ WH_MANAGER/WAREHOUSE_ADMIN เข้าได้ด้วย
+router.get('/', requireRoles('PLATFORM_ADMIN', 'COMPANY_ADMIN', 'WH_MANAGER', 'WAREHOUSE_ADMIN'), listWarehouses);
+router.get('/:id', requireRoles('PLATFORM_ADMIN', 'COMPANY_ADMIN', 'WH_MANAGER', 'WAREHOUSE_ADMIN'), getWarehouse);
 
-router.post('/', createWarehouse);
-router.get('/', listWarehouses);
-router.get('/:id', getWarehouse);
-router.put('/:id', updateWarehouse);
-router.delete('/:id', deleteWarehouse);
+// 2. จัดการข้อมูล (Create/Update/Delete): เฉพาะ Admin
+router.post('/', requireRoles('PLATFORM_ADMIN', 'COMPANY_ADMIN'), createWarehouse);
+router.put('/:id', requireRoles('PLATFORM_ADMIN', 'COMPANY_ADMIN'), updateWarehouse);
+router.delete('/:id', requireRoles('PLATFORM_ADMIN', 'COMPANY_ADMIN'), deleteWarehouse);
 
 export default router;

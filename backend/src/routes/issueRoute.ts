@@ -6,7 +6,7 @@ import { requireRoles } from '../middlewares/rolesMiddleware';
 const router = Router();
 router.use(authenticateToken);
 // ตัดของ (Issue): เฉพาะคนทำงานคลัง
-router.use(requireRoles('PLATFORM_ADMIN', 'COMPANY_ADMIN', 'WH_MANAGER'));
+router.use(requireRoles('PLATFORM_ADMIN', 'COMPANY_ADMIN', 'WH_MANAGER', 'WAREHOUSE_ADMIN'));
 
 router.post('/from-request/:requestId', createIssueFromRequest);
 router.get('/', listIssues);

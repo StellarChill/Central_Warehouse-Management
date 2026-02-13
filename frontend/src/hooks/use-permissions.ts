@@ -8,30 +8,44 @@ export const ROLES = {
 
 export function usePermissions() {
   const { user } = useAuth();
+  const role = user?.role;
 
-  const isAdmin = user?.role === ROLES.ADMIN;
-  const isCenter = user?.role === ROLES.CENTER;
-  const isBranch = user?.role === ROLES.BRANCH;
+  const isAdmin = ["PLATFORM_ADMIN", "COMPANY_ADMIN", "ADMIN"].includes(role || "");
+  const isWarehouseAdmin = ["WH_MANAGER", "WAREHOUSE_ADMIN"].includes(role || "");
+  const isRequester = role === "REQUESTER";
+
+  // Backward compatibility alias (if valid)
+  const isCenter = isAdmin || isWarehouseAdmin;
+  const isBranch = isRequester; // Map REQUESTER to BRANCH concept roughly
 
   // สิทธิ์ตามฟีเจอร์
-  const canApproveRequisition = isAdmin || isCenter;
+  const canApproveRequisition = isAdmin || isWarehouseAdmin;
   const canCreateRequisition = !!user;
-  const canManageUsers = isAdmin;
-  const canManageSuppliers = isAdmin || isCenter;
-  const canManageInventory = isAdmin || isCenter;
-  const canEditProducts = isAdmin || isCenter;
+  const canManageUsers = isAdmin; // Only Admins can manage users
+
+  // Suppliers & Inventory & Products: Admins + Warehouse Admins can manage
+  const canManageSuppliers = isAdmin || isWarehouseAdmin;
+  const canManageInventory = isAdmin || isWarehouseAdmin;
+  const canEditProducts = isAdmin || isWarehouseAdmin;
+  const canManageCategories = isAdmin || isWarehouseAdmin; // New permission for categories
 
   return {
     user,
+    role,
     isAdmin,
+    isWarehouseAdmin,
+    isRequester,
+    // Aliases
     isCenter,
     isBranch,
+    // Capabilities
     canApproveRequisition,
     canCreateRequisition,
     canManageUsers,
     canManageSuppliers,
     canManageInventory,
     canEditProducts,
+    canManageCategories
   };
 }
 

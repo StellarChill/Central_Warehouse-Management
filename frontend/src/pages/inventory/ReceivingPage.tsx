@@ -228,12 +228,10 @@ export default function ReceivingPage() {
       }
 
       await Promise.all(poIds.map(async (poId) => {
-        const pad = (n: number) => String(n).padStart(2, '0');
-        const stamp = `${ts.getFullYear()}${pad(ts.getMonth() + 1)}${pad(ts.getDate())}${pad(ts.getHours())}${pad(ts.getMinutes())}${pad(ts.getSeconds())}${String(ts.getMilliseconds()).padStart(3, '0')}`;
-        const code = `RC-${poList.find(p => p.id === poId)?.code || poId}-${stamp}`;
+        // Let backend generate running code
         return apiCreateReceipt({
           PurchaseOrderId: poId,
-          ReceiptCode: code,
+          ReceiptCode: "", // Backend will generate RC-YYYYMMDD-XXXX
           details: group[poId],
           WarehouseId: targetWarehouseId
         });

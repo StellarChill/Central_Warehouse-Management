@@ -6,7 +6,7 @@ import { requireRoles } from '../middlewares/rolesMiddleware';
 const router = Router();
 router.use(authenticateToken);
 // สั่งซื้อ: เฉพาะคนทำงานคลัง
-router.use(requireRoles('PLATFORM_ADMIN', 'COMPANY_ADMIN', 'WH_MANAGER'));
+router.use(requireRoles('PLATFORM_ADMIN', 'COMPANY_ADMIN', 'WH_MANAGER', 'WAREHOUSE_ADMIN'));
 
 router.post('/', createPurchaseOrder);
 router.get('/', listPurchaseOrders);

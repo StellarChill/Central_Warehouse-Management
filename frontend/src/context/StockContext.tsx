@@ -24,6 +24,10 @@ export function StockProvider({ children }: { children: ReactNode }) {
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
 
   const refresh = async () => {
+    // ไม่เรียก API ถ้ายังไม่ได้ login
+    const token = localStorage.getItem('auth_token');
+    if (!token) return;
+
     try {
       const [mats, stocks, issues] = await Promise.all([
         getMaterials(),
@@ -67,7 +71,8 @@ export function StockProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    refresh();
+    const token = localStorage.getItem('auth_token');
+    if (token) refresh();
   }, []);
 
   const onHandBySku = useMemo(() => {

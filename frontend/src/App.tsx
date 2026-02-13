@@ -45,6 +45,7 @@ const HomePage = lazy(() => import("./pages/shared/HomePage"));
 const WarehouseManagementPage = lazy(() => import("./pages/warehouse/WarehouseManagementPage"));
 const WarehouseDetailPage = lazy(() => import("./pages/warehouse/WarehouseDetailPage"));
 const WarehouseDashboardPage = lazy(() => import("./pages/warehouse/WarehouseDashboardPage"));
+const WarehouseSelectPage = lazy(() => import("./pages/warehouse/WarehouseSelectPage"));
 
 // ---- React Query sane defaults ----
 const queryClient = new QueryClient({
@@ -134,7 +135,7 @@ const App = () => (
                   <Route
                     path="admin"
                     element={
-                      <Guard allow={["COMPANY_ADMIN", "ADMIN"]}>
+                      <Guard allow={["COMPANY_ADMIN", "ADMIN", "WH_MANAGER"]}>
                         <CompanyDashboardPage />
                       </Guard>
                     }
@@ -144,7 +145,7 @@ const App = () => (
                   <Route
                     path="branch"
                     element={
-                      <Guard allow={["BRANCH_MANAGER", "BRANCH_USER", "CENTER", "BRANCH", "WAREHOUSE_ADMIN"]}>
+                      <Guard allow={["BRANCH_MANAGER", "BRANCH_USER", "CENTER", "BRANCH", "WAREHOUSE_ADMIN", "REQUESTER"]}>
                         <BranchDashboardPage />
                       </Guard>
                     }
@@ -185,13 +186,21 @@ const App = () => (
                   <Route
                     path="/warehouse-management"
                     element={
-                      <Guard allow={["COMPANY_ADMIN", "ADMIN"]}>
+                      <Guard allow={["COMPANY_ADMIN", "ADMIN", "WH_MANAGER"]}>
                         <WarehouseManagementPage />
                       </Guard>
                     }
                   />
                   <Route path="/warehouse/:id" element={<WarehouseDetailPage />} />
                   <Route path="/warehouse/:id/dashboard" element={<WarehouseDashboardPage />} />
+                  <Route
+                    path="select-warehouse"
+                    element={
+                      <Guard allow={["WH_MANAGER", "WAREHOUSE_ADMIN", "COMPANY_ADMIN", "ADMIN", "PLATFORM_ADMIN"]}>
+                        <WarehouseSelectPage />
+                      </Guard>
+                    }
+                  />
                 </Route>
 
                 {/* Catch-all */}
@@ -275,9 +284,11 @@ function RoleLanding() {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
   if (user.role === 'PLATFORM_ADMIN') return <Navigate to="/platform" replace />;
-  if (['COMPANY_ADMIN', 'ADMIN', 'WAREHOUSE_ADMIN'].includes(user.role)) {
+  if (['WH_MANAGER', 'WAREHOUSE_ADMIN', 'COMPANY_ADMIN'].includes(user.role)) return <Navigate to="/select-warehouse" replace />;
+  if (user.role === 'ADMIN') {
     return <CompanyWarehouseLanding />;
   }
+  if (user.role === 'REQUESTER') return <Navigate to="/requisitions" replace />;
   return <Navigate to="/inventory" replace />;
 }
 

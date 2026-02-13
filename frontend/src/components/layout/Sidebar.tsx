@@ -105,7 +105,7 @@ export function Sidebar({ onClose }: SidebarProps) {
   const { user } = useAuth();
   const role = user?.role || "BRANCH";
   const location = useLocation();
-  const allowWarehouseNav = ["COMPANY_ADMIN", "ADMIN", "WAREHOUSE_ADMIN"].includes(role);
+  const allowWarehouseNav = ["COMPANY_ADMIN", "ADMIN", "WAREHOUSE_ADMIN", "WH_MANAGER"].includes(role);
   const [warehouses, setWarehouses] = useState<WarehouseType[]>([]);
   const [loadingWarehouses, setLoadingWarehouses] = useState(false);
 
@@ -143,13 +143,59 @@ export function Sidebar({ onClose }: SidebarProps) {
     return match ? Number(match[1]) : null;
   }, [location.pathname]);
 
-  const filteredNav = navigation.filter((item) => {
-    const adminPaths = ["/admin", "/admin/users", "/admin/branches", "/admin/reports"];
-    if (adminPaths.includes(item.href)) return role === "ADMIN";
-    if (item.href === "/warehouse-management") return role === "COMPANY_ADMIN" || role === "ADMIN" || role === "WAREHOUSE_ADMIN";
-    if (item.href === "/purchase-orders" || item.href === "/receiving") return role !== "BRANCH";
-    return true;
-  });
+  const filteredNav = useMemo(() => {
+    return navigation.map(item => ({ ...item })).filter((item) => {
+      // Admin paths: accessible by ADMIN and COMPANY_ADMIN (for company dashboard)
+      const adminPaths = ["/admin", "/admin/users", "/admin/branches", "/admin/reports"];
+      if (adminPaths.includes(item.href)) {
+        if (item.href === "/admin") return ["ADMIN", "COMPANY_ADMIN"].includes(role);
+        return ["ADMIN", "COMPANY_ADMIN"].includes(role);
+      }
+
+      // Warehouse Management Menu Logic
+      if (item.href === "/warehouse-management") {
+        // Show for: COMPANY_ADMIN, ADMIN (Manage), and WH_MANAGER/WAREHOUSE_ADMIN (Select Warehouse)
+        if (!["COMPANY_ADMIN", "ADMIN", "WAREHOUSE_ADMIN", "WH_MANAGER"].includes(role)) return false;
+
+        // If role is WH_MANAGER or WAREHOUSE_ADMIN -> change href to /select-warehouse
+        if (["WH_MANAGER", "WAREHOUSE_ADMIN"].includes(role)) {
+          item.href = "/select-warehouse";
+        }
+        return true;
+      }
+
+      // REQUESTER visibility
+      if (role === "REQUESTER") {
+        const requesterPaths = ["/", "/ingredients", "/requisitions", "/requisitions/create"];
+        return requesterPaths.includes(item.href);
+      }
+
+      // WH_MANAGER / WAREHOUSE_ADMIN visibility
+      if (["WH_MANAGER", "WAREHOUSE_ADMIN"].includes(role)) {
+        // Hide unrelated menus if necessary (currently most are relevant)
+        // They should see: Dashboard, Receiving, Inventory, Products, Suppliers, Issuing, Purchasing, Categories, Requisitions, Warehouse Management(Select)
+        const allowedPaths = [
+          "/",
+          "/receiving",
+          "/inventory",
+          "/ingredients",
+          // "/suppliers", // Hidden (Purchasing Dept)
+          "/inventory/issuing",
+          "/purchase-orders",
+          // "/categories", // Hidden (Admin)
+          "/requisitions",
+          "/select-warehouse"
+        ];
+        // Check if current item is allowed
+        // Special case: /warehouse-management becomes /select-warehouse
+        const currentHref = item.href === "/warehouse-management" ? "/select-warehouse" : item.href;
+        return allowedPaths.includes(currentHref);
+      }
+
+      if (item.href === "/purchase-orders" || item.href === "/receiving") return role !== "BRANCH";
+      return true;
+    });
+  }, [role]);
 
   return (
     <div className="flex flex-col h-full bg-card text-card-foreground shadow-premium border-r">
@@ -221,6 +267,8 @@ export function Sidebar({ onClose }: SidebarProps) {
             <NavLink
               key={item.name}
               to={item.href}
+              // Prevent '/inventory' from matching '/inventory/issuing'
+              end={item.href === "/inventory" || item.href === "/"}
               onClick={onClose}
               className={({ isActive }) =>
                 cn(
@@ -238,53 +286,24 @@ export function Sidebar({ onClose }: SidebarProps) {
           );
         })}
 
-        {/* ซ่อนส่วนแสดงภาพรวมคลัง */}
-        {allowWarehouseNav && (
+        {/* ซ่อนส่วนแสดงภาพรวมคลัง (Redundant with Dropdown) */}
+        {/* {allowWarehouseNav && (
           <div className="pt-4 mt-4 border-t">
-            <p className="text-xs font-semibold text-muted-foreground mb-2">
-              คลังของบริษัท
-            </p>
-            {loadingWarehouses && (
+             <p className="text-xs font-semibold text-muted-foreground mb-2">
+               คลังของบริษัท
+             </p>
+             {loadingWarehouses && (
               <div className="text-xs text-muted-foreground">กำลังโหลดคลัง...</div>
             )}
             {!loadingWarehouses && warehouseNavItems.length === 0 && (
               <div className="text-xs text-muted-foreground">ยังไม่มีคลังที่ถูกสร้าง</div>
             )}
             {!loadingWarehouses && warehouseNavItems.map((item) => {
-              const isActive = activeWarehouseId === item.WarehouseId;
-              return (
-                <NavLink
-                  key={item.WarehouseId}
-                  to={item.href}
-                  onClick={onClose}
-                  className={({ isActive: navActive }) =>
-                    cn(
-                      "flex items-center justify-between gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
-                      navActive || isActive
-                        ? "bg-primary/10 text-primary"
-                        : "text-foreground hover:bg-accent hover:text-accent-foreground"
-                    )
-                  }
-                >
-                  <div className="flex items-center gap-3">
-                    <Warehouse className="h-4 w-4 text-primary" />
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium">{item.label}</span>
-                      {item.WarehouseCode && (
-                        <span className="text-xs text-muted-foreground">รหัส {item.WarehouseCode}</span>
-                      )}
-                    </div>
-                  </div>
-                  {item.isPrimary && (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/20 text-primary font-semibold">
-                      คลังหลัก
-                    </span>
-                  )}
-                </NavLink>
-              );
+               // ... (hidden items)
+               return null;
             })}
           </div>
-        )}
+        )} */}
       </nav>
 
       {/* Footer */}

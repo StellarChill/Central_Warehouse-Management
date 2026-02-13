@@ -10,31 +10,31 @@ async function main() {
   // 1. SETUP ROLES (4 ROLES REQUIRED)
   // --------------------------------------------------------
   // 1.1 Platform Admin (ดูแลระบบทั้งหมด)
-  await prisma.role.upsert({ 
-    where: { RoleCode: 'PLATFORM_ADMIN' }, 
-    update: {}, 
-    create: { RoleName: 'Platform Admin', RoleCode: 'PLATFORM_ADMIN' } 
+  await prisma.role.upsert({
+    where: { RoleCode: 'PLATFORM_ADMIN' },
+    update: {},
+    create: { RoleName: 'Platform Admin', RoleCode: 'PLATFORM_ADMIN' }
   });
 
   // 1.2 Company Admin (ดูแลบริษัทตัวเอง)
-  const companyAdminRole = await prisma.role.upsert({ 
-    where: { RoleCode: 'COMPANY_ADMIN' }, 
-    update: {}, 
-    create: { RoleName: 'Company Admin', RoleCode: 'COMPANY_ADMIN' } 
+  const companyAdminRole = await prisma.role.upsert({
+    where: { RoleCode: 'COMPANY_ADMIN' },
+    update: {},
+    create: { RoleName: 'Company Admin', RoleCode: 'COMPANY_ADMIN' }
   });
 
   // 1.3 Warehouse Manager (ดูแลคลัง/จัดซื้อ/เบิกจ่าย) -> เปลี่ยนจาก WAREHOUSE_ADMIN เป็น WH_MANAGER
-  await prisma.role.upsert({ 
-    where: { RoleCode: 'WH_MANAGER' }, 
-    update: {}, 
-    create: { RoleName: 'Warehouse Manager', RoleCode: 'WH_MANAGER' } 
+  await prisma.role.upsert({
+    where: { RoleCode: 'WH_MANAGER' },
+    update: {},
+    create: { RoleName: 'Warehouse Manager', RoleCode: 'WH_MANAGER' }
   });
 
   // 1.4 Requester (คนขอเบิกของผ่าน LINE)
-  const requesterRole = await prisma.role.upsert({ 
-    where: { RoleCode: 'REQUESTER' }, 
-    update: {}, 
-    create: { RoleName: 'Requester', RoleCode: 'REQUESTER' } 
+  const requesterRole = await prisma.role.upsert({
+    where: { RoleCode: 'REQUESTER' },
+    update: {},
+    create: { RoleName: 'Requester', RoleCode: 'REQUESTER' }
   });
 
   // (Optional) Role อื่นๆ เก็บไว้ได้ถ้าต้องการ Backward Compatibility หรือเผื่อใช้
@@ -67,7 +67,7 @@ async function main() {
   if (pfRole) {
     await prisma.user.upsert({
       where: { UserName: 'platform-admin' },
-      update: {},
+      update: { RoleId: pfRole.RoleId }, // ← แก้ role ถ้า user มีอยู่แล้วด้วย
       create: {
         CompanyId: platformCo.CompanyId,
         UserName: 'platform-admin',
@@ -79,6 +79,33 @@ async function main() {
         UserStatusActive: 'ACTIVE',
       },
     });
+  }
+
+  // --------------------------------------------------------
+  // 4. FIX COMPANY ADMIN USERS ที่ได้ role ผิด
+  // --------------------------------------------------------
+  // หา role เก่า (ADMIN, WAREHOUSE_ADMIN ฯลฯ) ที่ถูก assign ผิดให้ company admin users
+  const oldRoles = await prisma.role.findMany({
+    where: { RoleCode: { in: ['ADMIN', 'WAREHOUSE_ADMIN'] } }
+  });
+  const oldRoleIds = oldRoles.map(r => r.RoleId);
+
+  if (oldRoleIds.length > 0 && companyAdminRole) {
+    // หา users ที่มี CompanyId ไม่ใช่ Platform company แต่ได้ role ผิด
+    const wrongRoleUsers = await prisma.user.findMany({
+      where: {
+        RoleId: { in: oldRoleIds },
+        CompanyId: { not: platformCo.CompanyId },
+      }
+    });
+
+    for (const u of wrongRoleUsers) {
+      await prisma.user.update({
+        where: { UserId: u.UserId },
+        data: { RoleId: companyAdminRole.RoleId },
+      });
+      console.log(`  🔧 Fixed user "${u.UserName}" (UserId=${u.UserId}): → COMPANY_ADMIN`);
+    }
   }
 
   console.log('✅ Seed completed: Roles & Platform Admin created.');

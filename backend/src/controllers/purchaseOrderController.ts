@@ -30,28 +30,35 @@ function validateDetails(details: any[]) {
   }));
 }
 
-// สร้างโค้ดรันนิ่งแบบง่าย: PO-001, PO-002, ...
-async function generatePurchaseOrderCode() {
-  const prefix = 'PO-';
+// สร้างโค้ดรันนิ่ง: PO-YYYYMM-XXXX (Reset ทุกเดือน, แยกตามบริษัท)
+async function generatePurchaseOrderCode(companyId: number) {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const prefix = `PO-${year}${month}-`;
 
-  // หาเลข PO ล่าสุด
+  // หาเลข PO ล่าสุดของบริษัทนี้ ในเดือนนี้
   const last = await prisma.purchaseOrder.findFirst({
-    where: { PurchaseOrderCode: { startsWith: prefix } },
+    where: {
+      CompanyId: companyId,
+      PurchaseOrderCode: { startsWith: prefix }
+    },
     orderBy: { PurchaseOrderCode: 'desc' },
     select: { PurchaseOrderCode: true },
   });
 
-  // ดึงตัวเลขจาก PO code (เช่น "PO-001" -> 1)
+  // ดึงตัวเลขจาก PO code (เช่น "PO-202301-0001" -> 1)
   let nextNum = 1;
   if (last) {
-    const match = last.PurchaseOrderCode.match(/PO-(\d+)/);
-    if (match) {
-      nextNum = parseInt(match[1], 10) + 1;
+    const parts = last.PurchaseOrderCode.split('-');
+    const lastNum = parseInt(parts[parts.length - 1], 10);
+    if (!isNaN(lastNum)) {
+      nextNum = lastNum + 1;
     }
   }
 
-  // Format ด้วย zero-padding 3 หลัก (001, 002, ..., 999, 1000)
-  const paddedNum = nextNum.toString().padStart(3, '0');
+  // Format ด้วย zero-padding 4 หลัก (0001)
+  const paddedNum = nextNum.toString().padStart(4, '0');
   return `${prefix}${paddedNum}`;
 }
 
@@ -79,7 +86,7 @@ export async function createPurchaseOrder(req: Request, res: Response) {
     );
 
     // Generate running code (retry once if collision)
-    let code = await generatePurchaseOrderCode();
+    let code = await generatePurchaseOrderCode(CompanyId);
     let po;
     try {
       po = await prisma.purchaseOrder.create({
@@ -95,12 +102,13 @@ export async function createPurchaseOrder(req: Request, res: Response) {
       });
     } catch (e: any) {
       if (e?.code === 'P2002') {
-        code = await generatePurchaseOrderCode();
+        // Retry generation
+        code = await generatePurchaseOrderCode(CompanyId);
         po = await prisma.purchaseOrder.create({
           data: {
             CompanyId,
             SupplierId: +SupplierId,
-            PurchaseOrderCode: code,
+            PurchaseOrderCode: code, // Try again with likely new number
             TotalPrice: total,
             PurchaseOrderStatus: rest.PurchaseOrderStatus || 'DRAFT',
             DateTime: rest.DateTime ? new Date(rest.DateTime) : new Date(),

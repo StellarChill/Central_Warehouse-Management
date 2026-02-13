@@ -11,8 +11,9 @@ router.get('/', listMaterials);
 router.get('/:id', getMaterial);
 
 // สร้าง/แก้ไข/ลบ: เฉพาะ Admin + Manager
-router.post('/', requireRoles('PLATFORM_ADMIN', 'COMPANY_ADMIN', 'WH_MANAGER'), createMaterial);
-router.put('/:id', requireRoles('PLATFORM_ADMIN', 'COMPANY_ADMIN', 'WH_MANAGER'), updateMaterial);
-router.delete('/:id', requireRoles('PLATFORM_ADMIN', 'COMPANY_ADMIN', 'WH_MANAGER'), deleteMaterial);
+// สร้าง/แก้ไข/ลบ: เฉพาะ Admin + Manager
+router.post('/', requireRoles('PLATFORM_ADMIN', 'COMPANY_ADMIN', 'WH_MANAGER', 'WAREHOUSE_ADMIN'), createMaterial);
+router.put('/:id', requireRoles('PLATFORM_ADMIN', 'COMPANY_ADMIN', 'WH_MANAGER', 'WAREHOUSE_ADMIN'), updateMaterial);
+router.delete('/:id', requireRoles('PLATFORM_ADMIN', 'COMPANY_ADMIN', 'WH_MANAGER', 'WAREHOUSE_ADMIN'), deleteMaterial);
 
 export default router;

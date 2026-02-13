@@ -107,12 +107,12 @@ function genBarcode(receiptCode: string, materialId: number, idx: number) {
   // Unique enough: RC-CODE-MID-idx-yyyymmddHHMMssms
   const ts = new Date();
   const pad = (n: number) => n.toString().padStart(2, '0');
-  const stamp = `${ts.getFullYear()}${pad(ts.getMonth()+1)}${pad(ts.getDate())}${pad(ts.getHours())}${pad(ts.getMinutes())}${pad(ts.getSeconds())}${ts.getMilliseconds()}`;
+  const stamp = `${ts.getFullYear()}${pad(ts.getMonth() + 1)}${pad(ts.getDate())}${pad(ts.getHours())}${pad(ts.getMinutes())}${pad(ts.getSeconds())}${ts.getMilliseconds()}`;
   return `${receiptCode}-${materialId}-${idx}-${stamp}`;
 }
 
-// Generate daily running code: RC-YYYYMMDD-0001
-async function generateReceiptCode() {
+// Generate daily running code per Company: RC-YYYYMMDD-XXXX
+async function generateReceiptCode(companyId: number) {
   const pad4 = (n: number) => n.toString().padStart(4, '0');
   const d = new Date();
   const y = d.getFullYear();
@@ -120,8 +120,12 @@ async function generateReceiptCode() {
   const day = String(d.getDate()).padStart(2, '0');
   const dateStr = `${y}${m}${day}`;
   const prefix = `RC-${dateStr}-`;
+
   const last = await prisma.receipt.findFirst({
-    where: { ReceiptCode: { startsWith: prefix } },
+    where: {
+      CompanyId: companyId,
+      ReceiptCode: { startsWith: prefix }
+    },
     orderBy: { ReceiptCode: 'desc' },
     select: { ReceiptCode: true },
   });
@@ -146,42 +150,58 @@ export async function createReceipt(req: Request, res: Response) {
     const { map, total } = await enforceNotExceed(CompanyId, poId, normalized);
     const rdt = ReceiptDateTime ? new Date(ReceiptDateTime) : new Date();
 
-    // Generate running code (retry once on collision)
-    let code = await generateReceiptCode();
-    const created = await prisma.$transaction(async (tx) => {
-      const receipt = await tx.receipt.create({
-        data: { CompanyId, PurchaseOrderId: poId, ReceiptCode: code, ReceiptDateTime: rdt, ReceiptTotalPrice: total, CreatedBy },
-      });
-      await tx.receiptDetail.createMany({
-        data: normalized.map(d => ({
-          CompanyId,
-          WarehouseId,
-          ReceiptId: receipt.ReceiptId,
-          PurchaseOrderDetailId: map.get(d.MaterialId)!.podId,
-          MaterialId: d.MaterialId,
-          MaterialQuantity: d.MaterialQuantity,
-          CreatedBy,
-        })),
-      });
+    // Helper to perform transaction with a specific code
+    const doCreate = async (code: string) => {
+      return await prisma.$transaction(async (tx) => {
+        const receipt = await tx.receipt.create({
+          data: { CompanyId, PurchaseOrderId: poId, ReceiptCode: code, ReceiptDateTime: rdt, ReceiptTotalPrice: total, CreatedBy },
+        });
 
-      // Create stock rows per material (batch-level)
-      await tx.stock.createMany({
-        data: normalized.map((d, i) => ({
-          CompanyId,
-          WarehouseId,
-          MaterialId: d.MaterialId,
-          Quantity: d.MaterialQuantity,
-          Barcode: genBarcode(code, d.MaterialId, i + 1),
-          StockPrice: map.get(d.MaterialId)!.price,
-          ReceiptId: receipt.ReceiptId,
-          PurchaseOrderId: poId,
-          Issue: 0,
-          Remain: d.MaterialQuantity,
-          CreatedBy: CreatedBy,
-        })),
+        await tx.receiptDetail.createMany({
+          data: normalized.map(d => ({
+            CompanyId,
+            WarehouseId,
+            ReceiptId: receipt.ReceiptId,
+            PurchaseOrderDetailId: map.get(d.MaterialId)!.podId,
+            MaterialId: d.MaterialId,
+            MaterialQuantity: d.MaterialQuantity,
+            CreatedBy,
+          })),
+        });
+
+        // Create stock rows per material (batch-level)
+        await tx.stock.createMany({
+          data: normalized.map((d, i) => ({
+            CompanyId,
+            WarehouseId,
+            MaterialId: d.MaterialId,
+            Quantity: d.MaterialQuantity,
+            Barcode: genBarcode(code, d.MaterialId, i + 1),
+            StockPrice: map.get(d.MaterialId)!.price,
+            ReceiptId: receipt.ReceiptId,
+            PurchaseOrderId: poId,
+            Issue: 0,
+            Remain: d.MaterialQuantity,
+            CreatedBy: CreatedBy,
+          })),
+        });
+        return receipt;
       });
-      return receipt;
-    });
+    };
+
+    // Generate running code (retry once on collision)
+    let code = await generateReceiptCode(CompanyId);
+    let created;
+    try {
+      created = await doCreate(code);
+    } catch (e: any) {
+      if (e?.code === 'P2002') {
+        code = await generateReceiptCode(CompanyId);
+        created = await doCreate(code);
+      } else {
+        throw e;
+      }
+    }
 
     // After creation, if the PO is fully received, mark it as RECEIVED
     try {
@@ -200,7 +220,7 @@ export async function createReceipt(req: Request, res: Response) {
           });
         }
       }
-    } catch {}
+    } catch { }
 
     const result = await prisma.receipt.findUnique({ where: { ReceiptId: created.ReceiptId }, include: includeReceipt });
     if (!result) throw httpError(500, 'Failed to load created receipt');
@@ -213,8 +233,18 @@ export async function createReceipt(req: Request, res: Response) {
 export async function listReceipts(_req: Request, res: Response) {
   try {
     const CompanyId = getCompanyId(_req as any, true)!;
+    const WarehouseId = getWarehouseId(_req as any, false); // Optional filter
+
+    // Construct where clause
+    const where: any = { CompanyId };
+    if (WarehouseId) {
+      where.ReceiptDetails = {
+        some: { WarehouseId }
+      };
+    }
+
     const rows = await prisma.receipt.findMany({
-      where: { CompanyId },
+      where,
       orderBy: { ReceiptDateTime: 'desc' },
       include: { PurchaseOrder: { select: poSelect } },
     });
@@ -309,7 +339,7 @@ export async function updateReceipt(req: Request, res: Response) {
           });
         }
       }
-    } catch {}
+    } catch { }
 
     const result = await prisma.receipt.findUnique({ where: { ReceiptId: id }, include: includeReceipt });
     if (!result) throw httpError(404, 'Not found');

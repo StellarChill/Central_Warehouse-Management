@@ -8,104 +8,108 @@ const JWT_SECRET = process.env.JWT_SECRET || 'changeme';
 
 export async function register(req: Request, res: Response) {
 	try {
-			const { UserName, UserPassword, RoleId, BranchId, Email, TelNumber, LineId, CompanyId: CompanyIdBody, RequestedRoleText, RoleText, RequestedRole } = req.body;
-			if (!UserName) return res.status(400).json({ error: 'UserName is required' });
+		const { UserName, UserPassword, RoleId, BranchId, Email, TelNumber, LineId, CompanyId: CompanyIdBody, RequestedRoleText, RoleText, RequestedRole } = req.body;
+		if (!UserName) return res.status(400).json({ error: 'UserName is required' });
 
-			// If no password provided, allow it only when registering via LINE (LineId present)
-			if (!UserPassword && !LineId) {
-				return res.status(400).json({ error: 'UserPassword is required when not registering via LINE' });
-			}
+		// If no password provided, allow it only when registering via LINE (LineId present)
+		if (!UserPassword && !LineId) {
+			return res.status(400).json({ error: 'UserPassword is required when not registering via LINE' });
+		}
 
-			// Normalize numeric ids: treat 0 or invalid as unset so defaults apply
-			const roleIdNum = Number(RoleId);
-			const branchIdNum = Number(BranchId);
-			const roleToUse = Number.isFinite(roleIdNum) && roleIdNum > 0 ? roleIdNum : 3; // default BRANCH
-			const branchToUse = Number.isFinite(branchIdNum) && branchIdNum > 0 ? branchIdNum : 1;
+		// Normalize numeric ids: treat 0 or invalid as unset so defaults apply
+		const roleIdNum = Number(RoleId);
+		const branchIdNum = Number(BranchId);
+		const roleToUse = Number.isFinite(roleIdNum) && roleIdNum > 0 ? roleIdNum : 3; // default BRANCH
+		const branchToUse = Number.isFinite(branchIdNum) && branchIdNum > 0 ? branchIdNum : 1;
 
-			// Resolve CompanyId: prefer provided, otherwise derive from Branch
-			let companyIdToUse: number | null = null;
-			if (Number.isFinite(Number(CompanyIdBody)) && Number(CompanyIdBody) > 0) {
-				companyIdToUse = Number(CompanyIdBody);
-			} else if (Number.isFinite(branchToUse) && branchToUse > 0) {
-				const br = await prisma.branch.findUnique({ where: { BranchId: branchToUse } });
-				if (br) companyIdToUse = br.CompanyId;
-			}
-			if (!companyIdToUse) {
-				return res.status(400).json({ error: 'CompanyId is required (pass CompanyId or a BranchId belonging to a company)' });
-			}
+		// Resolve CompanyId: prefer provided, otherwise derive from Branch
+		let companyIdToUse: number | null = null;
+		if (Number.isFinite(Number(CompanyIdBody)) && Number(CompanyIdBody) > 0) {
+			companyIdToUse = Number(CompanyIdBody);
+		} else if (Number.isFinite(branchToUse) && branchToUse > 0) {
+			const br = await prisma.branch.findUnique({ where: { BranchId: branchToUse } });
+			if (br) companyIdToUse = br.CompanyId;
+		}
+		if (!companyIdToUse) {
+			return res.status(400).json({ error: 'CompanyId is required (pass CompanyId or a BranchId belonging to a company)' });
+		}
 
-			// Check existing by UserName or LineId to return clear errors
-			const existingByName = await prisma.user.findUnique({ where: { UserName } });
-			if (existingByName) {
-				// Return existing user info to help UI/admin locate the duplicate
-				return res.status(409).json({ error: 'User already exists', user: {
+		// Check existing by UserName or LineId to return clear errors
+		const existingByName = await prisma.user.findUnique({ where: { UserName } });
+		if (existingByName) {
+			// Return existing user info to help UI/admin locate the duplicate
+			return res.status(409).json({
+				error: 'User already exists', user: {
 					UserId: existingByName.UserId,
 					UserName: existingByName.UserName,
 					LineId: existingByName.LineId,
 					CreatedAt: existingByName.CreatedAt,
 					RoleId: existingByName.RoleId,
 					BranchId: existingByName.BranchId,
-				} });
-			}
-			if (LineId) {
-				const existingByLine = await prisma.user.findFirst({ where: { LineId } });
-				if (existingByLine) {
-					return res.status(409).json({ error: 'LINE account already registered', user: {
+				}
+			});
+		}
+		if (LineId) {
+			const existingByLine = await prisma.user.findFirst({ where: { LineId } });
+			if (existingByLine) {
+				return res.status(409).json({
+					error: 'LINE account already registered', user: {
 						UserId: existingByLine.UserId,
 						UserName: existingByLine.UserName,
 						LineId: existingByLine.LineId,
 						CreatedAt: existingByLine.CreatedAt,
 						RoleId: existingByLine.RoleId,
 						BranchId: existingByLine.BranchId,
-					} });
-				}
-			}
-
-			// If password missing (LIFF flow), generate a random one so user cannot login via password
-			let passwordToHash = UserPassword;
-			if (!passwordToHash) {
-				const crypto = await import('crypto');
-				passwordToHash = crypto.randomBytes(16).toString('hex');
-			}
-
-			const hashed = await bcrypt.hash(passwordToHash, 10);
-
-			try {
-				const user = await prisma.user.create({
-					data: ({
-						CompanyId: companyIdToUse!,
-						UserName,
-						UserPassword: hashed,
-						RoleId: roleToUse,
-						BranchId: branchToUse,
-						Email,
-						TelNumber,
-						LineId,
-						RequestedRoleText: (RequestedRoleText || RoleText || RequestedRole) ?? null,
-					} as any),
-					select: ({
-						UserId: true,
-						UserName: true,
-						RoleId: true,
-						BranchId: true,
-						Email: true,
-						TelNumber: true,
-						LineId: true,
-						RequestedRoleText: true,
-						CreatedAt: true,
-					} as any),
+					}
 				});
-
-				return res.status(201).json({ user });
-			} catch (e: any) {
-				console.error('Prisma create user failed', e);
-				// Prisma constraint error -> return meaningful message
-				if (e.code === 'P2002') {
-					return res.status(409).json({ error: 'Unique constraint failed' });
-				}
-				return res.status(500).json({ error: 'Internal server error' });
 			}
-    
+		}
+
+		// If password missing (LIFF flow), generate a random one so user cannot login via password
+		let passwordToHash = UserPassword;
+		if (!passwordToHash) {
+			const crypto = await import('crypto');
+			passwordToHash = crypto.randomBytes(16).toString('hex');
+		}
+
+		const hashed = await bcrypt.hash(passwordToHash, 10);
+
+		try {
+			const user = await prisma.user.create({
+				data: ({
+					CompanyId: companyIdToUse!,
+					UserName,
+					UserPassword: hashed,
+					RoleId: roleToUse,
+					BranchId: branchToUse,
+					Email,
+					TelNumber,
+					LineId,
+					RequestedRoleText: (RequestedRoleText || RoleText || RequestedRole) ?? null,
+				} as any),
+				select: ({
+					UserId: true,
+					UserName: true,
+					RoleId: true,
+					BranchId: true,
+					Email: true,
+					TelNumber: true,
+					LineId: true,
+					RequestedRoleText: true,
+					CreatedAt: true,
+				} as any),
+			});
+
+			return res.status(201).json({ user });
+		} catch (e: any) {
+			console.error('Prisma create user failed', e);
+			// Prisma constraint error -> return meaningful message
+			if (e.code === 'P2002') {
+				return res.status(409).json({ error: 'Unique constraint failed' });
+			}
+			return res.status(500).json({ error: 'Internal server error' });
+		}
+
 	} catch (err) {
 		console.error(err);
 		return res.status(500).json({ error: 'Internal server error' });
@@ -140,8 +144,8 @@ export async function registerPublic(req: Request, res: Response) {
 		} else {
 			const { TempCompanyName, TempCompanyCode, TempCompanyAddress, TempCompanyTaxId, TempCompanyTelNumber, TempCompanyEmail } = tempCompany || {};
 			if (!TempCompanyName) return res.status(400).json({ error: 'TempCompanyName is required' });
-			
-            const base = String(TempCompanyCode || TempCompanyName).toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'TEMP-CO';
+
+			const base = String(TempCompanyCode || TempCompanyName).toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'TEMP-CO';
 			let code = base;
 			let i = 1;
 			while (await prisma.tempCompany.findUnique({ where: { TempCompanyCode: code } })) {
@@ -164,16 +168,16 @@ export async function registerPublic(req: Request, res: Response) {
 		// Place under PLATFORM company temporarily
 		const platform = await prisma.company.findUnique({ where: { CompanyCode: 'PLATFORM' } });
 		if (!platform) return res.status(500).json({ error: 'Platform company not configured' });
-		
-        // Default branch (Platform HQ or find any)
-        const platformBranch = await prisma.branch.findFirst({ where: { CompanyId: platform.CompanyId } });
+
+		// Default branch (Platform HQ or find any)
+		const platformBranch = await prisma.branch.findFirst({ where: { CompanyId: platform.CompanyId } });
 		if (!platformBranch) return res.status(500).json({ error: 'Platform branch not configured' });
-		
-        // --- แก้ไขจุดนี้: ให้ Default Role เป็น REQUESTER ---
+
+		// --- แก้ไขจุดนี้: ให้ Default Role เป็น REQUESTER ---
 		const requesterRole = await prisma.role.findFirst({ where: { RoleCode: 'REQUESTER' } });
 		// ถ้าไม่มี REQUESTER ให้ fallback ไป VIEWER
-        const fallbackRole = await prisma.role.findFirst({ where: { RoleCode: 'VIEWER' } });
-        const roleToUse = requesterRole || fallbackRole;
+		const fallbackRole = await prisma.role.findFirst({ where: { RoleCode: 'VIEWER' } });
+		const roleToUse = requesterRole || fallbackRole;
 
 		if (!roleToUse) return res.status(500).json({ error: 'Default role (REQUESTER) not configured' });
 
@@ -376,7 +380,9 @@ export async function registerCompanyPublic(req: Request, res: Response) {
 			});
 
 			const companyAdminRole = await tx.role.findFirst({
-				where: { OR: [{ RoleCode: 'COMPANY_ADMIN' }, { RoleCode: 'ADMIN' }] },
+				where: { RoleCode: 'COMPANY_ADMIN' },
+			}) ?? await tx.role.findFirst({
+				where: { RoleCode: 'ADMIN' },
 			});
 			if (!companyAdminRole) throw new Error('Company Admin role not configured');
 
@@ -430,13 +436,13 @@ export async function registerCompanyPublic(req: Request, res: Response) {
 }
 
 export async function getAllUsers(req: Request, res: Response) {
-  try {
-    const users = await prisma.user.findMany();
-    res.json(users);
-  } catch (error) {
-    console.error('Error fetching users:', error);
-    res.status(500).json({ error: 'Failed to fetch users' });
-  }
+	try {
+		const users = await prisma.user.findMany();
+		res.json(users);
+	} catch (error) {
+		console.error('Error fetching users:', error);
+		res.status(500).json({ error: 'Failed to fetch users' });
+	}
 }
 
 // Company-scoped users: platform admin can override via ?companyId= or x-company-id header
