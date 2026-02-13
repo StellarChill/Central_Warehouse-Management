@@ -1,10 +1,10 @@
 // src/App.tsx
-import React, { Suspense, lazy } from "react";
+import React, { Suspense, lazy, useEffect, useState } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { AppLayout } from "./components/layout/AppLayout";
 import { AuthProvider, useAuth, Role } from "./context/AuthContext";
 import { StockProvider } from "./context/StockContext";
@@ -137,6 +137,14 @@ const App = () => (
                     element={
                       <Guard allow={["COMPANY_ADMIN", "ADMIN", "WH_MANAGER"]}>
                         <CompanyDashboardPage />
+                      </Guard>
+                    }
+                  />
+                  <Route
+                    path="/dashboard"
+                    element={
+                      <Guard allow={["COMPANY_ADMIN", "ADMIN", "WH_MANAGER"]}>
+                        <SmartDashboard />
                       </Guard>
                     }
                   />
@@ -290,6 +298,43 @@ function RoleLanding() {
   }
   if (user.role === 'REQUESTER') return <Navigate to="/requisitions" replace />;
   return <Navigate to="/inventory" replace />;
+}
+
+// Smart Dashboard: Redirects to specific warehouse dashboard (with graphs) or falls back to company view
+function SmartDashboard() {
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const resolveDashboard = async () => {
+      // 1. Check selected warehouse
+      const stored = localStorage.getItem('selected_warehouse_id');
+      if (stored && stored !== 'all') {
+        navigate(`/warehouse/${stored}/dashboard`, { replace: true });
+        return;
+      }
+
+      // 2. If 'all' selected (or none), try to find ANY warehouse to show graphs
+      // because User explicitly requested "graphs" which only exist in WarehouseDashboard
+      try {
+        const whs = await getWarehouses();
+        if (whs.length > 0) {
+          // Default to first warehouse
+          navigate(`/warehouse/${whs[0].WarehouseId}/dashboard`, { replace: true });
+          return;
+        }
+      } catch (e) {
+        console.error("Failed to fetch warehouses for dashboard redirect", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    resolveDashboard();
+  }, [navigate]);
+
+  if (loading) return <LoadingScreen />;
+  return <CompanyDashboardPage />;
 }
 
 function CompanyWarehouseLanding() {

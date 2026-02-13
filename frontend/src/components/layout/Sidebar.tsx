@@ -35,7 +35,7 @@ interface SidebarProps {
 const navigation = [
   {
     name: th.nav.dashboard,
-    href: "/",
+    href: "/dashboard",
     icon: Warehouse,
     premiumIcon: ClipboardList,
   },
