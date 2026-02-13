@@ -10,14 +10,16 @@ import {
     getMaterials,
     createWithdrawnRequest,
     Branch,
-    Material
+    Material,
+    deleteRequisition,
+    getRequisition
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "@/components/ui/use-toast";
-import { Loader2, Check, X, PackageCheck, RefreshCw, Plus, Trash2 } from "lucide-react";
+import { Loader2, Check, X, PackageCheck, RefreshCw, Plus, Trash2, Eye } from "lucide-react";
 import { format } from "date-fns";
 import { useStock } from "@/context/StockContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -33,6 +35,7 @@ export default function InventoryIssuingPage() {
     const [processingId, setProcessingId] = useState<number | null>(null);
     const { refresh: refreshStock } = useStock();
     const [createOpen, setCreateOpen] = useState(false);
+    const [viewItem, setViewItem] = useState<WithdrawnRequest | null>(null);
     const { user } = useAuth();
 
     const getSelectedWarehouseId = () => {
@@ -45,8 +48,6 @@ export default function InventoryIssuingPage() {
         setLoading(true);
         try {
             const data = await getRequisitions();
-            // Filter out completed ones if we only want to manage pending/approved
-            // Or show all sorted by date
             setRequests(data.sort((a, b) => new Date(b.CreatedAt).getTime() - new Date(a.CreatedAt).getTime()));
         } catch (e) {
             console.error("Failed to load requests", e);
@@ -101,10 +102,23 @@ export default function InventoryIssuingPage() {
             await shipRequisition(id);
             toast({ title: "บันทึกการจ่ายสินค้าเรียบร้อย" });
             await loadRequests();
-            refreshStock(); // Refresh global stock context
+            refreshStock();
         } catch (e: any) {
-            // e.message should come from backend (e.g. "สินค้าไม่เพียงพอ...")
             toast({ variant: "destructive", title: "ทำรายการไม่สำเร็จ", description: e.message });
+        } finally {
+            setProcessingId(null);
+        }
+    };
+
+    const handleDelete = async (id: number) => {
+        if (!confirm("ยืนยันการลบรายการนี้?")) return;
+        setProcessingId(id);
+        try {
+            await deleteRequisition(id);
+            toast({ title: "ลบรายการเรียบร้อย" });
+            loadRequests();
+        } catch (e: any) {
+            toast({ variant: "destructive", title: "เกิดข้อผิดพลาด", description: e.message });
         } finally {
             setProcessingId(null);
         }
@@ -116,7 +130,7 @@ export default function InventoryIssuingPage() {
                 return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">รอดำเนินการ</Badge>;
             case "APPROVED":
                 return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">อนุมัติแล้ว</Badge>;
-            case "COMPLETED": // Or whatever status 'shipRequisition' results in effectively (issue created)
+            case "COMPLETED":
                 return <Badge variant="default" className="bg-green-600">จ่ายแล้ว</Badge>;
             case "REJECTED":
                 return <Badge variant="destructive">ปฏิเสธ</Badge>;
@@ -206,6 +220,22 @@ export default function InventoryIssuingPage() {
                                                     <PackageCheck className="h-4 w-4 mr-1" /> จ่ายสินค้า
                                                 </Button>
                                             )}
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => setViewItem(req)}
+                                            >
+                                                <Eye className="h-4 w-4" />
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                onClick={() => handleDelete(req.RequestId)}
+                                                disabled={!!processingId}
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
                                         </TableCell>
                                     </TableRow>
                                 ))}
@@ -221,10 +251,87 @@ export default function InventoryIssuingPage() {
                 onSuccess={() => {
                     loadRequests();
                     toast({ title: "สร้างคำขอจำลองเรียบร้อย" });
-                    setCreateOpen(false);
                 }}
             />
+
+            <ViewRequestDialog
+                request={viewItem}
+                open={!!viewItem}
+                onOpenChange={(v) => !v && setViewItem(null)}
+            />
         </div>
+    );
+}
+
+function ViewRequestDialog({ request: initialRequest, open, onOpenChange }: { request: WithdrawnRequest | null, open: boolean, onOpenChange: (v: boolean) => void }) {
+    const [data, setData] = useState<WithdrawnRequest | null>(null);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (open && initialRequest?.RequestId) {
+            setLoading(true);
+            getRequisition(initialRequest.RequestId)
+                .then((res) => setData(res))
+                .catch((e) => console.error(e))
+                .finally(() => setLoading(false));
+        } else {
+            setData(null);
+        }
+    }, [open, initialRequest]);
+
+    const req = data || initialRequest;
+
+    if (!req) return null;
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-3xl">
+                <DialogHeader>
+                    <DialogTitle>รายละเอียดคำขอเบิก ({req.WithdrawnRequestCode})</DialogTitle>
+                </DialogHeader>
+                <div className="py-4">
+                    <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
+                        <div>
+                            <span className="font-semibold">วันที่:</span> {req.RequestDate ? format(new Date(req.RequestDate), "dd/MM/yyyy HH:mm") : '-'}
+                        </div>
+                        <div>
+                            <span className="font-semibold">สาขา:</span> Branch {req.BranchId}
+                        </div>
+                        <div>
+                            <span className="font-semibold">สถานะ:</span> {req.WithdrawnRequestStatus}
+                        </div>
+                    </div>
+
+                    {loading ? (
+                        <div className="text-center py-8"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></div>
+                    ) : (
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>รหัสสินค้า</TableHead>
+                                    <TableHead>ชื่อสินค้า</TableHead>
+                                    <TableHead className="text-right">จำนวนที่ขอ</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {req.WithdrawnRequestDetails?.map((d, i) => (
+                                    <TableRow key={i}>
+                                        <TableCell>{d.Material?.MaterialCode || '-'}</TableCell>
+                                        <TableCell>{d.Material?.MaterialName || `Material ${d.MaterialId}`}</TableCell>
+                                        <TableCell className="text-right">{d.WithdrawnQuantity}</TableCell>
+                                    </TableRow>
+                                ))}
+                                {(!req.WithdrawnRequestDetails || req.WithdrawnRequestDetails.length === 0) && (
+                                    <TableRow>
+                                        <TableCell colSpan={3} className="text-center text-muted-foreground">ไม่มีรายการสินค้า</TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    )}
+                </div>
+            </DialogContent>
+        </Dialog>
     );
 }
 
@@ -270,6 +377,7 @@ function CreateRequestDialog({ open, onOpenChange, onSuccess }: { open: boolean,
                 details
             });
             onSuccess();
+            onOpenChange(false);
         } catch (e) {
             alert("Error creating request");
         } finally {
@@ -336,3 +444,4 @@ function CreateRequestDialog({ open, onOpenChange, onSuccess }: { open: boolean,
         </Dialog>
     );
 }
+

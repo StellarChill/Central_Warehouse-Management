@@ -109,6 +109,12 @@ export async function createIssueFromRequest(req: Request, res: Response) {
         }
       }
 
+      // Update WithdrawnRequest status to COMPLETED
+      await tx.withdrawnRequest.update({
+        where: { RequestId: reqRow.RequestId },
+        data: { WithdrawnRequestStatus: 'COMPLETED' }
+      });
+
       return issue;
     });
 

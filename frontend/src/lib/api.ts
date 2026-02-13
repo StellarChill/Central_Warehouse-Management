@@ -339,6 +339,7 @@ export type WithdrawnRequest = {
   UpdatedAt: string;
   CreatedBy?: number | null;
   UpdatedBy?: number | null;
+  WithdrawnRequestDetails?: (WithdrawnRequestDetail & { Material?: { MaterialCode: string; MaterialName: string } })[];
 };
 
 export type WithdrawnRequestDetail = {
@@ -346,6 +347,7 @@ export type WithdrawnRequestDetail = {
   RequestId: number;
   MaterialId: number;
   WithdrawnQuantity: number;
+  Material?: { MaterialCode: string; MaterialName: string };
 };
 
 export async function getRequisitions(): Promise<WithdrawnRequest[]> {
@@ -364,6 +366,10 @@ export async function approveRequisition(id: number) {
 export async function rejectRequisition(id: number) {
   const user = getUser();
   return apiPut(`/request/${id}`, { WithdrawnRequestStatus: 'REJECTED', UpdatedBy: user?.UserId || undefined });
+}
+
+export async function deleteRequisition(id: number) {
+  return apiDelete(`/request/${id}`);
 }
 
 export async function shipRequisition(id: number) {

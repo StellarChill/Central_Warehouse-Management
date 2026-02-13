@@ -32,7 +32,7 @@ const emptyForm: FormState = { WarehouseName: "", WarehouseCode: "", WarehouseAd
 const WarehouseManagementPage: React.FC = () => {
   const qc = useQueryClient();
   const { user } = useAuth();
-  const canManage = user?.role === "COMPANY_ADMIN" || user?.role === "ADMIN";
+  const canManage = ["COMPANY_ADMIN", "ADMIN", "WH_MANAGER"].includes(user?.role || "");
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["warehouses"],
     queryFn: getWarehouses,

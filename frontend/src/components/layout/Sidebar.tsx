@@ -152,8 +152,8 @@ export function Sidebar({ onClose }: SidebarProps) {
         // Show for: COMPANY_ADMIN, ADMIN (Manage), and WH_MANAGER/WAREHOUSE_ADMIN (Select Warehouse)
         if (!["COMPANY_ADMIN", "ADMIN", "WAREHOUSE_ADMIN", "WH_MANAGER"].includes(role)) return false;
 
-        // If role is WH_MANAGER or WAREHOUSE_ADMIN -> change href to /select-warehouse
-        if (["WH_MANAGER", "WAREHOUSE_ADMIN"].includes(role)) {
+        // If role is WAREHOUSE_ADMIN -> change href to /select-warehouse (only select, no manage)
+        if (role === "WAREHOUSE_ADMIN") {
           item.href = "/select-warehouse";
         }
         return true;
@@ -179,12 +179,16 @@ export function Sidebar({ onClose }: SidebarProps) {
           "/purchase-orders",
           // "/categories", // Hidden (Admin)
           // "/requisitions",
+          "/warehouse-management",
           "/select-warehouse"
         ];
         // Check if current item is allowed
-        // Special case: /warehouse-management becomes /select-warehouse
-        const currentHref = item.href === "/warehouse-management" ? "/select-warehouse" : item.href;
-        return allowedPaths.includes(currentHref);
+        // Special case: /warehouse-management becomes /select-warehouse for WAREHOUSE_ADMIN
+        let currentHref = item.href;
+        if (role === "WAREHOUSE_ADMIN" && item.href === "/warehouse-management") {
+          currentHref = "/select-warehouse";
+        }
+        return allowedPaths.includes(currentHref) || allowedPaths.includes(item.href);
       }
 
       if (item.href === "/purchase-orders" || item.href === "/receiving") return role !== "BRANCH";
