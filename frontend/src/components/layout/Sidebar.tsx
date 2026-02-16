@@ -177,6 +177,7 @@ export function Sidebar({ onClose }: SidebarProps) {
         // They should see: Dashboard, Receiving, Inventory, Products, Suppliers, Issuing, Purchasing, Categories, Requisitions, Warehouse Management(Select)
         const allowedPaths = [
           "/",
+          "/dashboard",
           "/receiving",
           "/inventory",
           // "/inventory/adjustment",

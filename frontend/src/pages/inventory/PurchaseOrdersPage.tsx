@@ -16,7 +16,9 @@ import {
   CheckCircle,
   Send,
   FileTextIcon,
-  X
+  X,
+  AlertTriangle,
+  Info
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -37,6 +39,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -113,8 +125,7 @@ type POWithDetails = {
 
 export default function PurchaseOrdersPage() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [expandedStatus, setExpandedStatus] = useState<Record<string, boolean>>({});
+  const [statusFilter, setStatusFilter] = useState("active"); // active | history | all
   const [poList, setPoList] = useState<PO[]>([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -140,13 +151,48 @@ export default function PurchaseOrdersPage() {
   const [viewingPo, setViewingPo] = useState<POWithDetails | null>(null);
   const [viewingPoItems, setViewingPoItems] = useState<ApiMaterial[]>([]);
 
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [poToDelete, setPoToDelete] = useState<PO | null>(null);
+
+  const [confirmActionOpen, setConfirmActionOpen] = useState(false);
+  const [poToConfirm, setPoToConfirm] = useState<PO | null>(null);
+
   // Load params or local storage for current warehouse context
   useEffect(() => {
-    // Check if we are in a warehouse context (e.g., from URL or localStorage)
-    // For now, let's simulate a selector or check local storage "selected_warehouse_id"
     const stored = localStorage.getItem('selected_warehouse_id');
     if (stored) setSelectedWarehouseId(stored);
+
+    // Initial fetch
+    fetchData();
   }, []);
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const [pos, whs] = await Promise.all([
+        apiGetPOs(),
+        getWarehouses().catch(() => [])
+      ]);
+
+      const mapped: PO[] = pos.map((r) => ({
+        poId: r.PurchaseOrderId,
+        id: r.PurchaseOrderCode,
+        supplier: r.Supplier?.SupplierName || String(r.SupplierId),
+        date: r.DateTime,
+        total: r.TotalPrice,
+        status: r.PurchaseOrderStatus,
+        items: r._count?.PurchaseOrderDetails || 0,
+        requestedBy: r.CreatedByUser?.UserName || '-',
+        targetWarehouse: r.PurchaseOrderAddress || 'ไม่ระบุ',
+      }));
+      setPoList(mapped);
+      setWarehouses(whs);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'โหลดข้อมูลไม่สำเร็จ', description: e.message });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const openCreate = async () => {
     setCreateOpen(true);
@@ -154,7 +200,7 @@ export default function PurchaseOrdersPage() {
       const [ss, ms, whs] = await Promise.all([
         apiGetSuppliers(),
         apiGetMaterials(),
-        getWarehouses().catch(() => []) // Handle error if API fails
+        getWarehouses().catch(() => [])
       ]);
       setSuppliers(ss);
       setMaterials(ms);
@@ -239,12 +285,12 @@ export default function PurchaseOrdersPage() {
         });
       }
 
-      const newPO = await apiCreatePO({
+      await apiCreatePO({
         SupplierId: form.SupplierId,
-        WarehouseId: whToSubmit, // MUST send this for the new backend validation
+        WarehouseId: whToSubmit,
         DateTime: form.DateTime ? new Date(form.DateTime).toISOString() : undefined,
         PurchaseOrderStatus: form.PurchaseOrderStatus,
-        PurchaseOrderAddress: form.PurchaseOrderAddress, // Still keep the address/name for reference
+        PurchaseOrderAddress: form.PurchaseOrderAddress,
         details: form.details.map(d => ({
           MaterialId: Number(d.MaterialId),
           PurchaseOrderQuantity: Number(d.PurchaseOrderQuantity),
@@ -254,19 +300,7 @@ export default function PurchaseOrdersPage() {
       });
       toast({ title: 'สร้างใบสั่งซื้อสำเร็จ' });
       setCreateOpen(false);
-
-      const newMappedPO: PO = {
-        poId: newPO.PurchaseOrderId,
-        id: newPO.PurchaseOrderCode,
-        supplier: newPO.Supplier?.SupplierName || String(newPO.SupplierId),
-        date: newPO.DateTime,
-        total: newPO.TotalPrice,
-        status: newPO.PurchaseOrderStatus,
-        items: newPO._count?.PurchaseOrderDetails || 0,
-        requestedBy: newPO.CreatedByUser?.UserName || '-',
-        targetWarehouse: newPO.PurchaseOrderAddress || 'ไม่ระบุ', // Display warehouse
-      };
-      setPoList(prevList => [newMappedPO, ...prevList]);
+      fetchData(); // Refresh list using shared function
 
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'สร้างใบสั่งซื้อไม่สำเร็จ', description: e.message || '' });
@@ -309,12 +343,6 @@ export default function PurchaseOrdersPage() {
     if (!form.SupplierId) return toast({ variant: 'destructive', title: 'กรุณาเลือกผู้จำหน่าย' });
     if (!form.PurchaseOrderCode) return toast({ variant: 'destructive', title: 'กรุณากรอกรหัส PO' });
     if (form.details.length === 0) return toast({ variant: 'destructive', title: 'กรุณาเพิ่มรายการสินค้าอย่างน้อย 1 รายการ' });
-    for (const d of form.details) {
-      if (!d.MaterialId || d.MaterialId <= 0) return toast({ variant: 'destructive', title: 'เลือกรายการวัตถุดิบไม่ถูกต้อง' });
-      if (!d.PurchaseOrderQuantity || d.PurchaseOrderQuantity <= 0) return toast({ variant: 'destructive', title: 'จำนวนต้องมากกว่า 0' });
-      if (d.PurchaseOrderPrice === undefined || d.PurchaseOrderPrice === null || Number(d.PurchaseOrderPrice) < 0) return toast({ variant: 'destructive', title: 'ราคาต้องไม่ติดลบ' });
-      if (!d.PurchaseOrderUnit) return toast({ variant: 'destructive', title: 'กรุณาระบุหน่วย' });
-    }
     try {
       await apiUpdatePO(editingPoId, {
         SupplierId: form.SupplierId,
@@ -331,50 +359,29 @@ export default function PurchaseOrdersPage() {
       toast({ title: 'แก้ไขใบสั่งซื้อสำเร็จ' });
       setEditOpen(false);
       setEditingPoId(null);
-      // refresh list
-      setLoading(true);
-      const rows = await apiGetPOs();
-      const mapped: PO[] = rows.map((r) => ({
-        poId: r.PurchaseOrderId,
-        id: r.PurchaseOrderCode,
-        supplier: r.Supplier?.SupplierName || String(r.SupplierId),
-        date: r.DateTime,
-        total: r.TotalPrice,
-        status: r.PurchaseOrderStatus,
-      }));
-      setPoList(mapped);
+      fetchData();
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'แก้ไขใบสั่งซื้อไม่สำเร็จ', description: e.message || '' });
-    } finally {
-      setLoading(false);
     }
   };
 
-  const handleDelete = async (po: PO) => {
-    if (!confirm(`ยืนยันลบ PO ${po.id}?`)) return;
+  const handleDelete = (po: PO) => {
+    setPoToDelete(po);
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!poToDelete) return;
     try {
-      await apiDeletePO(po.poId);
+      await apiDeletePO(poToDelete.poId);
       toast({ title: 'ลบใบสั่งซื้อแล้ว' });
-      // refresh list
-      setLoading(true);
-      const rows = await apiGetPOs();
-      const mapped: PO[] = rows.map((r) => ({
-        poId: r.PurchaseOrderId,
-        id: r.PurchaseOrderCode,
-        supplier: r.Supplier?.SupplierName || String(r.SupplierId),
-        date: r.DateTime,
-        total: r.TotalPrice,
-        status: r.PurchaseOrderStatus,
-      }));
-      setPoList(mapped);
+      fetchData();
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'ลบใบสั่งซื้อไม่สำเร็จ', description: e.message || '' });
-    } finally {
-      setLoading(false);
     }
+    setDeleteConfirmOpen(false);
   };
 
-  // View PO details
   const openView = async (po: PO) => {
     setViewOpen(true);
     try {
@@ -382,7 +389,6 @@ export default function PurchaseOrdersPage() {
         apiGetPO(po.poId),
         apiGetMaterials(),
       ]);
-      // Type assertion to match our state type
       setViewingPo(full as POWithDetails);
       setViewingPoItems(mats);
     } catch (e: any) {
@@ -390,81 +396,83 @@ export default function PurchaseOrdersPage() {
     }
   };
 
-  const mapDisplayStatus = (status: string) => {
-    if (status === 'DRAFT') return 'PROFESSIONAL';
-    if (status === 'RECEIVED') return 'STOCKED';
-    // SENT / CONFIRMED => Pending Delivery
-    return 'PENDING';
-  };
-
   const getStatusBadge = (status: string) => {
-    const display = mapDisplayStatus(status);
+    const display = status;
     switch (display) {
-      case "PROFESSIONAL":
-        return <Badge variant="secondary" className="bg-gray-100 text-gray-800">กำลังจัดส่ง</Badge>;
+      case "PROFESSIONAL": // Legacy mapping if needed
+      case "DRAFT":
+        return <Badge variant="outline" className="bg-gray-100 text-gray-600 border-gray-200">ร่างเอกสาร</Badge>;
+      case "SENT":
       case "PENDING":
-        return <Badge variant="default" className="bg-primary">กำลังสั่งซื้อ</Badge>;
+        return <Badge variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-200 border-blue-200">สั่งซื้อแล้ว</Badge>;
+      case "RECEIVED":
       case "STOCKED":
-        return <Badge variant="default" className="bg-purple-500">รับของแล้ว</Badge>;
+        return <Badge variant="default" className="bg-green-600 text-white hover:bg-green-700">รับของแล้ว</Badge>;
+      case "CANCELLED":
+        return <Badge variant="destructive">ยกเลิก</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "DRAFT": return "text-gray-500";
-      case "SENT": return "text-primary";
-      case "CONFIRMED": return "text-success";
-      case "RECEIVED": return "text-purple-500";
-      default: return "text-gray-500";
-    }
-  };
-
   const filteredPOs = useMemo(() => {
-    return poList.filter(po => {
-      // 1. Warehouse Filter: If a specific warehouse is selected in context, hide others
+    let filtered = poList.filter(po => {
+      // 1. Warehouse Filter
       if (selectedWarehouseId !== "all") {
-        // We need to resolve WarehouseId to Name to check against po.targetWarehouse
-        // But here we rely on the PO having the name.
-        // If po.targetWarehouse is empty, we show it (legacy/global PO).
-        // If it is set, it MUST match the current warehouse name.
         const currentWhName = warehouses.find(w => String(w.WarehouseId) === selectedWarehouseId)?.WarehouseName;
         if (currentWhName && po.targetWarehouse && po.targetWarehouse !== currentWhName) {
           return false;
         }
       }
 
+      // 2. Search Filter
       const matchesSearch = !searchTerm ||
         po.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
         po.supplier.toLowerCase().includes(searchTerm.toLowerCase()) ||
         po.requestedBy?.toLowerCase().includes(searchTerm.toLowerCase());
-      return matchesSearch;
-    });
-  }, [poList, searchTerm, selectedWarehouseId, warehouses]);
+      if (!matchesSearch) return false;
 
-  const groupedPOs = useMemo(() => {
-    const groups: Record<string, PO[]> = {};
-    filteredPOs.forEach(po => {
-      const key = mapDisplayStatus(po.status);
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(po);
+      // 3. Status Tab Filter
+      if (statusFilter === "active") {
+        // Show pending tasks
+        return ["DRAFT", "SENT", "CONFIRMED", "PENDING"].includes(po.status);
+      } else if (statusFilter === "history") {
+        // Show completed tasks
+        return ["RECEIVED", "CANCELLED", "STOCKED"].includes(po.status);
+      }
+      return true;
     });
-    return groups;
-  }, [filteredPOs]);
 
-  const toggleStatus = (status: string) => {
-    setExpandedStatus(prev => ({
-      ...prev,
-      [status]: !prev[status]
-    }));
+    // Sort by Date Descending (Newest first)
+    return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [poList, searchTerm, selectedWarehouseId, warehouses, statusFilter]);
+
+  // Quick Action Handler
+  const handleQuickAction = (po: PO) => {
+    if (po.status === 'DRAFT') {
+      setPoToConfirm(po);
+      setConfirmActionOpen(true);
+    }
+  };
+
+  const confirmQuickAction = async () => {
+    if (!poToConfirm) return;
+    try {
+      await apiUpdatePO(poToConfirm.poId, { PurchaseOrderStatus: 'SENT' } as any);
+      toast({ title: 'ยืนยันใบสั่งซื้อเรียบร้อย', description: 'สถานะเปลี่ยนเป็นส่งใบสั่งซื้อแล้ว' });
+      fetchData(); // Refresh
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'เกิดข้อผิดพลาด', description: e.message });
+    }
+    setConfirmActionOpen(false);
   };
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case "PROFESSIONAL": return "กำลังจัดส่ง";
-      case "PENDING": return "กำลังสั่งซื้อ";
-      case "STOCKED": return "รับของแล้ว";
+      case "DRAFT": return "ร่างเอกสาร";
+      case "SENT": return "ส่งใบสั่งซื้อแล้ว";
+      case "RECEIVED": return "รับของแล้ว";
+      case "CANCELLED": return "ยกเลิก";
       default: return status;
     }
   };
@@ -476,7 +484,7 @@ export default function PurchaseOrdersPage() {
           <h1 className="text-2xl sm:text-3xl font-bold">ใบสั่งซื้อ (Purchase Orders)</h1>
           <p className="text-muted-foreground mt-1">จัดการใบสั่งซื้อวัตถุดิบจากผู้จำหน่าย</p>
         </div>
-        <Button className="gap-2 w-full sm:w-auto" onClick={openCreate}>
+        <Button className="gap-2 w-full sm:w-auto shadow-sm" onClick={openCreate}>
           <Plus className="h-4 w-4" /> สร้างใบสั่งซื้อ
         </Button>
       </div>
@@ -487,11 +495,11 @@ export default function PurchaseOrdersPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">กำลังจัดส่ง</p>
-                <p className="text-2xl font-bold mt-1">
-                  {poList.filter(po => po.status === "DRAFT").length}
+                <p className="text-2xl font-bold mt-1 text-primary">
+                  {poList.filter(po => po.status === "SENT" || po.status === "PENDING").length}
                 </p>
               </div>
-              <FileText className="h-8 w-8 text-gray-400" />
+              <FileTextIcon className="h-8 w-8 text-primary/40" />
             </div>
           </CardContent>
         </Card>
@@ -501,256 +509,286 @@ export default function PurchaseOrdersPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">รับของแล้ว</p>
-                <p className="text-2xl font-bold mt-1">
-                  {poList.filter(po => po.status === "RECEIVED").length}
+                <p className="text-2xl font-bold mt-1 text-green-600">
+                  {poList.filter(po => po.status === "RECEIVED" || po.status === "STOCKED").length}
                 </p>
               </div>
-              <Package className="h-8 w-8 text-purple-500" />
+              <CheckCircle className="h-8 w-8 text-green-500/40" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4 sm:p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">ร่างเอกสาร</p>
+                <p className="text-2xl font-bold mt-1 text-gray-500">
+                  {poList.filter(po => po.status === "DRAFT").length}
+                </p>
+              </div>
+              <Edit className="h-8 w-8 text-gray-400/40" />
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <span>รายการใบสั่งซื้อ</span>
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full sm:w-auto">
-              <div className="relative w-full sm:w-80">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  className="pl-10 w-full"
-                  placeholder="ค้นหา เลขที่ PO / ผู้จำหน่าย / ผู้ขอ"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              {/* ซ่อนตัวกรองสถานะชั่วคราวตามที่ร้องขอ */}
-            </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="text-center py-12 text-muted-foreground">กำลังโหลด...</div>
-          ) : Object.keys(groupedPOs).length > 0 ? (
-            <div className="space-y-6">
-              {Object.entries(groupedPOs).map(([status, pos]) => {
-                const isExpanded = expandedStatus[status] ?? true;
-                const displayPOs = isExpanded ? pos : pos.slice(0, 3);
+      <Card className="border-none shadow-none bg-transparent">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
+          {/* Filter Tabs */}
+          <div className="flex p-1 bg-muted rounded-lg self-start sm:self-auto">
+            <button
+              onClick={() => setStatusFilter("active")}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${statusFilter === "active" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              กำลังดำเนินการ ({poList.filter(p => ["DRAFT", "SENT", "CONFIRMED", "PENDING"].includes(p.status)).length})
+            </button>
+            <button
+              onClick={() => setStatusFilter("history")}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${statusFilter === "history" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              ประวัติ ({poList.filter(p => ["RECEIVED", "CANCELLED", "STOCKED"].includes(p.status)).length})
+            </button>
+            <button
+              onClick={() => setStatusFilter("all")}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${statusFilter === "all" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              ทั้งหมด
+            </button>
+          </div>
 
-                return (
-                  <div key={status} className="border rounded-lg">
-                    <div
-                      className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50"
-                      onClick={() => toggleStatus(status)}
-                    >
-                      <div className="flex items-center gap-2">
-                        {isExpanded ?
-                          <ChevronDown className="h-5 w-5 text-muted-foreground" /> :
-                          <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                        }
-                        <h3 className="font-semibold text-lg">
-                          {getStatusLabel(status)} <span className="text-muted-foreground">({pos.length})</span>
-                        </h3>
-                      </div>
-                      {getStatusBadge(status)}
-                    </div>
+          {/* Search */}
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              className="pl-9 w-full bg-background border-border/60"
+              placeholder="ค้นหา..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+        </div>
 
-                    {isExpanded && (
-                      <div className="overflow-x-auto border-t">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="px-4 whitespace-nowrap">เลขที่ PO</TableHead>
-                              <TableHead className="px-4 whitespace-nowrap">ผู้จำหน่าย</TableHead>
-                              <TableHead className="px-4 whitespace-nowrap">วันที่</TableHead>
-                              <TableHead className="px-4 text-center whitespace-nowrap">จำนวนรายการ</TableHead>
-                              <TableHead className="px-4 whitespace-nowrap">ผู้ขอ</TableHead>
-                              <TableHead className="px-4 whitespace-nowrap">สถานะ</TableHead>
-                              <TableHead className="px-4 text-center whitespace-nowrap">การดำเนินการ</TableHead>
-                            </TableRow>
-                          </TableHeader>
-
-                          <TableBody>
-                            {displayPOs.map((po) => (
-                              <TableRow key={po.id} className="hover:bg-muted/50">
-                                <TableCell className="px-4 font-medium whitespace-nowrap">{po.id}</TableCell>
-                                <TableCell className="px-4 whitespace-nowrap">{po.supplier}</TableCell>
-                                <TableCell className="px-4 whitespace-nowrap">
-                                  {new Date(po.date).toLocaleDateString('th-TH', {
-                                    year: 'numeric',
-                                    month: 'short',
-                                    day: 'numeric'
-                                  })}
-                                </TableCell>
-                                <TableCell className="px-4 text-center whitespace-nowrap">{po.items ?? '-'}</TableCell>
-                                <TableCell className="px-4 whitespace-nowrap">{po.requestedBy ?? '-'}</TableCell>
-                                <TableCell className="px-4 whitespace-nowrap">
-                                  {getStatusBadge(po.status)}
-                                </TableCell>
-                                <TableCell className="px-4">
-                                  <div className="flex items-center justify-center gap-2">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="hover:bg-accent"
-                                      onClick={() => openView(po)}
-                                    >
-                                      <Eye className="h-4 w-4" />
-                                    </Button>
-
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="hover:bg-accent"
-                                      onClick={() => openEdit(po)}
-                                    >
-                                      <Edit className="h-4 w-4" />
-                                    </Button>
-
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="text-destructive hover:bg-destructive/10"
-                                      onClick={() => handleDelete(po)}
-                                    >
-                                      <X className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-
-
-                        {!isExpanded && pos.length > 3 && (
-                          <div className="p-4 text-center border-t">
-                            <Button variant="ghost" onClick={() => toggleStatus(status)}>
-                              แสดงทั้งหมด ({pos.length} รายการ)
+        <CardContent className="p-0">
+          <div className="rounded-xl border bg-card text-card-foreground shadow-sm overflow-hidden">
+            <Table>
+              <TableHeader className="bg-muted/40">
+                <TableRow>
+                  <TableHead className="w-[140px] pl-6 py-4">เลขที่ PO</TableHead>
+                  <TableHead className="py-4">ผู้จำหน่าย</TableHead>
+                  <TableHead className="py-4">วันที่</TableHead>
+                  <TableHead className="py-4 text-center">รายการ</TableHead>
+                  <TableHead className="py-4">ผู้ขอ</TableHead>
+                  <TableHead className="py-4">สถานะ</TableHead>
+                  <TableHead className="py-4 text-right pr-6">ดำเนินการ</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="h-40 text-center text-muted-foreground">กำลังโหลดข้อมูล...</TableCell>
+                  </TableRow>
+                ) : filteredPOs.length > 0 ? (
+                  filteredPOs.map((po) => (
+                    <TableRow key={po.id} className="group hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => openView(po)}>
+                      <TableCell className="pl-6 font-semibold">{po.id}</TableCell>
+                      <TableCell className="font-medium">{po.supplier}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {new Date(po.date).toLocaleDateString('th-TH', { day: '2-digit', month: 'short', year: '2-digit' })}
+                      </TableCell>
+                      <TableCell className="text-center">{po.items ?? '-'}</TableCell>
+                      <TableCell className="text-muted-foreground">{po.requestedBy ?? '-'}</TableCell>
+                      <TableCell>{getStatusBadge(po.status)}</TableCell>
+                      <TableCell className="text-right pr-6" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-2">
+                          {/* Quick Action Button */}
+                          {po.status === 'DRAFT' && (
+                            <Button size="sm" className="h-8 bg-blue-600 hover:bg-blue-700 text-white shadow-sm" onClick={() => handleQuickAction(po)}>
+                              <Send className="h-3 w-3 mr-1.5" /> ยืนยันสั่งซื้อ
                             </Button>
-                          </div>
-                        )}
+                          )}
+
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-orange-600" onClick={() => openEdit(po)} title="แก้ไข">
+                            <Edit className="h-4 w-4" />
+                          </Button>
+
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10" onClick={() => handleDelete(po)} title="ลบรายการ">
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={7} className="h-60 text-center">
+                      <div className="flex flex-col items-center justify-center text-muted-foreground">
+                        <ShoppingCart className="h-12 w-12 mb-3 opacity-20" />
+                        <p>ไม่พบรายการใบสั่งซื้อในหน้านี้</p>
+                        {statusFilter !== 'all' && <Button variant="link" onClick={() => setStatusFilter('all')}>ดูรายการทั้งหมด</Button>}
                       </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="text-center py-12 text-muted-foreground">
-              <ShoppingCart className="h-12 w-12 mx-auto mb-4 text-muted" />
-              <p>ไม่พบใบสั่งซื้อ</p>
-            </div>
-          )}
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 
       {/* Create PO Dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="max-w-4xl">
-          <DialogHeader>
-            <DialogTitle>สร้างใบสั่งซื้อ</DialogTitle>
-            <DialogDescription>เลือกผู้จำหน่ายและเพิ่มรายการวัตถุดิบให้ครบถ้วนก่อนบันทึก</DialogDescription>
+        <DialogContent className="max-w-5xl p-0 overflow-hidden">
+          <DialogHeader className="px-6 py-4 border-b flex flex-row items-center justify-between space-y-0">
+            <div>
+              <DialogTitle className="text-xl font-bold flex items-center gap-2">
+                <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Plus className="h-5 w-5 text-primary" />
+                </div>
+                สร้างใบสั่งซื้อใหม่
+              </DialogTitle>
+              <DialogDescription className="mt-1">สร้างเอกสารสั่งซื้อวัตถุดิบเข้าคลังสินค้า</DialogDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="text-right mr-4 hidden sm:block">
+                <span className="text-sm text-muted-foreground block">ยอดรวมทั้งสิ้น</span>
+                <span className="text-2xl font-bold text-primary">฿{totalPrice.toLocaleString()}</span>
+              </div>
+            </div>
           </DialogHeader>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label>ผู้จำหน่าย</Label>
-              <Select value={String(form.SupplierId)} onValueChange={(v) => setForm(prev => ({ ...prev, SupplierId: Number(v) }))}>
-                <SelectTrigger className="w-full"><SelectValue placeholder="เลือกผู้จำหน่าย" /></SelectTrigger>
-                <SelectContent>
-                  {suppliers.map(s => (
-                    <SelectItem key={s.SupplierId} value={String(s.SupplierId)}>{s.SupplierName}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>รหัส PO</Label>
-              <Input
-                value={form.PurchaseOrderCode}
-                placeholder="ระบบจะสร้างให้อัตโนมัติ (เช่น PO-001)"
-                disabled
-                className="bg-muted"
-              />
-            </div>
-            <div>
-              <Label>วันที่</Label>
-              <Input type="date" value={form.DateTime} onChange={(e) => setForm(prev => ({ ...prev, DateTime: e.target.value }))} />
-            </div>
-            {/* ซ่อนฟิลด์สถานะในหน้า Create ตามที่ร้องขอ */}
-          </div>
 
-          <div className="mt-4 border rounded-lg">
-            <div className="flex items-center justify-between p-3">
-              <div className="font-medium">รายการสินค้า</div>
-              <Button size="sm" variant="outline" onClick={addDetailRow} disabled={!materials.length}><Plus className="h-4 w-4 mr-1" />เพิ่มรายการ</Button>
+          <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
+            {/* Header Section */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">ผู้จำหน่าย (Supplier)</Label>
+                <Select value={String(form.SupplierId)} onValueChange={(v) => setForm(prev => ({ ...prev, SupplierId: Number(v) }))}>
+                  <SelectTrigger className="w-full bg-background"><SelectValue placeholder="เลือกบริษัทคู่ค้า" /></SelectTrigger>
+                  <SelectContent>
+                    {suppliers.map(s => (
+                      <SelectItem key={s.SupplierId} value={String(s.SupplierId)}>{s.SupplierName}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">รหัสเอกสาร</Label>
+                <Input
+                  value={form.PurchaseOrderCode}
+                  placeholder="Auto (PO-XXXX)"
+                  disabled
+                  className="bg-muted text-muted-foreground font-mono"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">วันที่เอกสาร</Label>
+                <Input type="date" className="bg-background" value={form.DateTime} onChange={(e) => setForm(prev => ({ ...prev, DateTime: e.target.value }))} />
+              </div>
             </div>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="whitespace-nowrap">วัตถุดิบ</TableHead>
-                    <TableHead className="whitespace-nowrap">จำนวน</TableHead>
-                    <TableHead className="whitespace-nowrap">หน่วย</TableHead>
-                    <TableHead className="whitespace-nowrap">ราคา/หน่วย</TableHead>
-                    <TableHead className="whitespace-nowrap">รวม</TableHead>
-                    <TableHead></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {form.details.map((d, idx) => {
-                    const mat = materials.find(m => m.MaterialId === d.MaterialId) || materials[0];
-                    return (
-                      <TableRow key={idx}>
-                        <TableCell className="min-w-[220px]">
-                          <Select value={String(d.MaterialId)} onValueChange={(v) => {
-                            const m = materials.find(mm => mm.MaterialId === Number(v));
-                            updateDetail(idx, { MaterialId: Number(v), PurchaseOrderPrice: m?.Price || 0, PurchaseOrderUnit: m?.Unit || '' });
-                          }}>
-                            <SelectTrigger className="w-[220px]"><SelectValue placeholder="เลือกวัตถุดิบ" /></SelectTrigger>
-                            <SelectContent>
-                              {materials.map(m => (
-                                <SelectItem key={m.MaterialId} value={String(m.MaterialId)}>{m.MaterialName}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell className="min-w-[120px]">
-                          <Input type="number" min="1" value={d.PurchaseOrderQuantity} onChange={(e) => updateDetail(idx, { PurchaseOrderQuantity: Number(e.target.value) })} />
-                        </TableCell>
-                        <TableCell className="min-w-[120px]">
-                          <Input value={d.PurchaseOrderUnit} onChange={(e) => updateDetail(idx, { PurchaseOrderUnit: e.target.value })} placeholder={mat?.Unit || ''} />
-                        </TableCell>
-                        <TableCell className="min-w-[140px]">
-                          <Input type="number" min="0" value={d.PurchaseOrderPrice} onChange={(e) => updateDetail(idx, { PurchaseOrderPrice: Number(e.target.value) })} />
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap">฿{((Number(d.PurchaseOrderQuantity) || 0) * (Number(d.PurchaseOrderPrice) || 0)).toLocaleString()}</TableCell>
-                        <TableCell>
-                          <Button variant="ghost" size="sm" onClick={() => removeDetail(idx)}>
-                            <X className="h-4 w-4" />
-                          </Button>
+
+            {/* Items Section */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-lg flex items-center gap-2">
+                  <Package className="h-5 w-5 text-muted-foreground" /> รายการสินค้า
+                </h3>
+                <Button size="sm" onClick={addDetailRow} disabled={!materials.length} className="shadow-sm">
+                  <Plus className="h-4 w-4 mr-1" /> เพิ่มรายการ
+                </Button>
+              </div>
+
+              <div className="border rounded-md">
+                <Table>
+                  <TableHeader className="bg-muted">
+                    <TableRow>
+                      <TableHead className="w-[40%] pl-4">รายการวัตถุดิบ</TableHead>
+                      <TableHead className="w-[15%]">จำนวน</TableHead>
+                      <TableHead className="w-[15%]">หน่วย</TableHead>
+                      <TableHead className="w-[15%] text-right">ราคา/หน่วย</TableHead>
+                      <TableHead className="w-[10%] text-right">รวม</TableHead>
+                      <TableHead className="w-[5%]"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {form.details.map((d, idx) => {
+                      const mat = materials.find(m => m.MaterialId === d.MaterialId) || materials[0];
+                      return (
+                        <TableRow key={idx} className="hover:bg-muted/30">
+                          <TableCell className="pl-4 py-2">
+                            <Select value={String(d.MaterialId)} onValueChange={(v) => {
+                              const m = materials.find(mm => mm.MaterialId === Number(v));
+                              updateDetail(idx, { MaterialId: Number(v), PurchaseOrderPrice: m?.Price || 0, PurchaseOrderUnit: m?.Unit || '' });
+                            }}>
+                              <SelectTrigger className="w-full border-0 shadow-none bg-transparent hover:bg-muted/50 h-9 px-2 focus:ring-0 font-medium">
+                                <SelectValue placeholder="เลือกสินค้า" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {materials.map(m => (
+                                  <SelectItem key={m.MaterialId} value={String(m.MaterialId)}>{m.MaterialName}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell className="py-2">
+                            <Input
+                              type="number" min="1"
+                              className="border-0 shadow-none bg-transparent hover:bg-muted/50 h-9 focus-visible:ring-0 text-center font-medium"
+                              value={d.PurchaseOrderQuantity}
+                              onChange={(e) => updateDetail(idx, { PurchaseOrderQuantity: Number(e.target.value) })}
+                            />
+                          </TableCell>
+                          <TableCell className="py-2">
+                            <Input
+                              className="border-0 shadow-none bg-transparent hover:bg-muted/50 h-9 focus-visible:ring-0 text-center text-muted-foreground"
+                              value={d.PurchaseOrderUnit}
+                              onChange={(e) => updateDetail(idx, { PurchaseOrderUnit: e.target.value })}
+                              placeholder={mat?.Unit || ''}
+                            />
+                          </TableCell>
+                          <TableCell className="text-right py-2">
+                            <Input
+                              type="number" min="0"
+                              className="border-0 shadow-none bg-transparent hover:bg-muted/50 h-9 focus-visible:ring-0 text-right font-mono"
+                              value={d.PurchaseOrderPrice}
+                              onChange={(e) => updateDetail(idx, { PurchaseOrderPrice: Number(e.target.value) })}
+                            />
+                          </TableCell>
+                          <TableCell className="text-right font-mono font-medium text-foreground py-2 pr-4">
+                            {((Number(d.PurchaseOrderQuantity) || 0) * (Number(d.PurchaseOrderPrice) || 0)).toLocaleString()}
+                          </TableCell>
+                          <TableCell className="py-2 pr-2">
+                            <Button variant="ghost" size="icon" onClick={() => removeDetail(idx)} className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10">
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                    {form.details.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={6} className="h-32 text-center text-muted-foreground bg-muted/10 border-none">
+                          <Package className="h-10 w-10 mx-auto mb-2 opacity-20" />
+                          ยังไม่มีรายการสินค้า กดปุ่ม "เพิ่มรายการ" เพื่อเริ่ม
                         </TableCell>
                       </TableRow>
-                    );
-                  })}
-                  {form.details.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center text-muted-foreground">ยังไม่มีรายการสินค้า</TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
             </div>
-            <div className="flex items-center justify-end p-3 gap-4">
-              <div className="text-sm text-muted-foreground">รวมทั้งสิ้น</div>
-              <div className="font-semibold">฿{totalPrice.toLocaleString()}</div>
+            {/* Mobile Total Display */}
+            <div className="sm:hidden flex items-center justify-between p-4 bg-muted/30 rounded-lg border">
+              <span className="font-semibold">ยอดรวมทั้งสิ้น</span>
+              <span className="text-xl font-bold text-primary">฿{totalPrice.toLocaleString()}</span>
             </div>
           </div>
 
-          <div className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setCreateOpen(false)}>ยกเลิก</Button>
-            <Button onClick={submitCreate} disabled={creating}>{creating ? 'กำลังบันทึก...' : 'บันทึก'}</Button>
+          <div className="p-4 border-t flex justify-end gap-3">
+            <Button variant="ghost" onClick={() => setCreateOpen(false)}>ยกเลิก</Button>
+            <Button onClick={submitCreate} disabled={creating} className="min-w-[120px] shadow-md">
+              {creating ? <span className="flex items-center gap-2"><div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> บันทึก...</span> : 'ยืนยันใบสั่งซื้อ'}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -782,7 +820,6 @@ export default function PurchaseOrdersPage() {
               <Label>วันที่</Label>
               <Input type="date" value={form.DateTime} onChange={(e) => setForm(prev => ({ ...prev, DateTime: e.target.value }))} />
             </div>
-            {/* ซ่อนฟิลด์สถานะในหน้า Edit ตามที่ร้องขอ */}
           </div>
 
           <div className="mt-4 border rounded-lg">
@@ -943,6 +980,49 @@ export default function PurchaseOrdersPage() {
           )}
         </DialogContent>
       </Dialog>
+      {/* Alert Dialog for Deletion */}
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent className="max-w-[400px]">
+          <AlertDialogHeader className="flex flex-col items-center text-center sm:text-center">
+            <div className="h-12 w-12 rounded-full bg-red-100 flex items-center justify-center mb-2">
+              <AlertTriangle className="h-6 w-6 text-red-600" />
+            </div>
+            <AlertDialogTitle className="text-xl text-red-600">ยืนยันการลบรายการ?</AlertDialogTitle>
+            <AlertDialogDescription className="text-center pt-2">
+              ท่านต้องการลบใบสั่งซื้อ <span className="font-semibold text-foreground">{poToDelete?.id}</span> ใช่หรือไม่?
+              <br />การกระทำนี้ไม่สามารถย้อนกลับได้
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="sm:justify-center gap-2 mt-4">
+            <AlertDialogCancel className="w-full sm:w-auto">ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white">
+              ยืนยันการลบ
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Alert Dialog for Quick Action (Send PO) */}
+      <AlertDialog open={confirmActionOpen} onOpenChange={setConfirmActionOpen}>
+        <AlertDialogContent className="max-w-[400px]">
+          <AlertDialogHeader className="flex flex-col items-center text-center sm:text-center">
+            <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center mb-2">
+              <Send className="h-6 w-6 text-blue-600 ml-1" />
+            </div>
+            <AlertDialogTitle className="text-xl text-blue-700">ยืนยันการส่งใบสั่งซื้อ?</AlertDialogTitle>
+            <AlertDialogDescription className="text-center pt-2">
+              ท่านต้องการยืนยันส่งใบสั่งซื้อ <span className="font-semibold text-foreground">{poToConfirm?.id}</span> ใช่หรือไม่?
+              <br />สถานะเอกสารจะถูกเปลี่ยนเป็น "สั่งซื้อแล้ว"
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="sm:justify-center gap-2 mt-4">
+            <AlertDialogCancel className="w-full sm:w-auto">ตรวจสอบก่อน</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmQuickAction} className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white">
+              ยืนยันส่งทันที
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

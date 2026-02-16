@@ -698,6 +698,8 @@ export type PurchaseOrder = {
   UpdatedAt: string;
   Supplier?: { SupplierName: string };
   PurchaseOrderAddress?: string | null;
+  CreatedByUser?: { UserName: string } | null;
+  _count?: { PurchaseOrderDetails: number };
 };
 
 export type PurchaseOrderDetail = {

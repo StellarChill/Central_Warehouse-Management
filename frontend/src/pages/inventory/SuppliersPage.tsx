@@ -6,8 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, Edit, Trash2, Users } from "lucide-react";
-import { 
+import { Search, Plus, Edit, Trash2, Users, AlertTriangle } from "lucide-react";
+import {
   getSuppliers as apiGetSuppliers,
   createSupplier as apiCreateSupplier,
   updateSupplier as apiUpdateSupplier,
@@ -15,6 +15,16 @@ import {
   Supplier as ApiSupplier
 } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type Supplier = ApiSupplier;
 
@@ -27,6 +37,10 @@ export default function SuppliersPage() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Supplier | null>(null);
   const [form, setForm] = useState({ SupplierName: "", SupplierCode: "", SupplierAddress: "", SupplierTelNumber: "" });
+
+  // Delete Confirmation State
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [supplierToDelete, setSupplierToDelete] = useState<number | null>(null);
 
   const loadSuppliers = async () => {
     setLoading(true);
@@ -102,14 +116,22 @@ export default function SuppliersPage() {
     }
   };
 
-  const remove = async (id: number) => {
-    if (!confirm("ยืนยันการลบผู้จำหน่ายนี้?")) return;
+  const initiateDelete = (id: number) => {
+    setSupplierToDelete(id);
+    setDeleteOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!supplierToDelete) return;
     try {
-      await apiDeleteSupplier(id);
+      await apiDeleteSupplier(supplierToDelete);
       toast({ title: "ลบผู้จำหน่ายแล้ว" });
       await loadSuppliers();
     } catch (e: any) {
       toast({ variant: "destructive", title: "ลบไม่สำเร็จ", description: e.message || "" });
+    } finally {
+      setDeleteOpen(false);
+      setSupplierToDelete(null);
     }
   };
 
@@ -171,7 +193,7 @@ export default function SuppliersPage() {
                         <Button variant="ghost" size="sm" className="w-full sm:w-auto hover:bg-accent" onClick={() => startEdit(s)}>
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" className="w-full sm:w-auto text-destructive hover:bg-destructive/10" onClick={() => remove(s.SupplierId)}>
+                        <Button variant="ghost" size="sm" className="w-full sm:w-auto text-destructive hover:bg-destructive/10" onClick={() => initiateDelete(s.SupplierId)}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
@@ -216,6 +238,27 @@ export default function SuppliersPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent className="max-w-[400px]">
+          <AlertDialogHeader className="flex flex-col items-center text-center sm:text-center">
+            <div className="h-12 w-12 rounded-full bg-red-100 flex items-center justify-center mb-2">
+              <AlertTriangle className="h-6 w-6 text-red-600" />
+            </div>
+            <AlertDialogTitle className="text-xl text-red-600">ยืนยันการลบ?</AlertDialogTitle>
+            <AlertDialogDescription className="text-center pt-2">
+              คุณต้องการลบผู้จำหน่ายรายนี้ใช่หรือไม่? <br />
+              การกระทำนี้ไม่สามารถย้อนกลับได้
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="sm:justify-center gap-2 mt-4">
+            <AlertDialogCancel className="w-full sm:w-auto">ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white">
+              ลบผู้จำหน่าย
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

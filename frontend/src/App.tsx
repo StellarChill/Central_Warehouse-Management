@@ -145,7 +145,7 @@ const App = () => (
                   <Route
                     path="/dashboard"
                     element={
-                      <Guard allow={["COMPANY_ADMIN", "ADMIN", "WH_MANAGER"]}>
+                      <Guard allow={["COMPANY_ADMIN", "ADMIN", "WH_MANAGER", "WAREHOUSE_ADMIN"]}>
                         <SmartDashboard />
                       </Guard>
                     }

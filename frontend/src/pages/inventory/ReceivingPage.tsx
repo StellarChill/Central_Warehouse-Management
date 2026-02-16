@@ -8,11 +8,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Building2, Package, ShoppingCart, CheckCircle, Filter, Plus, X, Edit, Trash2 } from "lucide-react";
+import { Search, Building2, Package, ShoppingCart, CheckCircle, Filter, Plus, X, Edit, Trash2, FileText, Calendar, Truck, Clock, ChevronDown, MoreHorizontal, ArrowUpRight, AlertCircle, RefreshCw } from "lucide-react";
 import { useStock } from "@/context/StockContext";
 import { getReceipts as apiGetReceipts, getPurchaseOrders as apiGetPOs, getPurchaseOrder as apiGetPO, createReceipt as apiCreateReceipt, getMaterials as apiGetMaterials, getReceipt as apiGetReceipt, deleteReceipt as apiDeleteReceipt, updateReceipt as apiUpdateReceipt, getWarehouses, getUser, Receipt as FullReceipt, ReceiptDetail } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { startOfMonth, subMonths, isAfter } from "date-fns";
 
 type Receipt = {
   id: string;
@@ -381,66 +383,217 @@ export default function ReceivingPage() {
     }
   };
 
+  // Stats calculation
+  const stats = useMemo(() => {
+    const today = new Date();
+    const thisMonth = receipts.filter(r => {
+      const d = new Date(r.date);
+      return d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
+    }).length;
+
+    const total = receipts.length;
+    // Mock pending POs calculation based on poList
+    const pendingPOs = poList.filter(p => p.status === 'SENT' || p.status === 'CONFIRMED').length;
+
+    return { total, thisMonth, pendingPOs };
+  }, [receipts, poList]);
+
+  // Time filter state
+  const [timeFilter, setTimeFilter] = useState("ALL");
+
+  const filteredReceipts = useMemo(() => {
+    let data = receipts;
+    const now = new Date();
+
+    if (timeFilter === "THIS_MONTH") {
+      const start = startOfMonth(now);
+      data = data.filter(r => isAfter(new Date(r.date), start));
+    } else if (timeFilter === "LAST_MONTH") {
+      const start = startOfMonth(subMonths(now, 1));
+      const end = startOfMonth(now);
+      data = data.filter(r => {
+        const d = new Date(r.date);
+        return isAfter(d, start) && d < end;
+      });
+    }
+
+    if (q.trim()) {
+      const s = q.trim().toLowerCase();
+      data = data.filter(r => `${r.code} ${r.poCode || ''}`.toLowerCase().includes(s));
+    }
+
+    return data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [receipts, q, timeFilter]);
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="p-6 space-y-8 bg-slate-50/50 min-h-screen font-sans text-slate-900 animate-in fade-in duration-500">
+
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold">การรับวัตถุดิบ (ตามสาขา)</h1>
-          <p className="text-muted-foreground mt-1">สรุปว่าสาขาไหนรับวัตถุดิบไปเท่าไหร่</p>
+          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">การรับวัตถุดิบ (Receiving)</h1>
+          <p className="text-slate-500 mt-2 text-lg">จัดการการรับสินค้าเข้าคลังและตรวจสอบรายการจาก Purchase Orders</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Button variant="outline" className="h-11 rounded-xl border-slate-200 text-slate-600 hover:bg-white hover:text-blue-600 shadow-sm transition-all" onClick={() => loadReceipts()}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            รีเฟรชข้อมูล
+          </Button>
+          <Button
+            className="h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/20 px-6 font-bold transition-all hover:scale-105 active:scale-95"
+            onClick={() => setPoDialogOpen(true)}
+          >
+            <Plus className="h-5 w-5 mr-2" />
+            รับสินค้าจาก PO
+          </Button>
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <span>บันทึกรับวัตถุดิบ</span>
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full sm:w-auto">
-              <Button onClick={() => setPoDialogOpen(true)} className="w-full sm:w-auto">
-                <Plus className="h-4 w-4 mr-2" />
-                เลือกจาก PO
-              </Button>
-
-              <div className="relative w-full sm:w-80">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input className="pl-10 w-full" placeholder="ค้นหา เลขที่ใบรับ/PO" value={q} onChange={(e) => setQ(e.target.value)} />
-              </div>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card className="border-none shadow-premium bg-white/70 backdrop-blur-sm hover:shadow-premium-hover transition-all duration-300 group">
+          <CardContent className="p-6 flex items-center justify-between">
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-slate-500">ใบรับสินค้าทั้งหมด</p>
+              <h3 className="text-3xl font-bold text-slate-800">{stats.total}</h3>
             </div>
-          </CardTitle>
+            <div className="h-12 w-12 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600 group-hover:scale-110 transition-transform">
+              <FileText className="h-6 w-6" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-none shadow-premium bg-white/70 backdrop-blur-sm hover:shadow-premium-hover transition-all duration-300 group">
+          <CardContent className="p-6 flex items-center justify-between">
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-slate-500">รับเข้าเดือนนี้</p>
+              <h3 className="text-3xl font-bold text-slate-800">{stats.thisMonth}</h3>
+            </div>
+            <div className="h-12 w-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 group-hover:scale-110 transition-transform">
+              <Calendar className="h-6 w-6" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card
+          className="border-none shadow-premium bg-white/70 backdrop-blur-sm hover:shadow-premium-hover transition-all duration-300 group cursor-pointer hover:ring-2 hover:ring-amber-100"
+          onClick={() => setPoDialogOpen(true)}
+        >
+          <CardContent className="p-6 flex items-center justify-between">
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-slate-500">PO รอรับของ</p>
+              <h3 className="text-3xl font-bold text-amber-600">{stats.pendingPOs}</h3>
+            </div>
+            <div className="h-12 w-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600 group-hover:scale-110 transition-transform">
+              <Truck className="h-6 w-6" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Main Content Card */}
+      <Card className="border-none shadow-premium bg-white pb-6 overflow-hidden">
+        <CardHeader className="border-b border-slate-100 p-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+
+            <Tabs value={timeFilter} onValueChange={setTimeFilter} className="w-full md:w-auto">
+              <TabsList className="bg-slate-100 p-1 rounded-xl h-12 w-full md:w-auto grid grid-cols-3 md:flex gap-1">
+                <TabsTrigger value="ALL" className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-sm font-medium px-6">ทั้งหมด</TabsTrigger>
+                <TabsTrigger value="THIS_MONTH" className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-sm font-medium px-6">เดือนนี้</TabsTrigger>
+                <TabsTrigger value="LAST_MONTH" className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-sm font-medium px-6">เดือนที่แล้ว</TabsTrigger>
+              </TabsList>
+            </Tabs>
+
+            <div className="relative w-full md:w-80 group">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+              <Input
+                className="pl-10 h-11 rounded-xl bg-slate-50 border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all font-medium"
+                placeholder="ค้นหาเลขที่ใบรับ, PO..."
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+              />
+            </div>
+          </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           <div className="overflow-x-auto">
             <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="whitespace-nowrap">เลขที่ใบรับ</TableHead>
-                  <TableHead className="whitespace-nowrap">เลขที่ PO</TableHead>
-                  <TableHead className="whitespace-nowrap">วันที่</TableHead>
-                  <TableHead className="whitespace-nowrap text-right">Actions</TableHead>
+              <TableHeader className="bg-slate-50/60 sticky top-0 backdrop-blur-sm z-10">
+                <TableRow className="border-slate-100 hover:bg-transparent">
+                  <TableHead className="py-4 pl-6 font-semibold text-slate-600 w-[240px]">เลขที่ใบรับ</TableHead>
+                  <TableHead className="py-4 font-semibold text-slate-600">อ้างอิง PO</TableHead>
+                  <TableHead className="py-4 font-semibold text-slate-600">วันที่รับเข้า</TableHead>
+                  <TableHead className="py-4 font-semibold text-slate-600">คลังสินค้า</TableHead>
+                  <TableHead className="py-4 pr-6 text-right font-semibold text-slate-600">จัดการ</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {useMemo(() => {
-                  const s = q.trim().toLowerCase();
-                  const list = s ? receipts.filter(r => `${r.code} ${r.poCode || ''}`.toLowerCase().includes(s)) : receipts;
-                  return list;
-                }, [receipts, q]).map((r) => (
-                  <TableRow key={r.id} className="hover:bg-muted/50">
-                    <TableCell className="font-medium whitespace-nowrap">{r.code}</TableCell>
-                    <TableCell className="whitespace-nowrap">{r.poCode || '-'}</TableCell>
-                    <TableCell className="whitespace-nowrap">{new Date(r.date).toLocaleDateString("th-TH")}</TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" onClick={() => handleOpenEditDialog(r)}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => {
-                        setReceiptToDelete(r);
-                        setDeleteDialogOpen(true);
-                      }}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                {filteredReceipts.length > 0 ? (
+                  filteredReceipts.map((r) => (
+                    <TableRow key={r.id} className="border-slate-50 hover:bg-blue-50/30 transition-colors group">
+                      <TableCell className="pl-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs shadow-sm border border-blue-100/50">RC</div>
+                          <span className="font-bold text-slate-800 tracking-tight text-sm font-mono whitespace-nowrap">{r.code}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-4">
+                        {r.poCode ? (
+                          <Badge variant="outline" className="font-mono bg-white text-slate-600 border-slate-200 px-3 py-1 rounded-md shadow-sm">
+                            {r.poCode}
+                          </Badge>
+                        ) : (
+                          <span className="text-slate-400 text-sm italic">- ไม่มี -</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="py-4">
+                        <div className="flex items-center gap-2 text-slate-600 text-sm">
+                          <Calendar className="h-4 w-4 text-slate-400" />
+                          <span className="font-medium">{new Date(r.date).toLocaleDateString("th-TH", { year: '2-digit', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} น.</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-4 text-sm text-slate-600">
+                        {/* Placeholder for Warehouse if available in Receipt later */}
+                        <div className="flex items-center gap-2">
+                          <div className="h-6 w-6 rounded-full bg-slate-100 flex items-center justify-center">
+                            <Building2 className="h-3 w-3 text-slate-400" />
+                          </div>
+                          <span className="text-slate-400">-</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="pr-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                          <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors" onClick={() => handleOpenEditDialog(r)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-colors" onClick={() => {
+                            setReceiptToDelete(r);
+                            setDeleteDialogOpen(true);
+                          }}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={5} className="h-64 text-center">
+                      <div className="flex flex-col items-center justify-center text-slate-400 py-12">
+                        <div className="h-20 w-20 rounded-full bg-slate-50 flex items-center justify-center mb-4 border border-slate-100">
+                          <FileText className="h-10 w-10 text-slate-300" />
+                        </div>
+                        <h3 className="text-lg font-bold text-slate-700">ไม่พบรายการรับสินค้า</h3>
+                        <p className="text-slate-500 max-w-sm mt-1">
+                          {q ? `ไม่พบข้อมูลที่ตรงกับ "${q}"` : "ยังไม่มีข้อมูลการรับสินค้าในช่วงเวลานี้"}
+                        </p>
+                        <Button variant="link" className="mt-4 text-blue-600 font-medium" onClick={() => { setTimeFilter("ALL"); setQ("") }}>
+                          ล้างตัวกรองทั้งหมด
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                )}
               </TableBody>
             </Table>
           </div>
@@ -449,24 +602,26 @@ export default function ReceivingPage() {
 
       {/* Purchase Order Selection Dialog */}
       <Dialog open={poDialogOpen} onOpenChange={setPoDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <ShoppingCart className="h-12 w-12 mx-auto mb-4 text-muted" />
-              เลือกรายการสินค้าจาก Purchase Order
-            </DialogTitle>
-            <DialogDescription>
-              เลือก PO จากนั้นเลือกรายการสินค้าที่ต้องการรับเข้าคลัง
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent className="max-w-5xl max-h-[85vh] overflow-hidden flex flex-col p-0 gap-0 rounded-[2.5rem] border-none shadow-premium">
+          <div className="p-8 border-b border-slate-100 bg-white flex-shrink-0">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-4 text-2xl font-bold text-slate-800 tracking-tight">
+                <div className="h-12 w-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                  <ShoppingCart className="h-6 w-6" />
+                </div>
+                เลือกรายการจากใบสั่งซื้อ (PO)
+              </DialogTitle>
+              <DialogDescription className="text-slate-500 text-base mt-2 ml-16">
+                เลือก PO ที่ต้องการรับสินค้าและระบุจำนวนที่รับเข้าจริงจากผู้จำหน่าย
+              </DialogDescription>
+            </DialogHeader>
+          </div>
 
-          <div className="space-y-4">
+          <div className="flex-1 overflow-y-auto bg-slate-50/30 p-6 space-y-4">
             {poList.filter(p => {
               // Warehouse Isolation Logic
               if (selectedWarehouseId !== "all") {
                 const currentWhName = warehouses.find(w => String(w.WarehouseId) === selectedWarehouseId)?.WarehouseName;
-                // If PO has a target warehouse, it must match our current one.
-                // If PO has no target, we assume it's global/legacy and show it.
                 if (currentWhName && p.targetWarehouse && p.targetWarehouse !== currentWhName) {
                   return false;
                 }
@@ -484,82 +639,78 @@ export default function ReceivingPage() {
               const displayItems = isExpanded ? itemsWithRemaining : itemsWithRemaining.slice(0, 5);
 
               return (
-                <Card key={po.id}>
-                  <CardHeader className="pb-3">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                      <div>
-                        <CardTitle className="text-lg">{po.code}</CardTitle>
-                        <p className="text-sm text-muted-foreground">{po.supplier}</p>
-                        <p className="text-xs text-muted-foreground">วันที่สั่ง: {new Date(po.date).toLocaleDateString("th-TH")}</p>
+                <Card key={po.id} className="border border-slate-200 shadow-sm overflow-hidden group hover:shadow-md transition-all duration-300">
+                  <div className="p-4 bg-white border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="h-12 w-12 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-xs group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
+                        PO
                       </div>
-                      {getStatusBadge(po.status)}
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-bold text-slate-800 text-lg tracking-tight">{po.code}</h4>
+                          {getStatusBadge(po.status)}
+                        </div>
+                        <div className="flex items-center gap-3 text-sm text-slate-500 mt-0.5">
+                          <span className="flex items-center gap-1"><Building2 className="h-3 w-3" /> {po.supplier}</span>
+                          <span className="w-1 h-1 rounded-full bg-slate-300"></span>
+                          <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {new Date(po.date).toLocaleDateString("th-TH")}</span>
+                        </div>
+                      </div>
                     </div>
 
-                    {/* PO Search and Filter */}
-                    <div className="flex flex-col sm:flex-row gap-2 mt-3">
-                      <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <div className="flex items-center gap-3 w-full sm:w-auto">
+                      <div className="relative flex-1 sm:w-64">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                         <Input
-                          placeholder="ค้นหาสินค้าใน PO นี้..."
+                          placeholder="ค้นหาสินค้าใน PO..."
                           value={poSearchTerms[String(po.id)] || ""}
-                          onChange={(e) => setPoSearchTerms(prev => ({
-                            ...prev,
-                            [String(po.id)]: e.target.value
-                          }))}
-                          className="pl-10"
+                          onChange={(e) => setPoSearchTerms(prev => ({ ...prev, [String(po.id)]: e.target.value }))}
+                          className="pl-9 h-9 text-sm bg-slate-50 border-slate-200 focus:bg-white transition-all rounded-lg"
                         />
                       </div>
-                      {itemsWithRemaining.length > 5 && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => togglePOExpansion(po.id)}
-                          className="flex items-center gap-2"
-                        >
-                          <Filter className="h-4 w-4" />
-                          {isExpanded ? 'แสดงน้อยลง' : `แสดงทั้งหมด (${itemsWithRemaining.length})`}
-                        </Button>
-                      )}
                     </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-12">เลือก</TableHead>
-                            <TableHead className="whitespace-nowrap">สินค้า</TableHead>
-                            <TableHead className="whitespace-nowrap">จำนวนที่สั่ง</TableHead>
-                            <TableHead className="whitespace-nowrap">จำนวนรับ</TableHead>
-                            <TableHead className="whitespace-nowrap">คงเหลือรับ</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {displayItems.map((item) => {
-                            const isSelected = selectedItems.some(si => si.materialId === item.MaterialId && si.poId === po.id);
-                            const key = `${po.id}-${item.MaterialId}`;
+                  </div>
 
-                            return (
-                              <TableRow key={item.MaterialId} className={item.remaining <= 0 ? "bg-muted/30 text-muted-foreground" : ""}>
-                                <TableCell>
-                                  <Checkbox
-                                    checked={isSelected}
-                                    disabled={item.remaining <= 0}
-                                    onCheckedChange={(checked) => handleItemSelect(item, po.id, !!checked, item.remaining)}
-                                  />
-                                </TableCell>
-                                <TableCell>
-                                  <div>
-                                    <div className="font-medium">{materialMap[item.MaterialId]?.name || `MAT-${item.MaterialId}`}</div>
-                                    <div className="text-sm text-muted-foreground">ID: {item.MaterialId}</div>
-                                    {item.remaining <= 0 && (
-                                      <Badge variant="secondary" className="mt-1">รับครบแล้ว</Badge>
-                                    )}
-                                  </div>
-                                </TableCell>
-                                <TableCell className="whitespace-nowrap">{item.PurchaseOrderQuantity.toLocaleString()} {materialMap[item.MaterialId]?.unit || item.PurchaseOrderUnit}</TableCell>
-                                <TableCell>
-                                  {isSelected && (
+                  <div className="bg-white p-0">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-slate-50/50 border-b border-slate-100">
+                          <TableHead className="w-12 py-2 pl-4">เลือก</TableHead>
+                          <TableHead className="py-2">รายการสินค้า</TableHead>
+                          <TableHead className="py-2 text-right">จำนวนซื้อ</TableHead>
+                          <TableHead className="py-2 text-center w-32">จำนวนที่รับ</TableHead>
+                          <TableHead className="py-2 text-right pr-4">คงเหลือ</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {displayItems.map((item) => {
+                          const isSelected = selectedItems.some(si => si.materialId === item.MaterialId && si.poId === po.id);
+                          const key = `${po.id}-${item.MaterialId}`;
+                          const isFullyReceived = item.remaining <= 0;
+
+                          return (
+                            <TableRow key={item.MaterialId} className={`border-slate-50 ${isFullyReceived ? "bg-slate-50/50 opacity-60" : "hover:bg-blue-50/10"}`}>
+                              <TableCell className="pl-4 py-3">
+                                <Checkbox
+                                  checked={isSelected}
+                                  disabled={item.remaining <= 0}
+                                  onCheckedChange={(checked) => handleItemSelect(item, po.id, !!checked, item.remaining)}
+                                  className="border-slate-300 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 rounded"
+                                />
+                              </TableCell>
+                              <TableCell className="py-3">
+                                <div>
+                                  <div className="font-semibold text-slate-700">{materialMap[item.MaterialId]?.name || `MAT-${item.MaterialId}`}</div>
+                                  <div className="text-xs text-slate-400 font-mono mt-0.5">ID: {item.MaterialId}</div>
+                                  {isFullyReceived && <Badge variant="secondary" className="mt-1 text-[10px] h-5 px-1.5 bg-slate-200 text-slate-600">ครบแล้ว</Badge>}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right py-3 font-medium text-slate-600">
+                                {item.PurchaseOrderQuantity.toLocaleString()} <span className="text-slate-400 text-xs">{materialMap[item.MaterialId]?.unit || item.PurchaseOrderUnit}</span>
+                              </TableCell>
+                              <TableCell className="py-3 px-2">
+                                {isSelected ? (
+                                  <div className="relative">
                                     <Input
                                       type="number"
                                       min="1"
@@ -569,97 +720,115 @@ export default function ReceivingPage() {
                                         ...prev,
                                         [key]: Math.min(Math.max(1, Number(e.target.value)), item.remaining)
                                       }))}
-                                      className="w-24"
+                                      className="h-9 text-center font-bold text-blue-600 border-blue-200 focus:ring-blue-200 bg-blue-50/30"
                                     />
-                                  )}
-                                </TableCell>
-                                <TableCell className="whitespace-nowrap">{item.remaining.toLocaleString()} {materialMap[item.MaterialId]?.unit || item.PurchaseOrderUnit}</TableCell>
-                              </TableRow>
-                            );
-                          })}
-
-                          {itemsWithRemaining.length === 0 && (
-                            <TableRow>
-                              <TableCell colSpan={6} className="text-center text-muted-foreground py-4">
-                                ไม่พบสินค้าที่ตรงกับเงื่อนไขการค้นหา
+                                    {/* <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-blue-400">/ {item.remaining}</span> */}
+                                  </div>
+                                ) : (
+                                  <div className="text-center text-slate-300">-</div>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right pr-4 py-3 font-mono text-slate-600">
+                                {item.remaining.toLocaleString()}
                               </TableCell>
                             </TableRow>
-                          )}
-                        </TableBody>
-                      </Table>
-                    </div>
+                          );
+                        })}
+                        {itemsWithRemaining.length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={6} className="text-center text-muted-foreground py-6">
+                              ไม่พบสินค้าที่ตรงกับเงื่อนไขการค้นหา
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
 
                     {!isExpanded && itemsWithRemaining.length > 5 && (
-                      <div className="mt-2 text-center">
+                      <div className="bg-slate-50/30 border-t border-slate-100 p-2 text-center">
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => togglePOExpansion(po.id)}
+                          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 text-xs h-8"
                         >
-                          แสดงทั้งหมด ({itemsWithRemaining.length} รายการ)
+                          แสดงรายการที่เหลืออีก {itemsWithRemaining.length - 5} รายการ
                         </Button>
                       </div>
                     )}
-                  </CardContent>
+                  </div>
                 </Card>
               );
             })}
+            {poList.length === 0 && (
+              <div className="text-center py-12">
+                <div className="h-16 w-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
+                  <Package className="h-8 w-8 text-slate-400" />
+                </div>
+                <h3 className="text-lg font-bold text-slate-700">ไม่พบ Purchase Order</h3>
+                <p className="text-slate-500">กรุณาสร้าง PO และส่งไปยัง Supplier ก่อนทำการรับสินค้า</p>
+              </div>
+            )}
           </div>
 
-          {selectedItems.length > 0 && (
-            <div className="border-t pt-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-                <div className="text-sm text-muted-foreground">
-                  เลือกแล้ว {selectedItems.length} รายการ
-                </div>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <Button variant="outline" className="w-full sm:w-auto" onClick={() => {
+          <div className="p-4 bg-white border-t border-slate-200 flex-shrink-0 z-10 shadow-[0_-5px_15px_rgba(0,0,0,0.05)]">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2 text-slate-600">
+                <CheckCircle className={`h-5 w-5 ${selectedItems.length > 0 ? 'text-blue-600' : 'text-slate-300'}`} />
+                <span className="font-medium">เลือก {selectedItems.length} รายการ</span>
+                {selectedItems.length > 0 && (
+                  <Button variant="ghost" size="sm" className="h-6 text-xs text-rose-500 hover:text-rose-700 px-2" onClick={() => {
                     setSelectedItems([]);
                     setReceivingQuantities({});
                   }}>
-                    <X className="h-4 w-4 mr-2" />
-                    ล้างการเลือก
+                    ล้างค่า
                   </Button>
-                  <Button onClick={handleReceiveItems} className="bg-green-600 hover:bg-green-700 w-full sm:w-auto">
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    รับเข้าคลัง ({selectedItems.length} รายการ)
-                  </Button>
-                </div>
+                )}
+              </div>
+              <div className="flex gap-3">
+                <Button variant="outline" onClick={() => setPoDialogOpen(false)} className="rounded-xl h-11 px-6 border-slate-200 hover:bg-slate-50 text-slate-700">ปิดหน้าต่าง</Button>
+                <Button
+                  onClick={handleReceiveItems}
+                  disabled={selectedItems.length === 0}
+                  className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-11 px-8 font-bold shadow-lg shadow-blue-500/20 disabled:opacity-50 disabled:shadow-none"
+                >
+                  <ArrowUpRight className="h-5 w-5 mr-2" />
+                  บันทึกรับสินค้า ({selectedItems.length})
+                </Button>
               </div>
             </div>
-          )}
-
-          <div className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setPoDialogOpen(false)}>ปิด</Button>
           </div>
         </DialogContent>
       </Dialog>
 
       {/* Edit Receipt Dialog */}
+      {/* Edit Receipt Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>แก้ไขใบรับสินค้า: {receiptToEdit?.ReceiptCode}</DialogTitle>
-            <DialogDescription>
-              อัปเดตจำนวนสินค้าที่รับเข้าคลังสำหรับใบรับนี้
-            </DialogDescription>
-          </DialogHeader>
-          <div className="max-h-[60vh] overflow-y-auto p-1">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>สินค้า</TableHead>
-                  <TableHead className="w-40">จำนวน</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+        <DialogContent className="max-w-xl rounded-[2rem] shadow-premium border-none p-0 overflow-hidden">
+          <div className="p-8">
+            <DialogHeader className="mb-6">
+              <div className="flex items-center gap-4 mb-2">
+                <div className="h-12 w-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                  <Edit className="h-6 w-6" />
+                </div>
+                <div>
+                  <DialogTitle className="text-2xl font-bold text-slate-800">แก้ไขใบรับสินค้า</DialogTitle>
+                  <p className="text-sm font-bold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-md w-fit mt-1">{receiptToEdit?.ReceiptCode}</p>
+                </div>
+              </div>
+              <DialogDescription className="text-slate-500 text-base">
+                อัปเดตจำนวนสินค้าที่รับเข้าคลังสำหรับใบรับนี้
+              </DialogDescription>
+            </DialogHeader>
+            <div className="max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
+              <div className="space-y-3">
                 {receiptToEdit?.ReceiptDetails.map(detail => (
-                  <TableRow key={detail.MaterialId}>
-                    <TableCell>
-                      <div className="font-medium">{materialMap[detail.MaterialId]?.name || `MAT-${detail.MaterialId}`}</div>
-                      <div className="text-sm text-muted-foreground">ID: {detail.MaterialId}</div>
-                    </TableCell>
-                    <TableCell>
+                  <div key={detail.MaterialId} className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-100 group hover:border-indigo-200 transition-colors">
+                    <div className="flex-1">
+                      <div className="font-bold text-slate-700 text-lg">{materialMap[detail.MaterialId]?.name || `MAT-${detail.MaterialId}`}</div>
+                      <div className="text-xs text-slate-400 font-mono mt-0.5">ID: {detail.MaterialId}</div>
+                    </div>
+                    <div className="w-32">
                       <Input
                         type="number"
                         min="0"
@@ -668,64 +837,78 @@ export default function ReceivingPage() {
                           ...prev,
                           [detail.MaterialId]: Number(e.target.value)
                         }))}
-                        className="w-full"
+                        className="h-12 text-center font-bold text-lg bg-white border-slate-200 focus:ring-indigo-100 focus:border-indigo-300 rounded-xl"
                       />
-                    </TableCell>
-                  </TableRow>
+                    </div>
+                  </div>
                 ))}
-              </TableBody>
-            </Table>
+              </div>
+            </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>ยกเลิก</Button>
-            <Button onClick={handleUpdateReceipt}>บันทึกการเปลี่ยนแปลง</Button>
+          <DialogFooter className="p-6 bg-slate-50/80 border-t border-slate-100 gap-3">
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)} className="h-12 rounded-xl border-slate-200 hover:bg-white px-6">ยกเลิก</Button>
+            <Button onClick={handleUpdateReceipt} className="h-12 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-lg shadow-indigo-500/20 px-8">บันทึกการเปลี่ยนแปลง</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Manual Receiving Dialog */}
+      {/* Manual Receiving Dialog - Simplified visuals */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
+        {/* Kept minimal changes here as context suggests focus elsewhere, but styled consistent */}
+        <DialogContent className="rounded-2xl">
           <DialogHeader>
-            <DialogTitle>รับวัตถุดิบเข้าคลัง (แบบ Manual)</DialogTitle>
+            <DialogTitle>รับวัตถุดิบเข้าคลัง (Manual)</DialogTitle>
             <DialogDescription>
               ระบุ SKU และจำนวนของวัตถุดิบที่ต้องการรับเข้าคลัง
             </DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+            <div className="space-y-2">
               <Label>SKU</Label>
-              <Input value={sku} onChange={(e) => setSku(e.target.value)} list="sku-list" />
+              <Input value={sku} onChange={(e) => setSku(e.target.value)} list="sku-list" className="rounded-lg h-10" />
               <datalist id="sku-list">
                 {products.map((p) => (
                   <option key={p.sku} value={p.sku}>{p.name}</option>
                 ))}
               </datalist>
             </div>
-            <div>
+            <div className="space-y-2">
               <Label>จำนวน</Label>
-              <Input type="number" value={qty} onChange={(e) => setQty(Number(e.target.value))} />
+              <Input type="number" value={qty} onChange={(e) => setQty(Number(e.target.value))} className="rounded-lg h-10" />
             </div>
           </div>
-          <div className="flex flex-col sm:flex-row justify-end gap-2 mt-4">
-            <Button variant="outline" className="w-full sm:w-auto" onClick={() => setOpen(false)}>ยกเลิก</Button>
-            <Button className="w-full sm:w-auto" onClick={() => { receive(sku, qty, "Manual GRN"); setOpen(false); }}>บันทึก</Button>
+          <div className="flex flex-col sm:flex-row justify-end gap-2 mt-2">
+            <Button variant="outline" className="w-full sm:w-auto rounded-xl" onClick={() => setOpen(false)}>ยกเลิก</Button>
+            <Button className="w-full sm:w-auto rounded-xl bg-blue-600" onClick={() => { receive(sku, qty, "Manual GRN"); setOpen(false); }}>บันทึก</Button>
           </div>
         </DialogContent>
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>ยืนยันการลบ</AlertDialogTitle>
-            <AlertDialogDescription>
-              คุณแน่ใจหรือไม่ว่าต้องการลบใบรับสินค้า <span className="font-bold">{receiptToDelete?.code}</span>? การกระทำนี้ไม่สามารถย้อนกลับได้
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setReceiptToDelete(null)}>ยกเลิก</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteReceipt}>ยืนยัน</AlertDialogAction>
+        <AlertDialogContent className="max-w-[420px] rounded-[2rem] border-none shadow-premium p-0 overflow-hidden">
+          <div className="p-8 space-y-6 text-center">
+            <div className="h-24 w-24 rounded-full flex items-center justify-center mx-auto border-4 bg-rose-50 border-rose-100 text-rose-600">
+              <Trash2 className="h-10 w-10" />
+            </div>
+            <div className="space-y-2">
+              <AlertDialogTitle className="text-2xl font-bold text-slate-800">
+                ยืนยันการลบ?
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-slate-500 text-base">
+                คุณต้องการลบใบรับสินค้า <span className="font-bold text-rose-600 bg-rose-50 px-2 rounded">{receiptToDelete?.code}</span> ใช่หรือไม่?<br />
+                สต็อกสินค้าจะถูกหักออกและสถานะ PO อาจเปลี่ยนแปลง
+              </AlertDialogDescription>
+            </div>
+          </div>
+          <AlertDialogFooter className="p-6 bg-slate-50/80 border-t border-slate-100 grid grid-cols-2 gap-3">
+            <AlertDialogCancel onClick={() => setReceiptToDelete(null)} className="w-full h-12 rounded-xl border-slate-200 hover:bg-white hover:text-slate-900">ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteReceipt}
+              className="w-full h-12 rounded-xl font-bold text-white shadow-lg bg-rose-600 hover:bg-rose-700 shadow-rose-500/20"
+            >
+              ลบข้อมูล
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
