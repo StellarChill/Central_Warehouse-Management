@@ -28,23 +28,34 @@ export default function LiffEntryPage() {
                     return;
                 }
 
-                // 4. Get ID Token for secure backend login
+                // 4. Get ID Token and/or Profile
                 const idToken = liff.getIDToken();
-                if (!idToken) {
-                    throw new Error("ไม่พบ ID Token จาก LINE");
-                }
+                const profile = await liff.getProfile();
 
-                setStatus("กำลังเข้าสู่ระบบ...");
+                setStatus(`สวัสดีคุณ ${profile.displayName || 'User'} กำลังเข้าสู่ระบบ...`);
 
                 // 5. Try login to Backend
                 try {
-                    await loginWithLine(idToken, true);
+                    // Try Secure Login (ID Token) first
+                    if (idToken) {
+                        try {
+                            await loginWithLine(idToken, true);
+                        } catch (e) {
+                            console.warn("ID Token login failed, trying fallback...", e);
+                            // Fallback: Try Legacy Login (LineUserId)
+                            await loginWithLine(profile.userId, false);
+                        }
+                    } else {
+                        // No ID Token, use Profile ID directly
+                        await loginWithLine(profile.userId, false);
+                    }
+
                     // Login Success -> Redirect to Requisition Page
-                    // Mark as LIFF user in local storage if needed
                     localStorage.setItem("liff_only", "1");
-                    navigate("/requisitions/create", { replace: true });
+                    navigate("/liff/create", { replace: true });
+
                 } catch (err: any) {
-                    // 6. Login Failed
+                    // 6. Login Failed (Likely user not found in DB)
                     const errMsg = String(err.message || "").toLowerCase();
 
                     // If "Pending Approval"
@@ -53,10 +64,8 @@ export default function LiffEntryPage() {
                         return;
                     }
 
-                    // If "User not found" or other login error -> Go to Register
-                    // We can check strictly for 404/not found if API returns consistent error
-                    // For now, assume any non-pending error means "Needs Registration"
-                    console.log("Login failed (likely not registered), redirecting to register...", err);
+                    // If "User not found" -> Go to Register
+                    console.log("User not found, redirecting to register...", err);
                     navigate("/liff/register", { replace: true });
                 }
 
