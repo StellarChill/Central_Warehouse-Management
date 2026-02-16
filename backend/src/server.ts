@@ -18,6 +18,8 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: (origin, callback) => {
+    // OLD LOGIC (Commented out for reference)
+    /*
     // อนุญาต requests ที่ไม่มี origin (Postman, Mobile apps)
     if (!origin) return callback(null, true);
 
@@ -27,10 +29,13 @@ app.use(cors({
     // ตรวจสอบ allowed origins
     if (allowedOrigins.includes(origin)) return callback(null, true);
 
-    // Block origin อื่นๆ — don't throw an error here (that returns 500 without CORS headers)
-    // instead return false so the cors middleware will not set CORS headers and the browser will block the request.
     console.warn('🚫 CORS blocked (not in allowedOrigins):', origin);
     return callback(null, false);
+    */
+
+    // NEW LOGIC FOR NGROK: Allow ANY origin that comes in
+    // This fixes the "wildcard * with credentials" error by reflecting the origin back
+    return callback(null, true);
   },
   credentials: true,
 }));
