@@ -12,7 +12,8 @@ import {
     Branch,
     Material,
     deleteRequisition,
-    getRequisition
+    getRequisition,
+    getCompany // Added Import
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -50,6 +51,7 @@ export default function InventoryIssuingPage() {
     const [viewItem, setViewItem] = useState<WithdrawnRequest | null>(null);
     const { user } = useAuth();
     const { toast } = useToast();
+    const [companyName, setCompanyName] = useState(""); // Added State
 
     // Dialog States
     const [confirmOpen, setConfirmOpen] = useState(false);
@@ -61,11 +63,17 @@ export default function InventoryIssuingPage() {
         return stored && stored !== 'all' ? Number(stored) : null;
     };
 
+    const [branches, setBranches] = useState<Branch[]>([]);
+
     const loadRequests = async () => {
         setLoading(true);
         try {
-            const data = await getRequisitions();
-            setRequests(data.sort((a, b) => new Date(b.CreatedAt).getTime() - new Date(a.CreatedAt).getTime()));
+            const [reqData, branchData] = await Promise.all([
+                getRequisitions(),
+                getBranches()
+            ]);
+            setRequests(reqData.sort((a, b) => new Date(b.CreatedAt).getTime() - new Date(a.CreatedAt).getTime()));
+            setBranches(branchData);
         } catch (e) {
             toast({ variant: "destructive", title: "โหลดรายการไม่สำเร็จ" });
         } finally {
@@ -76,6 +84,12 @@ export default function InventoryIssuingPage() {
     useEffect(() => {
         loadRequests();
     }, []);
+
+    useEffect(() => {
+        if (user?.CompanyId) {
+            getCompany(user.CompanyId).then(c => setCompanyName(c.CompanyName)).catch(() => { });
+        }
+    }, [user]);
 
     const handleActionClick = (type: 'APPROVE' | 'REJECT' | 'ISSUE' | 'DELETE', id: number) => {
         if (type === 'ISSUE') {
@@ -127,6 +141,7 @@ export default function InventoryIssuingPage() {
     const getStatusBadge = (status: string) => {
         switch (status) {
             case "PENDING":
+            case "REQUESTED":
                 return <Badge variant="outline" className="bg-amber-50 text-amber-600 border-amber-200 px-3 py-1 rounded-full font-bold">รอดำเนินการ</Badge>;
             case "APPROVED":
                 return <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-200 px-3 py-1 rounded-full font-bold">อนุมัติแล้ว</Badge>;
@@ -144,13 +159,13 @@ export default function InventoryIssuingPage() {
 
     const stats = {
         total: requests.length,
-        pending: requests.filter(r => r.WithdrawnRequestStatus === 'PENDING').length,
+        pending: requests.filter(r => r.WithdrawnRequestStatus === 'PENDING' || r.WithdrawnRequestStatus === 'REQUESTED').length,
         approved: requests.filter(r => r.WithdrawnRequestStatus === 'APPROVED').length,
         completed: requests.filter(r => r.WithdrawnRequestStatus === 'COMPLETED').length,
     };
 
     const filteredRequests = requests.filter(req => {
-        const matchesStatus = filterStatus === "ALL" || req.WithdrawnRequestStatus === filterStatus;
+        const matchesStatus = filterStatus === "ALL" || req.WithdrawnRequestStatus === filterStatus || (filterStatus === "PENDING" && req.WithdrawnRequestStatus === "REQUESTED");
         const matchesSearch =
             req.WithdrawnRequestCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
             (req.BranchId && `Branch ${req.BranchId}`.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -162,7 +177,9 @@ export default function InventoryIssuingPage() {
             {/* Header Section */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div>
-                    <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">การเบิกจ่ายสินค้า (Issuing)</h1>
+                    <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">
+                        การเบิกจ่ายสินค้า (Issuing) {companyName && <span className="text-indigo-600 text-2xl">[{companyName}]</span>}
+                    </h1>
                     <p className="text-slate-500 mt-2 text-lg">จัดการคำขอเบิกสินค้าจากสาขาและควบคุมการตัดสต็อก</p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -311,7 +328,11 @@ export default function InventoryIssuingPage() {
                                                 <div className="h-6 w-6 rounded-full bg-slate-100 flex items-center justify-center">
                                                     <Building2 className="h-3 w-3 text-slate-500" />
                                                 </div>
-                                                <span className="font-medium text-slate-700 text-sm">{req.BranchId ? `สาขา ${req.BranchId}` : '-'}</span>
+                                                <span className="font-medium text-slate-700 text-sm">
+                                                    {req.BranchId
+                                                        ? branches.find(b => b.BranchId === req.BranchId)?.BranchName || `สาขา ${req.BranchId}`
+                                                        : '-'}
+                                                </span>
                                             </div>
                                         </TableCell>
                                         <TableCell className="py-4 text-center">
@@ -321,7 +342,7 @@ export default function InventoryIssuingPage() {
                                         </TableCell>
                                         <TableCell className="pr-6 py-4 text-right">
                                             <div className="flex justify-end gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
-                                                {req.WithdrawnRequestStatus === "PENDING" && (
+                                                {(req.WithdrawnRequestStatus === "PENDING" || req.WithdrawnRequestStatus === "REQUESTED") && (
                                                     <>
                                                         <Button
                                                             size="icon"
@@ -670,5 +691,3 @@ function CreateRequestDialog({ open, onOpenChange, onSuccess }: { open: boolean,
         </Dialog>
     );
 }
-
-

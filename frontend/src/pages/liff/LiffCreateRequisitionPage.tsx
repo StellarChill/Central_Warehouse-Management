@@ -31,70 +31,80 @@ export default function LiffCreateRequisitionPage() {
     const [searchTerm, setSearchTerm] = useState("");
     const [isLiffInitializing, setIsLiffInitializing] = useState(true);
     const [branchName, setBranchName] = useState<string | null>(null);
+    const [hasCheckedProfile, setHasCheckedProfile] = useState(false);
 
     // Selection State
     const [selectedMaterial, setSelectedMaterial] = useState<any | null>(null); // For dialog
     const [tempQty, setTempQty] = useState(1);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
 
+    const [lineProfile, setLineProfile] = useState<any>(null);
+    const [status, setStatus] = useState("กำลังตรวจสอบข้อมูลสมาชิก...");
+    const [error, setError] = useState<string | null>(null);
+
     // 1. Robust Auth Check & LIFF Init
     useEffect(() => {
-        const initLiffDoc = async () => {
-            // If already authenticated via localStorage, we are good
-            if (user) {
-                setIsLiffInitializing(false);
-                return;
-            }
+        if (hasCheckedProfile) return;
 
+        const initLiffDoc = async () => {
             // Perform LIFF Login Sequence
             try {
+                setStatus("กำลังเชื่อมต่อ LINE...");
                 await liff.init({ liffId: import.meta.env.VITE_LIFF_ID });
 
                 // Wait for ready (optional but safe)
                 if (liff.ready) await liff.ready;
 
                 if (!liff.isLoggedIn()) {
-                    liff.login({ redirectUri: `${window.location.origin}/liff` });
+                    setStatus("กำลังเข้าสู่ระบบ LINE...");
+                    // ... login logic ...
+                    if (!user) {
+                        liff.login({ redirectUri: `${window.location.origin}/liff` });
+                    } else {
+                        setIsLiffInitializing(false);
+                        setHasCheckedProfile(true);
+                    }
                     return;
                 }
 
-                // Try to login to backend
-                const idToken = liff.getIDToken();
+                // Get Profile
+                setStatus("กำลังดึงข้อมูลโปรไฟล์...");
                 const profile = await liff.getProfile();
+                setLineProfile(profile);
+
+                // Try to login/refresh to backend
+                setStatus("กำลังยืนยันตัวตนกับระบบ...");
+                const idToken = liff.getIDToken();
 
                 try {
                     // Prefer ID Token
                     if (idToken) await loginWithLine(idToken, true);
                     else await loginWithLine(profile.userId, false);
 
-                    // Login Success - Stay on this page
                     localStorage.setItem("liff_only", "1");
-                    setIsLiffInitializing(false);
 
                 } catch (backendErr: any) {
-                    // Login Failed -> User likely not registered
                     console.warn("Backend Login Failed:", backendErr);
-
                     if (String(backendErr.message).includes("pending")) {
                         navigate("/awaiting-approval", { replace: true });
-                        return;
+                    } else if (!user) {
+                        navigate("/liff/register", { replace: true });
                     }
-
-                    // Redirect to Register
-                    navigate("/liff/register", { replace: true });
                 }
 
             } catch (err) {
                 console.error("LIFF Init Error:", err);
-                toast.error("ไม่สามารถเชื่อมต่อ LINE ได้");
-                setIsLiffInitializing(false); // Stop loading to show error or empty state
+                if (!user) toast.error("ไม่สามารถเชื่อมต่อ LINE ได้");
+            } finally {
+                setIsLiffInitializing(false);
+                setHasCheckedProfile(true);
             }
         };
 
         if (!isAuthLoading) {
             initLiffDoc();
         }
-    }, [user, isAuthLoading, loginWithLine, navigate]);
+    }, [isAuthLoading, hasCheckedProfile, loginWithLine, navigate, user]);
 
     // Fetch Branch Name
     useEffect(() => {
@@ -130,50 +140,28 @@ export default function LiffCreateRequisitionPage() {
     }, [user]);
 
     // Handlers
-    const openAddDialog = (material: any) => {
-        setSelectedMaterial(material);
-        setTempQty(1);
-        setIsDialogOpen(true);
-    };
-
-    const addToCart = () => {
-        if (!selectedMaterial) return;
-
+    const handleQuantityChange = (material: any, qty: number) => {
         setCart((prev) => {
-            // Check if exists
-            const existing = prev.find((p) => p.id === selectedMaterial.MaterialId);
-            if (existing) {
-                return prev.map((p) =>
-                    p.id === selectedMaterial.MaterialId
-                        ? { ...p, qty: p.qty + tempQty }
-                        : p
-                );
+            const existing = prev.find((p) => p.id === material.MaterialId);
+            if (qty <= 0) {
+                // Remove from cart
+                return prev.filter(p => p.id !== material.MaterialId);
             }
+            if (existing) {
+                // Update qty
+                return prev.map(p => p.id === material.MaterialId ? { ...p, qty } : p);
+            }
+            // Add new
             return [
                 ...prev,
                 {
-                    id: selectedMaterial.MaterialId,
-                    name: selectedMaterial.MaterialName,
-                    unit: selectedMaterial.Unit,
-                    qty: tempQty,
-                },
+                    id: material.MaterialId,
+                    name: material.MaterialName,
+                    unit: material.Unit,
+                    qty: qty
+                }
             ];
         });
-
-        setIsDialogOpen(false);
-        toast.success("เพิ่มลงรายการแล้ว");
-    };
-
-    const updateQty = (id: number, delta: number) => {
-        setCart((prev) =>
-            prev.map((item) => {
-                if (item.id === id) {
-                    const newQty = Math.max(1, item.qty + delta);
-                    return { ...item, qty: newQty };
-                }
-                return item;
-            })
-        );
     };
 
     const handleSubmit = async () => {
@@ -181,10 +169,10 @@ export default function LiffCreateRequisitionPage() {
         setIsSubmitting(true);
         try {
             const payload = {
-                WithdrawnRequestCode: `REQ-LIFF-${Date.now()}`,
+                WithdrawnRequestCode: `REQ-LIFF-${crypto.randomUUID()}`,
                 BranchId: user?.BranchId || 1,
                 RequestDate: new Date().toISOString(),
-                WithdrawnRequestStatus: "REQUESTED",
+                WithdrawnRequestStatus: "PENDING",
                 details: cart.map((i) => ({
                     MaterialId: i.id,
                     WithdrawnQuantity: i.qty,
@@ -200,6 +188,8 @@ export default function LiffCreateRequisitionPage() {
             });
 
             setCart([]);
+            // Optional: Close LIFF or redirect
+            // liff.closeWindow(); 
 
         } catch (e: any) {
             console.error(e);
@@ -209,153 +199,166 @@ export default function LiffCreateRequisitionPage() {
         }
     };
 
-    const handleLogout = () => {
-        logout(); // Clear local context
-        try {
-            // Check if liff is initialized before calling isLoggedIn
-            // Safety check for liff object
-            if (typeof liff !== 'undefined' && liff.id) {
-                if (liff.isLoggedIn()) {
-                    liff.logout();
-                }
-            }
-        } catch (e) {
-            // ignore liff errors
-            console.warn("LIFF logout warning", e);
-        }
-        navigate("/liff"); // Go to LIFF Entry
-    };
-
     // Safe area padding
-    const safeAreaBottom = "pb-24";
+    const safeAreaBottom = "pb-6";
 
     const filteredMaterials = materials.filter(m =>
         m.MaterialName.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     // Loading Screen
+    if (error) {
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 gap-4 p-4 text-center">
+                <LogOut className="h-10 w-10 text-rose-500" />
+                <h3 className="text-lg font-bold text-slate-800">เข้าสู่ระบบไม่สำเร็จ</h3>
+                <p className="text-slate-500 text-sm">{error}</p>
+                <Button onClick={() => window.location.reload()} variant="outline">ลองใหม่อีกครั้ง</Button>
+            </div>
+        );
+    }
+
     if (isAuthLoading || (isLiffInitializing && !user)) {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 gap-4">
                 <Loader2 className="h-10 w-10 text-primary animate-spin" />
-                <p className="text-slate-500 animate-pulse">กำลังตรวจสอบข้อมูลสมาชิก...</p>
+                <p className="text-slate-500 animate-pulse">{status}</p>
+            </div>
+        );
+    }
+
+    // If initialization done but no user (and no error caught yet), show fallback
+    if (!user) {
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 gap-4 p-4 text-center">
+                <Loader2 className="h-10 w-10 text-slate-400 animate-spin" />
+                <p className="text-slate-500">กำลังยืนยันข้อมูล...</p>
+                <Button onClick={() => window.location.reload()} variant="link" className="text-slate-400">รีโหลดหน้าเว็บ</Button>
             </div>
         );
     }
 
     return (
-        <div className={`min-h-screen bg-slate-50 flex flex-col ${safeAreaBottom}`}>
-            {/* Header */}
-            <div className="bg-white px-4 py-3 sticky top-0 z-10 shadow-sm flex items-center justify-between">
-                <div>
-                    <h1 className="text-lg font-bold text-slate-800">เบิกวัตถุดิบ</h1>
-                    {branchName && <p className="text-xs text-primary font-medium">{branchName}</p>}
-                </div>
-                <div className="flex items-center gap-3">
-                    <div className="flex flex-col items-end">
-                        <span className="text-sm font-semibold text-slate-700">{user?.UserName}</span>
-                        <span className="text-[10px] text-slate-500 uppercase px-1.5 py-0.5 bg-slate-100 rounded">
-                            {user?.role}
-                        </span>
+        <div className="min-h-screen bg-slate-100 flex justify-center">
+            <div className={`w-full max-w-md bg-slate-50 flex flex-col min-h-screen shadow-xl relative ${safeAreaBottom}`}>
+                {/* Header */}
+                <div className="bg-white px-4 py-3 sticky top-0 z-30 shadow-sm flex items-center justify-between">
+                    <div>
+                        <h1 className="text-lg font-bold text-slate-800">เบิกวัตถุดิบ</h1>
+                        {branchName && <p className="text-xs text-slate-500 font-medium">สาขา: <span className="text-primary">{branchName}</span></p>}
                     </div>
-                    <Button variant="ghost" size="icon" onClick={handleLogout} className="text-red-500 hover:text-red-600 hover:bg-red-50">
-                        <LogOut className="h-5 w-5" />
-                    </Button>
+                    <div className="flex items-center gap-3">
+                        <div className="flex flex-col items-end">
+                            <span className="text-sm font-semibold text-slate-700">
+                                {lineProfile?.displayName || user?.UserName}
+                            </span>
+                            <span className="text-[10px] text-slate-500 uppercase px-1.5 py-0.5 bg-slate-100 rounded">
+                                {user?.role}
+                            </span>
+                        </div>
+                        {lineProfile?.pictureUrl && (
+                            <img src={lineProfile.pictureUrl} alt="Profile" className="h-8 w-8 rounded-full border border-slate-200" />
+                        )}
+                    </div>
                 </div>
-            </div>
 
-            {/* Search */}
-            <div className="p-4 bg-white border-b">
-                <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                    <Input
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        placeholder="ค้นหาวัตถุดิบ..."
-                        className="pl-9 bg-slate-100 border-none"
-                    />
+                {/* Search */}
+                <div className="p-4 bg-white border-b sticky top-[60px] z-20 shadow-sm">
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                        <Input
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            placeholder="ค้นหาวัตถุดิบ..."
+                            className="pl-9 bg-slate-50 border-slate-200 focus:bg-white transition-all h-10 rounded-xl"
+                        />
+                    </div>
                 </div>
-            </div>
 
-            {/* Materials List */}
-            <div className="flex-1 p-4 grid gap-3">
-                {filteredMaterials.map((m) => {
-                    const inCart = cart.find(c => c.id === m.MaterialId);
-                    return (
-                        <Card key={m.MaterialId} className="border-none shadow-sm active:scale-[0.98] transition-transform" onClick={() => openAddDialog(m)}>
-                            <CardContent className="p-4 flex items-center justify-between">
-                                <div>
-                                    <h3 className="font-semibold text-slate-800">{m.MaterialName}</h3>
-                                    <p className="text-sm text-slate-500">หน่วย: {m.Unit}</p>
-                                </div>
-                                {inCart ? (
-                                    <div className="bg-green-100 text-green-700 font-bold px-3 py-1 rounded-full text-sm">
-                                        x {inCart.qty}
+                {/* Materials List */}
+                <div className="flex-1 p-3 grid gap-3 content-start">
+                    {filteredMaterials.map((m) => {
+                        const inCart = cart.find(c => c.id === m.MaterialId);
+                        const qty = inCart ? inCart.qty : 0;
+
+                        return (
+                            <Card key={m.MaterialId} className={`border-none shadow-sm transition-all ${qty > 0 ? 'ring-2 ring-primary/20 bg-primary/5' : 'bg-white'}`}>
+                                <CardContent className="p-4 flex items-center justify-between gap-3">
+                                    <div className="flex-1 min-w-0">
+                                        <h3 className="font-semibold text-slate-800 text-sm truncate">{m.MaterialName}</h3>
+                                        <p className="text-xs text-slate-500">หน่วย: {m.Unit}</p>
                                     </div>
-                                ) : (
-                                    <Button size="icon" variant="ghost" className="text-primary bg-primary/10 rounded-full h-8 w-8 hover:bg-primary/20">
-                                        <Plus className="h-5 w-5" />
-                                    </Button>
-                                )}
-                            </CardContent>
-                        </Card>
-                    );
-                })}
-                {filteredMaterials.length === 0 && (
-                    <div className="text-center py-10 text-slate-400">
-                        ไม่พบรายการวัตถุดิบ
-                    </div>
-                )}
-            </div>
 
-            {/* Bottom Cart Bar */}
-            {cart.length > 0 && (
-                <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 shadow-lg z-20">
-                    <div className="flex items-center justify-between mb-3">
-                        <span className="font-semibold text-slate-700">รายการในตะกร้า</span>
-                        <span className="font-bold text-primary text-lg">{cart.reduce((s, i) => s + i.qty, 0)} รายการ</span>
-                    </div>
+                                    <div className="flex items-center bg-slate-100 rounded-lg p-1 h-9 shadow-inner">
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-7 w-7 rounded-md hover:bg-white hover:text-red-500 transition-colors"
+                                            onClick={() => handleQuantityChange(m, Math.max(0, qty - 1))}
+                                            disabled={qty === 0}
+                                        >
+                                            <Minus className="h-3 w-3" />
+                                        </Button>
 
-                    <div className="flex gap-2">
-                        <Button variant="outline" className="flex-1" onClick={() => setCart([])}>
-                            ล้าง
-                        </Button>
-                        <Button className="flex-[3]" onClick={handleSubmit} disabled={isSubmitting}>
-                            {isSubmitting ? "กำลังส่ง..." : "ยืนยันการเบิก"}
-                        </Button>
-                    </div>
-                </div>
-            )}
+                                        <input
+                                            type="number"
+                                            className="w-12 h-full text-center bg-transparent border-none text-sm font-bold text-slate-800 focus:outline-none focus:ring-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                            value={qty === 0 ? '' : qty}
+                                            placeholder="0"
+                                            onChange={(e) => {
+                                                const val = e.target.value === '' ? 0 : parseInt(e.target.value);
+                                                if (!isNaN(val)) handleQuantityChange(m, Math.max(0, val));
+                                            }}
+                                            onFocus={(e) => e.target.select()}
+                                        />
 
-            {/* Add Item Dialog */}
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogContent className="w-[90%] rounded-xl">
-                    <DialogHeader>
-                        <DialogTitle>ระบุจำนวน</DialogTitle>
-                    </DialogHeader>
-
-                    {selectedMaterial && (
-                        <div className="py-4 flex flex-col items-center gap-4">
-                            <h3 className="text-xl font-semibold">{selectedMaterial.MaterialName}</h3>
-                            <div className="flex items-center gap-4">
-                                <Button size="icon" variant="outline" className="h-12 w-12 rounded-full" onClick={() => setTempQty(Math.max(1, tempQty - 1))}>
-                                    <Minus />
-                                </Button>
-                                <span className="text-3xl font-bold w-16 text-center">{tempQty}</span>
-                                <Button size="icon" variant="outline" className="h-12 w-12 rounded-full" onClick={() => setTempQty(tempQty + 1)}>
-                                    <Plus />
-                                </Button>
-                            </div>
-                            <p className="text-slate-500">หน่วย: {selectedMaterial.Unit}</p>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-7 w-7 rounded-md hover:bg-white hover:text-green-600 transition-colors"
+                                            onClick={() => handleQuantityChange(m, qty + 1)}
+                                        >
+                                            <Plus className="h-3 w-3" />
+                                        </Button>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        );
+                    })}
+                    {filteredMaterials.length === 0 && (
+                        <div className="text-center py-10 text-slate-400">
+                            ไม่พบรายการวัตถุดิบ
                         </div>
                     )}
+                </div>
 
-                    <DialogFooter className="flex-row gap-2 sm:justify-center">
-                        <Button variant="outline" className="flex-1" onClick={() => setIsDialogOpen(false)}>ยกเลิก</Button>
-                        <Button className="flex-1" onClick={addToCart}>ยืนยัน</Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                {/* Bottom Cart Bar */}
+                <div className="sticky bottom-0 left-0 right-0 bg-white border-t p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-30">
+                    <div className="flex items-center justify-between mb-3">
+                        <span className="font-semibold text-slate-700 text-sm">รวมรายการ</span>
+                        <span className="font-bold text-primary text-xl">{cart.reduce((s, i) => s + i.qty, 0)} <span className="text-sm font-normal text-slate-500">ชิ้น</span></span>
+                    </div>
+
+                    <div className="flex gap-3">
+                        {cart.length > 0 && (
+                            <Button variant="outline" className="px-3 border-slate-200 text-slate-500 hover:text-red-500 hover:border-red-200 hover:bg-red-50" onClick={() => setCart([])}>
+                                <LogOut className="h-4 w-4 rotate-180" />
+                            </Button>
+                        )}
+                        <Button
+                            className="flex-1 h-12 text-lg font-bold shadow-lg shadow-primary/20 rounded-xl"
+                            onClick={handleSubmit}
+                            disabled={isSubmitting || cart.length === 0}
+                        >
+                            {isSubmitting ? (
+                                <>
+                                    <Loader2 className="mr-2 h-5 w-5 animate-spin" /> กำลังส่ง...
+                                </>
+                            ) : "ยืนยันการเบิก"}
+                        </Button>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }

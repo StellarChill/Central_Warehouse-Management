@@ -423,6 +423,7 @@ function getAuthUser() {
 
 export type Branch = {
   BranchId: number;
+  CompanyId: number;
   BranchName: string;
   BranchCode: string;
   BranchAddress: string | null;
