@@ -169,7 +169,7 @@ export default function LiffCreateRequisitionPage() {
         setIsSubmitting(true);
         try {
             const payload = {
-                WithdrawnRequestCode: `REQ-LIFF-${crypto.randomUUID()}`,
+                WithdrawnRequestCode: `REQ-LIFF-${crypto.randomUUID().split('-')[0].toUpperCase()}`,
                 BranchId: user?.BranchId || 1,
                 RequestDate: new Date().toISOString(),
                 WithdrawnRequestStatus: "PENDING",
