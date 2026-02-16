@@ -5,7 +5,7 @@ import { getMaterials, apiPost } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { Minus, Plus, Loader2, Search } from "lucide-react";
+import { Minus, Plus, Loader2, Search, LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
@@ -21,7 +21,7 @@ type CartItem = {
 };
 
 export default function LiffCreateRequisitionPage() {
-    const { user, loginWithLine, isLoading: isAuthLoading } = useAuth();
+    const { user, loginWithLine, logout, isLoading: isAuthLoading } = useAuth();
     const navigate = useNavigate();
 
     // State
@@ -30,6 +30,7 @@ export default function LiffCreateRequisitionPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
     const [isLiffInitializing, setIsLiffInitializing] = useState(true);
+    const [branchName, setBranchName] = useState<string | null>(null);
 
     // Selection State
     const [selectedMaterial, setSelectedMaterial] = useState<any | null>(null); // For dialog
@@ -53,7 +54,7 @@ export default function LiffCreateRequisitionPage() {
                 if (liff.ready) await liff.ready;
 
                 if (!liff.isLoggedIn()) {
-                    liff.login({ redirectUri: window.location.href });
+                    liff.login({ redirectUri: `${window.location.origin}/liff` });
                     return;
                 }
 
@@ -94,6 +95,17 @@ export default function LiffCreateRequisitionPage() {
             initLiffDoc();
         }
     }, [user, isAuthLoading, loginWithLine, navigate]);
+
+    // Fetch Branch Name
+    useEffect(() => {
+        if (user?.BranchId) {
+            import("@/lib/api").then(({ getBranch }) => {
+                getBranch(user.BranchId)
+                    .then(b => setBranchName(b.BranchName))
+                    .catch(() => setBranchName("สาขาไม่ระบุ"));
+            });
+        }
+    }, [user]);
 
     // 2. Load Materials (Only if Auth is clear)
     useEffect(() => {
@@ -197,6 +209,23 @@ export default function LiffCreateRequisitionPage() {
         }
     };
 
+    const handleLogout = () => {
+        logout(); // Clear local context
+        try {
+            // Check if liff is initialized before calling isLoggedIn
+            // Safety check for liff object
+            if (typeof liff !== 'undefined' && liff.id) {
+                if (liff.isLoggedIn()) {
+                    liff.logout();
+                }
+            }
+        } catch (e) {
+            // ignore liff errors
+            console.warn("LIFF logout warning", e);
+        }
+        navigate("/liff"); // Go to LIFF Entry
+    };
+
     // Safe area padding
     const safeAreaBottom = "pb-24";
 
@@ -218,9 +247,20 @@ export default function LiffCreateRequisitionPage() {
         <div className={`min-h-screen bg-slate-50 flex flex-col ${safeAreaBottom}`}>
             {/* Header */}
             <div className="bg-white px-4 py-3 sticky top-0 z-10 shadow-sm flex items-center justify-between">
-                <h1 className="text-lg font-bold text-slate-800">เบิกวัตถุดิบ</h1>
-                <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-500">{user?.UserName || 'Guest'}</span>
+                <div>
+                    <h1 className="text-lg font-bold text-slate-800">เบิกวัตถุดิบ</h1>
+                    {branchName && <p className="text-xs text-primary font-medium">{branchName}</p>}
+                </div>
+                <div className="flex items-center gap-3">
+                    <div className="flex flex-col items-end">
+                        <span className="text-sm font-semibold text-slate-700">{user?.UserName}</span>
+                        <span className="text-[10px] text-slate-500 uppercase px-1.5 py-0.5 bg-slate-100 rounded">
+                            {user?.role}
+                        </span>
+                    </div>
+                    <Button variant="ghost" size="icon" onClick={handleLogout} className="text-red-500 hover:text-red-600 hover:bg-red-50">
+                        <LogOut className="h-5 w-5" />
+                    </Button>
                 </div>
             </div>
 
