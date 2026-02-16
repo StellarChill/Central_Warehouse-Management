@@ -1,239 +1,214 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useMemo, useState, useEffect } from "react";
-import { toast } from "@/components/ui/sonner";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { getMaterials } from "@/lib/api";
-import { apiPost } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import { getMaterials, apiPost } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
+import { Minus, Plus, Loader2, Search, ShoppingCart, ArrowLeft } from "lucide-react";
+import { toast } from "sonner";
 
-type Item = { name: string; qty: number; unit: string; sku?: number };
+// Type for Cart Item
+type CartItem = {
+  id: number;
+  name: string;
+  qty: number;
+  unit: string;
+};
 
 export default function BranchRequisitionCreatePage() {
   const { user, isLoading } = useAuth();
-  const [branch, setBranch] = useState("กำลังโหลด...");
-  const [sku, setSku] = useState<string>("");
-  const [qty, setQty] = useState(1);
-  const [unit, setUnit] = useState("ชิ้น");
-  const [items, setItems] = useState<Item[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
   const navigate = useNavigate();
 
-  // แคตตาล็อกวัตถุดิบ
-  type BackendCatalogItem = { MaterialId: number; MaterialName: string; Unit: string };
-  const [catalog, setCatalog] = useState<BackendCatalogItem[]>([]);
+  // State
+  const [materials, setMaterials] = useState<any[]>([]);
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [branchName, setBranchName] = useState<string>("กำลังโหลด...");
 
-  // Load Branch Name from User
+  // Fetch Branch Name
   useEffect(() => {
     if (user?.BranchId) {
-      import("@/lib/api").then(({ getBranch, getCompany }) => {
+      import("@/lib/api").then(({ getBranch }) => {
         getBranch(user.BranchId)
-          .then(async (b) => {
-            let name = b.BranchName;
-            if (b.CompanyId) {
-              try {
-                const co = await getCompany(b.CompanyId);
-                if (co) name += ` (${co.CompanyName})`;
-              } catch { }
-            }
-            setBranch(name);
-          })
-          .catch(() => setBranch("ไม่พบข้อมูลสาขา"));
+          .then(b => setBranchName(b.BranchName))
+          .catch(() => setBranchName("ไม่ระบุสาขา"));
       });
-    } else if (user && !user.BranchId) {
-      setBranch("ไม่ระบุสาขา");
     }
   }, [user]);
 
-  // เรียกวัสดุจาก backend
+  // Load Materials
   useEffect(() => {
-    let mounted = true;
-    (async () => {
+    async function load() {
       try {
-        const mats: any = await getMaterials();
-        if (!mounted) return;
-        const mapped = mats.map((m: any) => ({ MaterialId: m.MaterialId, MaterialName: m.MaterialName, Unit: m.Unit }));
-        setCatalog(mapped);
+        const res = await getMaterials();
+        setMaterials(res || []);
       } catch (e) {
-        if (!mounted) return;
-        setCatalog([
-          { MaterialId: 1, MaterialName: "แป้งสาลีอเนกประสงค์", Unit: "กิโลกรัม" },
-          { MaterialId: 2, MaterialName: "น้ำตาลทราย", Unit: "กิโลกรัม" },
-          { MaterialId: 3, MaterialName: "เนยเค็ม", Unit: "กิโลกรัม" },
-        ]);
+        console.error("Load materials error", e);
+        // Fallback
+        setMaterials([]);
       }
-    })();
-    return () => { mounted = false; };
+    }
+    load();
   }, []);
 
-  const selectedProduct = useMemo(() => catalog.find((c) => String(c.MaterialId) === sku), [catalog, sku]);
-
-  // If user opens this page directly without auth
-  useEffect(() => {
-    if (!isLoading && !user) {
-      navigate('/liff', { replace: true });
-    }
-  }, [isLoading, user, navigate]);
-
-  if (isLoading || !user) {
-    return null;
-  }
-
-  const addItem = () => {
-    if (!selectedProduct || qty <= 0) {
-      toast.error("กรุณาเลือกวัตถุดิบและระบุจำนวนที่ถูกต้อง");
-      return;
-    }
-    const name = selectedProduct.MaterialName;
-    const materialId = selectedProduct.MaterialId;
-
-    // prevent duplicate
-    if (items.some((it: any) => Number(it.sku) === Number(materialId))) {
-      toast.error("วัตถุดิบนี้มีอยู่แล้วในรายการ");
-      return;
-    }
-    setItems((prev) => [...prev, { name, qty, unit, sku: materialId }]);
-    setSku("");
-    setQty(1);
-    setSearchTerm("");
+  // Handlers
+  const handleQuantityChange = (material: any, qty: number) => {
+    setCart((prev) => {
+      const existing = prev.find((p) => p.id === material.MaterialId);
+      if (qty <= 0) {
+        return prev.filter(p => p.id !== material.MaterialId);
+      }
+      if (existing) {
+        return prev.map(p => p.id === material.MaterialId ? { ...p, qty } : p);
+      }
+      return [...prev, { id: material.MaterialId, name: material.MaterialName, unit: material.Unit, qty }];
+    });
   };
 
-  const removeItem = (idx: number) => {
-    setItems((prev) => prev.filter((_, i) => i !== idx));
-  };
-
-  const submit = async () => {
-    if (items.length === 0) {
-      toast.error('รายการว่าง');
-      return;
-    }
+  const handleSubmit = async () => {
+    if (cart.length === 0) return;
+    setIsSubmitting(true);
     try {
-      const details = items.map((i: any) => ({ MaterialId: Number(i.sku), WithdrawnQuantity: Number(i.qty) }));
-      const code = `REQ-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-      const payload: any = {
-        WithdrawnRequestCode: code,
-        BranchId: Number(user?.BranchId) || 1,
+      const payload = {
+        WithdrawnRequestCode: `REQ-${Date.now()}`,
+        BranchId: user?.BranchId || 1,
         RequestDate: new Date().toISOString(),
-        WithdrawnRequestStatus: 'REQUESTED',
-        details,
-        CreatedBy: user?.UserId || undefined,
+        WithdrawnRequestStatus: "REQUESTED",
+        details: cart.map((i) => ({
+          MaterialId: i.id,
+          WithdrawnQuantity: i.qty,
+        })),
+        CreatedBy: user?.UserId,
       };
 
-      const res = await apiPost('/request', payload);
-      toast.success("ส่งคำขอเรียบร้อย ติดตามสถานะได้ที่หน้ารายการเบิก", { description: `รหัส: ${res.RequestId} | รายการ: ${items.length}` });
-      setItems([]);
-      navigate('/requisitions');
+      const res = await apiPost("/request", payload);
+      toast.success("ส่งคำขอเรียบร้อย", { description: `รหัส: ${res.RequestId}` });
+      navigate("/requisitions");
     } catch (e: any) {
-      toast.error('ส่งคำขอไม่สำเร็จ: ' + (e?.message || 'Unknown error'));
+      toast.error("ส่งคำขอไม่สำเร็จ", { description: e.message });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
+  const filteredMaterials = materials.filter(m =>
+    m.MaterialName.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  if (isLoading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>;
+
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>สร้างคำขอเบิกวัตถุดิบสำหรับสาขา</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="text-sm">สาขา / บริษัท</label>
-              <Input value={branch} readOnly className="bg-slate-50 text-slate-500" />
-            </div>
-            <div>
-              <label className="text-sm">ค้นหาวัตถุดิบ</label>
-              <Input placeholder={catalog.length ? "พิมพ์เพื่อค้นหา..." : "กำลังโหลด..."} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-              <div className="mt-2">
-                {searchTerm && (
-                  <div className="border rounded bg-white max-h-48 overflow-auto">
-                    {catalog.filter(c => c.MaterialName.toLowerCase().includes(searchTerm.toLowerCase())).map((c) => (
-                      <div key={c.MaterialId} className="p-2 hover:bg-slate-50 cursor-pointer" onClick={() => { setSku(String(c.MaterialId)); setUnit(c.Unit); setSearchTerm(''); }}>
-                        {c.MaterialName} <span className="text-muted-foreground text-sm">({c.Unit})</span>
-                      </div>
-                    ))}
-                    {catalog.filter(c => c.MaterialName.toLowerCase().includes(searchTerm.toLowerCase())).length === 0 && (
-                      <div className="p-2 text-sm text-muted-foreground">ไม่พบวัตถุดิบ</div>
-                    )}
+    <div className="min-h-screen bg-slate-100 flex justify-center font-sans">
+      <div className="w-full max-w-md bg-slate-50 flex flex-col min-h-screen shadow-2xl relative pb-24">
+
+        {/* Header */}
+        <div className="bg-white px-4 py-3 sticky top-0 z-30 shadow-sm flex items-center gap-3">
+          <Button variant="ghost" size="icon" className="-ml-2 text-slate-500" onClick={() => navigate(-1)}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div className="flex-1">
+            <h1 className="text-lg font-bold text-slate-800">เบิกวัตถุดิบ</h1>
+            <p className="text-xs text-primary font-medium">{branchName}</p>
+          </div>
+        </div>
+
+        {/* Search */}
+        <div className="p-4 bg-white border-b sticky top-[60px] z-20">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="ค้นหาวัตถุดิบ..."
+              className="pl-9 bg-slate-50 border-slate-200 focus:bg-white transition-all h-10 rounded-xl"
+            />
+          </div>
+        </div>
+
+        {/* Materials List */}
+        <div className="flex-1 p-3 grid gap-3 content-start">
+          {filteredMaterials.map((m) => {
+            const inCart = cart.find(c => c.id === m.MaterialId);
+            const qty = inCart ? inCart.qty : 0;
+            const isSelected = qty > 0;
+
+            return (
+              <Card key={m.MaterialId} className={`border-none shadow-sm transition-all ${isSelected ? 'ring-1 ring-indigo-500 bg-indigo-50/10' : 'bg-white'}`}>
+                <CardContent className="p-4 flex items-center justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <h3 className={`font-semibold text-sm truncate ${isSelected ? 'text-indigo-700' : 'text-slate-800'}`}>{m.MaterialName}</h3>
+                    <p className="text-xs text-slate-500">หน่วย: {m.Unit}</p>
                   </div>
-                )}
-                {!searchTerm && (
-                  <div className="mt-1 text-sm text-muted-foreground">พิมพ์ชื่อวัตถุดิบเพื่อค้นหา</div>
-                )}
-              </div>
+
+                  <div className="flex items-center bg-slate-100 rounded-lg p-1 h-9 shadow-inner">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 rounded-md hover:bg-white hover:text-red-500 transition-colors"
+                      onClick={() => handleQuantityChange(m, Math.max(0, qty - 1))}
+                      disabled={qty === 0}
+                    >
+                      <Minus className="h-3 w-3" />
+                    </Button>
+
+                    <input
+                      type="number"
+                      className="w-12 h-full text-center bg-transparent border-none text-sm font-bold text-slate-800 focus:outline-none focus:ring-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      value={qty === 0 ? '' : qty}
+                      placeholder="0"
+                      onChange={(e) => {
+                        const val = e.target.value === '' ? 0 : parseInt(e.target.value);
+                        if (!isNaN(val)) handleQuantityChange(m, Math.max(0, val));
+                      }}
+                      onFocus={(e) => e.target.select()}
+                    />
+
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 rounded-md hover:bg-white hover:text-green-600 transition-colors"
+                      onClick={() => handleQuantityChange(m, qty + 1)}
+                    >
+                      <Plus className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+          {filteredMaterials.length === 0 && (
+            <div className="text-center py-10 text-slate-400">
+              ไม่พบรายการวัตถุดิบ
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-sm">จำนวน</label>
-                <Input type="number" value={qty} onChange={(e) => setQty(Number(e.target.value))} />
-              </div>
-              <div>
-                <label className="text-sm">หน่วย</label>
-                <Input value={unit} onChange={(e) => setUnit(e.target.value)} />
-              </div>
-            </div>
-          </div>
-          <div className="flex justify-end">
-            <Button onClick={addItem} disabled={!selectedProduct} className="w-full sm:w-auto">เพิ่มรายการ</Button>
+          )}
+        </div>
+
+        {/* Sticky Bottom Bar */}
+        <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white border-t p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-40">
+          <div className="flex items-center justify-between mb-3">
+            <span className="font-semibold text-slate-700 text-sm">รวมรายการ</span>
+            <span className="font-bold text-indigo-600 text-xl">{cart.reduce((s, i) => s + i.qty, 0)} <span className="text-sm font-normal text-slate-500">ชิ้น</span></span>
           </div>
 
-          <div className="my-6">
-            <h3 className="text-lg font-semibold mb-3">รายการวัตถุดิบทั้งหมด</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-              {catalog.filter(c => !searchTerm || c.MaterialName.toLowerCase().includes(searchTerm.toLowerCase())).map((m) => (
-                <Card key={m.MaterialId} className="hover:shadow-md transition-shadow cursor-pointer border-slate-200" onClick={() => {
-                  setSku(String(m.MaterialId));
-                  setUnit(m.Unit);
-                  setQty(1); // Reset qty to 1 when clicking from catalog
-                }}>
-                  <CardContent className="p-4 flex flex-col gap-2">
-                    <div className="h-20 bg-slate-100 rounded flex items-center justify-center text-slate-400 text-xs text-center p-2">
-                      {/* Placeholder image logic or icon */}
-                      {m.MaterialName}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-sm truncate" title={m.MaterialName}>{m.MaterialName}</p>
-                      <p className="text-xs text-slate-500">หน่วย: {m.Unit}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="whitespace-nowrap">สินค้า</TableHead>
-                  <TableHead className="text-right whitespace-nowrap">จำนวน</TableHead>
-                  <TableHead className="whitespace-nowrap">หน่วย</TableHead>
-                  <TableHead className="whitespace-nowrap text-right">ลบ</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {items.map((i, idx) => (
-                  <TableRow key={idx}>
-                    <TableCell className="whitespace-nowrap">{i.name}</TableCell>
-                    <TableCell className="text-right whitespace-nowrap">{i.qty}</TableCell>
-                    <TableCell className="whitespace-nowrap">{i.unit}</TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" onClick={() => removeItem(idx)}>
-                        ลบ
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-
-          <div className="flex justify-end">
-            <Button disabled={items.length === 0} onClick={submit} className="w-full sm:w-auto">ส่งคำขอ</Button>
-          </div>
-        </CardContent>
-      </Card>
+          <Button
+            className="w-full h-12 text-lg font-bold shadow-lg shadow-indigo-200 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white"
+            onClick={handleSubmit}
+            disabled={isSubmitting || cart.length === 0}
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" /> กำลังส่ง...
+              </>
+            ) : (
+              <>
+                <ShoppingCart className="mr-2 h-5 w-5" /> ยืนยันการเบิก
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
