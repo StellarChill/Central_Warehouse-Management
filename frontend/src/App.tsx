@@ -88,6 +88,16 @@ const App = () => (
 
                 <Route path="/awaiting-approval" element={<WaitingApprovalPage />} />
 
+                {/* Mobile Requisition Page (No Dashboard Layout) */}
+                <Route
+                  path="/requisitions/create"
+                  element={
+                    <ProtectedRoute>
+                      <BranchRequisitionCreatePage />
+                    </ProtectedRoute>
+                  }
+                />
+
                 {/* Root route - shows login if not authenticated; renders layout for all nested routes */}
                 <Route path="/" element={<RootRoute />}>
                   {/* Index redirects user to appropriate portal based on role */}
@@ -99,10 +109,6 @@ const App = () => (
                   <Route path="inventory" element={<InventoryPage />} />
                   <Route path="inventory/issuing" element={<InventoryIssuingPage />} />
                   <Route path="purchase-orders" element={<PurchaseOrdersPage />} />
-                  <Route
-                    path="requisitions/create"
-                    element={<BranchRequisitionCreatePage />}
-                  />
                   <Route path="receiving" element={<ReceivingPage />} />
                   {/* <Route path="inventory/adjustment" element={<StockAdjustmentPage />} /> */}
                   <Route path="requisitions" element={<RequisitionsPage />} />

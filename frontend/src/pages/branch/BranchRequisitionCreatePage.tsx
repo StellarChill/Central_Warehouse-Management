@@ -16,6 +16,9 @@ type CartItem = {
   unit: string;
 };
 
+// Declare LIFF globally
+declare const liff: any;
+
 export default function BranchRequisitionCreatePage() {
   const { user, isLoading } = useAuth();
   const navigate = useNavigate();
@@ -26,6 +29,24 @@ export default function BranchRequisitionCreatePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [branchName, setBranchName] = useState<string>("กำลังโหลด...");
+  const [lineProfile, setLineProfile] = useState<any>(null);
+
+  // Fetch LINE Profile if in LIFF
+  useEffect(() => {
+    const fetchLiffProfile = async () => {
+      try {
+        await liff.init({ liffId: import.meta.env.VITE_LIFF_ID });
+        if (liff.isLoggedIn()) {
+          const profile = await liff.getProfile();
+          setLineProfile(profile);
+        }
+      } catch (e) {
+        // Not in LIFF or error
+        console.log("LIFF init failed or not in LIFF context", e);
+      }
+    };
+    fetchLiffProfile();
+  }, []);
 
   // Fetch Branch Name
   useEffect(() => {
@@ -85,7 +106,8 @@ export default function BranchRequisitionCreatePage() {
 
       const res = await apiPost("/request", payload);
       toast.success("ส่งคำขอเรียบร้อย", { description: `รหัส: ${res.RequestId}` });
-      navigate("/requisitions");
+      setCart([]); // Reset cart
+      // navigate("/requisitions"); // Remove navigation
     } catch (e: any) {
       toast.error("ส่งคำขอไม่สำเร็จ", { description: e.message });
     } finally {
@@ -111,6 +133,19 @@ export default function BranchRequisitionCreatePage() {
           <div className="flex-1">
             <h1 className="text-lg font-bold text-slate-800">เบิกวัตถุดิบ</h1>
             <p className="text-xs text-primary font-medium">{branchName}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="text-right">
+              <p className="text-sm font-bold text-slate-700 leading-tight">{lineProfile?.displayName || user?.UserName}</p>
+              <p className="text-[10px] text-slate-400 font-medium uppercase">{user?.role}</p>
+            </div>
+            {lineProfile?.pictureUrl || user?.LinePictureUrl ? (
+              <img src={lineProfile?.pictureUrl || user?.LinePictureUrl} alt="Probe" className="h-9 w-9 rounded-full border border-indigo-100 shadow-sm object-cover" />
+            ) : (
+              <div className="h-9 w-9 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-bold shadow-sm">
+                {user?.UserName?.charAt(0).toUpperCase() || 'U'}
+              </div>
+            )}
           </div>
         </div>
 

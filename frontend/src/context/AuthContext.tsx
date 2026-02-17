@@ -21,6 +21,7 @@ type User = {
   CompanyName?: string | null;
   CompanyCode?: string | null;
   Email?: string;
+  LinePictureUrl?: string; // Added from LINE Profile
   UserStatus?: string; // 👈 เพิ่มสถานะ user
   role: Role; // from roleCode or RoleId
   roleCode?: string;
