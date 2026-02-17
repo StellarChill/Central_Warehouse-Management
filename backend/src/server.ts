@@ -18,23 +18,20 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: (origin, callback) => {
-    // OLD LOGIC (Commented out for reference)
-    /*
-    // อนุญาต requests ที่ไม่มี origin (Postman, Mobile apps)
+    // อนุญาต requests ที่ไม่มี origin (เช่น Postman, Mobile apps) โดยเฉพาะในโหมด dev
     if (!origin) return callback(null, true);
 
-    // อนุญาต localhost ทุก port
-    if (origin.includes('localhost')) return callback(null, true);
+    // ใน Production ควรเช็ค allowedOrigins อย่างเคร่งครัด
+    if (process.env.NODE_ENV === 'production') {
+      if (allowedOrigins.indexOf(origin) !== -1) {
+        return callback(null, true);
+      } else {
+        console.warn('🚫 CORS blocked:', origin);
+        return callback(null, false);
+      }
+    }
 
-    // ตรวจสอบ allowed origins
-    if (allowedOrigins.includes(origin)) return callback(null, true);
-
-    console.warn('🚫 CORS blocked (not in allowedOrigins):', origin);
-    return callback(null, false);
-    */
-
-    // NEW LOGIC FOR NGROK: Allow ANY origin that comes in
-    // This fixes the "wildcard * with credentials" error by reflecting the origin back
+    // ใน Development หรือ ngrok อนุญาตหมดเพื่อความสะดวก
     return callback(null, true);
   },
   credentials: true,
