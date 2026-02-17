@@ -192,13 +192,7 @@ export default function InventoryIssuingPage() {
                         <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
                         รีเฟรช
                     </Button>
-                    <Button
-                        onClick={() => setCreateOpen(true)}
-                        className="h-11 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-500/20 px-6 font-semibold"
-                    >
-                        <Plus className="h-5 w-5 mr-2" />
-                        สร้างคำขอจำลอง
-                    </Button>
+
                 </div>
             </div>
 

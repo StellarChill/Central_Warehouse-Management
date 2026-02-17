@@ -106,10 +106,38 @@ const App = () => (
                   <Route path="suppliers" element={<SuppliersPage />} />
                   <Route path="ingredients" element={<ProductsPage />} />
                   <Route path="categories" element={<CategoriesManagePage />} />
-                  <Route path="inventory" element={<InventoryPage />} />
-                  <Route path="inventory/issuing" element={<InventoryIssuingPage />} />
-                  <Route path="purchase-orders" element={<PurchaseOrdersPage />} />
-                  <Route path="receiving" element={<ReceivingPage />} />
+                  <Route
+                    path="inventory"
+                    element={
+                      <Guard allow={["ADMIN", "COMPANY_ADMIN", "WH_MANAGER", "WAREHOUSE_ADMIN", "PLATFORM_ADMIN"]}>
+                        <InventoryPage />
+                      </Guard>
+                    }
+                  />
+                  <Route
+                    path="inventory/issuing"
+                    element={
+                      <Guard allow={["ADMIN", "COMPANY_ADMIN", "WH_MANAGER", "WAREHOUSE_ADMIN", "PLATFORM_ADMIN"]}>
+                        <InventoryIssuingPage />
+                      </Guard>
+                    }
+                  />
+                  <Route
+                    path="purchase-orders"
+                    element={
+                      <Guard allow={["ADMIN", "COMPANY_ADMIN", "WH_MANAGER", "WAREHOUSE_ADMIN", "PLATFORM_ADMIN"]}>
+                        <PurchaseOrdersPage />
+                      </Guard>
+                    }
+                  />
+                  <Route
+                    path="receiving"
+                    element={
+                      <Guard allow={["ADMIN", "COMPANY_ADMIN", "WH_MANAGER", "WAREHOUSE_ADMIN", "PLATFORM_ADMIN"]}>
+                        <ReceivingPage />
+                      </Guard>
+                    }
+                  />
                   {/* <Route path="inventory/adjustment" element={<StockAdjustmentPage />} /> */}
                   <Route path="requisitions" element={<RequisitionsPage />} />
                   {/* Platform admin portal */}
@@ -308,10 +336,10 @@ function RoleLanding() {
   if (!user) return <Navigate to="/login" replace />;
   if (user.role === 'PLATFORM_ADMIN') return <Navigate to="/platform" replace />;
   if (['WH_MANAGER', 'WAREHOUSE_ADMIN', 'COMPANY_ADMIN'].includes(user.role)) return <Navigate to="/select-warehouse" replace />;
+  if (['BRANCH', 'BRANCH_USER', 'REQUESTER'].includes(user.role)) return <Navigate to="/requisitions/create" replace />;
   if (user.role === 'ADMIN') {
     return <CompanyWarehouseLanding />;
   }
-  if (user.role === 'REQUESTER') return <Navigate to="/requisitions" replace />;
   return <Navigate to="/inventory" replace />;
 }
 

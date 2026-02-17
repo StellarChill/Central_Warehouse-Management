@@ -242,9 +242,24 @@ export default function LiffCreateRequisitionPage() {
         <div className="min-h-screen bg-slate-100 flex justify-center">
             <div className={`w-full max-w-md bg-slate-50 flex flex-col min-h-screen shadow-xl relative ${safeAreaBottom}`}>
                 {/* Header */}
+                {/* Header */}
                 <div className="bg-white px-4 py-3 sticky top-0 z-30 shadow-sm flex items-center justify-between">
-                    <div>
-                        <h1 className="text-lg font-bold text-slate-800">เบิกวัตถุดิบ</h1>
+                    <Button variant="ghost" size="icon" className="-ml-2 text-slate-500" onClick={() => {
+                        if (window.confirm('ต้องการออกจากระบบหรือไม่?')) {
+                            // Clear App Auth
+                            logout();
+                            // Clear LIFF Auth if applicable
+                            if (liff.isLoggedIn()) {
+                                liff.logout();
+                            }
+                            // Force reload to clear any memory states / re-run entry logic
+                            window.location.href = "/liff/register";
+                        }
+                    }}>
+                        <LogOut className="h-5 w-5 rotate-180" />
+                    </Button>
+                    <div className="flex-1 ml-2">
+                        <h1 className=" text-lg font-bold text-slate-800">เบิกวัตถุดิบ</h1>
                         {branchName && <p className="text-xs text-slate-500 font-medium">สาขา: <span className="text-primary">{branchName}</span></p>}
                     </div>
                     <div className="flex items-center gap-3">

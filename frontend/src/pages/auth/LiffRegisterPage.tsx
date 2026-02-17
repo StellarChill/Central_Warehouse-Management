@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { UserPlus, Warehouse } from "lucide-react";
+import { UserPlus, Warehouse, Loader2 } from "lucide-react";
 import { th } from "../../i18n/th";
 import { useAuth } from "../../context/AuthContext";
 
@@ -45,81 +45,81 @@ export default function LiffRegisterPage() {
   const [isCheckingUser, setIsCheckingUser] = useState(true);
 
   useEffect(() => {
-  const initializeLiffAndLogin = async () => {
-    try {
-      await liff.init({ liffId: import.meta.env.VITE_LIFF_ID });
+    const initializeLiffAndLogin = async () => {
       try {
-        if ((liff as any).ready) await (liff as any).ready;
-      } catch {}
-
-      if (!liff.isLoggedIn()) {
-        liff.login({ redirectUri: window.location.href });
-        return;
-      }
-      
-      // Prefer ID token flow first
-      const idToken = (liff as any).getIDToken ? (liff as any).getIDToken() : undefined;
-      if (idToken) {
+        await liff.init({ liffId: import.meta.env.VITE_LIFF_ID });
         try {
-          await loginWithLine(idToken, true);
+          if ((liff as any).ready) await (liff as any).ready;
+        } catch { }
+
+        if (!liff.isLoggedIn()) {
+          liff.login({ redirectUri: window.location.href });
+          return;
+        }
+
+        // Prefer ID token flow first
+        const idToken = (liff as any).getIDToken ? (liff as any).getIDToken() : undefined;
+        if (idToken) {
+          try {
+            await loginWithLine(idToken, true);
+            localStorage.setItem("liff_only", "1");
+            navigate("/liff/create", { replace: true });
+            return;
+          } catch (err: any) {
+            if (String(err.message).toLowerCase().includes("pending")) {
+              navigate("/awaiting-approval", { replace: true });
+              return;
+            }
+            // Fall back to profile/LineId
+          }
+        }
+
+        const profile = await liff.getProfile();
+        const lineId = profile.userId;
+
+        // Set default values in form
+        setFormData(prev => ({
+          ...prev,
+          LineId: lineId,
+          UserName: profile.displayName
+        }));
+
+        // 🔥 ลอง login ด้วย LineId เพื่อตรวจว่า user นี้มีอยู่ใน DB แล้วไหม
+        try {
+          await loginWithLine(lineId);
           localStorage.setItem("liff_only", "1");
-          navigate("/requisitions/create", { replace: true });
+
+          // ถ้า login ผ่าน = มี user ในฐานข้อมูลแล้ว + ถูก approve แล้ว
+          navigate("/liff/create", { replace: true });
           return;
         } catch (err: any) {
-          if (String(err.message).toLowerCase().includes("pending")) {
+
+          // ถ้า user ยังไม่ approve
+          if (String(err.message).includes("pending")) {
             navigate("/awaiting-approval", { replace: true });
             return;
           }
-          // Fall back to profile/LineId
-        }
-      }
 
-      const profile = await liff.getProfile();
-      const lineId = profile.userId;
-
-      // Set default values in form
-      setFormData(prev => ({
-        ...prev,
-        LineId: lineId,
-        UserName: profile.displayName
-      }));
-
-      // 🔥 ลอง login ด้วย LineId เพื่อตรวจว่า user นี้มีอยู่ใน DB แล้วไหม
-      try {
-        await loginWithLine(lineId);
-        localStorage.setItem("liff_only", "1");
-
-        // ถ้า login ผ่าน = มี user ในฐานข้อมูลแล้ว + ถูก approve แล้ว
-        navigate("/requisitions/create", { replace: true });
-        return;
-      } catch (err: any) {
-
-        // ถ้า user ยังไม่ approve
-        if (String(err.message).includes("pending")) {
-          navigate("/awaiting-approval", { replace: true });
-          return;
+          // ถ้า loginWithLine error = แปลว่ายังไม่มี user ในฐานข้อมูล
+          // >>> ให้โชว์ฟอร์มสมัครต่อไป
+          console.log("User not in DB. Showing register form.");
         }
 
-        // ถ้า loginWithLine error = แปลว่ายังไม่มี user ในฐานข้อมูล
-        // >>> ให้โชว์ฟอร์มสมัครต่อไป
-        console.log("User not in DB. Showing register form.");
+      } catch (error) {
+        console.error("LIFF init error", error);
+        setLiffError("ไม่สามารถเชื่อมต่อกับ LINE ได้");
+      } finally {
+        setIsCheckingUser(false);
       }
+    };
 
-    } catch (error) {
-      console.error("LIFF init error", error);
-      setLiffError("ไม่สามารถเชื่อมต่อกับ LINE ได้");
-    } finally {
-      setIsCheckingUser(false);
-    }
-  };
-
-  initializeLiffAndLogin();
-}, [loginWithLine, navigate]);
+    initializeLiffAndLogin();
+  }, [loginWithLine, navigate]);
   const handleChange =
     (field: keyof LiffRegisterFormData) =>
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      setFormData((prev) => ({ ...prev, [field]: e.target.value }));
-    };
+      (e: React.ChangeEvent<HTMLInputElement>) => {
+        setFormData((prev) => ({ ...prev, [field]: e.target.value }));
+      };
 
   const validate = () => {
     const next: Partial<Record<keyof LiffRegisterFormData, string>> = {};
@@ -180,8 +180,16 @@ export default function LiffRegisterPage() {
     }
   };
 
-  // จะมี isCheckingUser แต่ถ้าอยากแสดง loading ก็ทำเพิ่มได้
-  // ถ้ายังไม่ต้องก็ปล่อยเฉย ๆ แบบนี้ได้
+  if (isCheckingUser) {
+    return (
+      <div className="min-h-screen gradient-surface flex items-center justify-center p-4">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-10 w-10 text-primary animate-spin" />
+          <p className="text-muted-foreground animate-pulse">กำลังตรวจสอบข้อมูลสมาชิก...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen gradient-surface flex items-center justify-center p-4">

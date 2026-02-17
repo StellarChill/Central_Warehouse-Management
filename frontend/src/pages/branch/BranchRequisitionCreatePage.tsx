@@ -20,7 +20,7 @@ type CartItem = {
 declare const liff: any;
 
 export default function BranchRequisitionCreatePage() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, logout } = useAuth();
   const navigate = useNavigate();
 
   // State
@@ -127,7 +127,12 @@ export default function BranchRequisitionCreatePage() {
 
         {/* Header */}
         <div className="bg-white px-4 py-3 sticky top-0 z-30 shadow-sm flex items-center gap-3">
-          <Button variant="ghost" size="icon" className="-ml-2 text-slate-500" onClick={() => navigate(-1)}>
+          <Button variant="ghost" size="icon" className="-ml-2 text-slate-500" onClick={() => {
+            if (window.confirm('ต้องการออกจากระบบหรือไม่?')) {
+              logout();
+              navigate("/liff");
+            }
+          }}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="flex-1">
