@@ -128,7 +128,7 @@ export default function LiffEntryPage() {
                 </div>
 
                 <button
-                    onClick={() => navigate("/liff/register")}
+                    onClick={handleLogin}
                     className="w-full max-w-xs py-3.5 bg-[#06C755] hover:bg-[#05b54c] text-white font-bold rounded-xl shadow-lg shadow-green-500/20 flex items-center justify-center gap-2 transition-all active:scale-95"
                 >
                     เข้าสู่ระบบ / ลงทะเบียน

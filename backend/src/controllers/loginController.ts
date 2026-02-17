@@ -111,7 +111,14 @@ export async function loginWithLine(req: Request, res: Response) {
         return res.status(401).json({ error: 'Invalid id_token' });
       }
 
-      const verifyData: any = await verifyRes.json();
+      let verifyData: any;
+      try {
+        verifyData = await verifyRes.json();
+      } catch (e) {
+        console.error('Error parsing LINE verify response', e);
+        return res.status(500).json({ error: 'Failed to parse LINE verification response' });
+      }
+
       const aud = verifyData.aud;
       const exp = verifyData.exp;
 
@@ -122,8 +129,9 @@ export async function loginWithLine(req: Request, res: Response) {
           .json({ error: 'Invalid id_token (missing claims)' });
       }
 
-      if (aud !== clientId) {
-        console.warn('LINE id_token audience mismatch', { aud, clientId });
+      const channelId = process.env.LINE_CHANNEL_ID || process.env.LIFF_ID;
+      if (aud !== channelId) {
+        console.warn('LINE id_token audience mismatch', { aud, channelId });
         return res.status(401).json({ error: 'id_token audience mismatch' });
       }
 
@@ -137,7 +145,9 @@ export async function loginWithLine(req: Request, res: Response) {
       lineUserId = verifyData.sub;
     } catch (err) {
       console.error('Error verifying LINE id_token', err);
-      return res.status(500).json({ error: 'Failed to verify id_token' });
+      // return res.status(500).json({ error: 'Failed to verify id_token' });
+      // Fallback: if verification fails (e.g. network), we can't trust the token
+      return res.status(401).json({ error: 'Failed to verify id_token' });
     }
   } else if (LineId) {
     // legacy: รับ LineId ตรง ๆ (จาก profile.userId)
