@@ -4,16 +4,20 @@
 // ถ้ามี VITE_API_URL ใช้ตามนั้น (ควรมี /api ตอนท้าย)
 // ถ้าไม่มี ใช้ /api สำหรับ development (จะใช้ proxy ใน vite.config.ts)
 const getApiBase = () => {
+  // 1. Try VITE_API_URL from environment (set in Vercel)
   const envUrl = import.meta.env.VITE_API_URL;
+
   if (envUrl) {
-    // ลบ trailing slash และตรวจสอบว่า URL มี /api หรือไม่
+    // Ensure no trailing slash
     const cleanUrl = envUrl.replace(/\/+$/, "");
-    // ถ้า URL ไม่มี /api ตอนท้าย ให้เพิ่ม /api
-    if (!cleanUrl.endsWith('/api')) {
-      return `${cleanUrl}/api`;
+    // Check if it already ends with /api to avoid duplication
+    if (cleanUrl.endsWith('/api')) {
+      return cleanUrl;
     }
-    return cleanUrl;
+    return `${cleanUrl}/api`;
   }
+
+  // 2. Fallback to /api (relies on Vite proxy in dev)
   return "/api";
 };
 
