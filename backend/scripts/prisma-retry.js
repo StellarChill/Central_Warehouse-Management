@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 const { execSync } = require('child_process');
 
-const MAX_RETRIES = 5;
-const RETRY_DELAY_MS = 15000; // 15 seconds - give database time to wake up
+const MAX_RETRIES = 10; // Increase to 10 attempts
+const RETRY_DELAY_MS = 20000; // Increase to 20 seconds
 
 async function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
