@@ -343,37 +343,20 @@ function RoleLanding() {
   return <Navigate to="/inventory" replace />;
 }
 
-// Smart Dashboard: Redirects to specific warehouse dashboard (with graphs) or falls back to company view
+// SmartDashboard: Shows specific warehouse dashboard if selected, otherwise Company Dashboard (Global)
 function SmartDashboard() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const resolveDashboard = async () => {
-      // 1. Check selected warehouse
-      const stored = localStorage.getItem('selected_warehouse_id');
-      if (stored && stored !== 'all') {
-        navigate(`/warehouse/${stored}/dashboard`, { replace: true });
-        return;
-      }
-
-      // 2. If 'all' selected (or none), try to find ANY warehouse to show graphs
-      // because User explicitly requested "graphs" which only exist in WarehouseDashboard
-      try {
-        const whs = await getWarehouses();
-        if (whs.length > 0) {
-          // Default to first warehouse
-          navigate(`/warehouse/${whs[0].WarehouseId}/dashboard`, { replace: true });
-          return;
-        }
-      } catch (e) {
-        console.error("Failed to fetch warehouses for dashboard redirect", e);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    resolveDashboard();
+    const stored = localStorage.getItem('selected_warehouse_id');
+    // If a specific warehouse is selected, redirect to it
+    if (stored && stored !== 'all') {
+      navigate(`/warehouse/${stored}/dashboard`, { replace: true });
+      return;
+    }
+    // If 'all' or nothing is selected, stay here (and render CompanyDashboardPage)
+    setLoading(false);
   }, [navigate]);
 
   if (loading) return <LoadingScreen />;

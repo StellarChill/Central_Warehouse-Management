@@ -246,8 +246,8 @@ export function Sidebar({ onClose }: SidebarProps) {
                 } else {
                   localStorage.setItem('selected_warehouse_id', val);
                 }
-                // Force reload to apply headers and context
-                window.location.reload();
+                // Redirect to dashboard to show relevant view
+                window.location.href = '/dashboard';
               }}
             >
               <SelectTrigger className="w-full bg-background border-muted-foreground/20 h-9 text-sm">
