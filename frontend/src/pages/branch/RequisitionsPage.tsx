@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useEffect, useMemo, useState } from "react";
 import { approveRequisition, getRequisitions, rejectRequisition, shipRequisition, type WithdrawnRequest } from "@/lib/api";
 import { usePermissions } from "@/hooks/use-permissions";
+import { SimulateLiffOrderButton } from "@/components/SimulateLiffOrderButton";
 
 type Row = {
   id: number;
@@ -68,7 +69,10 @@ export default function RequisitionsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
-            <span>Requisitions</span>
+            <div className="flex items-center gap-4">
+              <span>Requisitions</span>
+              <SimulateLiffOrderButton onSuccess={load} />
+            </div>
             <div className="relative">
               <Input
                 className="pl-3 w-80"
@@ -104,10 +108,10 @@ export default function RequisitionsPage() {
                         status === 'SHIPPED' || status === 'COMPLETED'
                           ? "bg-success/10 text-success border-success/20"
                           : status === 'REJECTED'
-                          ? "bg-destructive/10 text-destructive border-destructive/20"
-                          : status === 'APPROVED' || status === 'PREPARING'
-                          ? "bg-info/10 text-info border-info/20"
-                          : "bg-warning/10 text-warning-foreground border-warning/20";
+                            ? "bg-destructive/10 text-destructive border-destructive/20"
+                            : status === 'APPROVED' || status === 'PREPARING'
+                              ? "bg-info/10 text-info border-info/20"
+                              : "bg-warning/10 text-warning-foreground border-warning/20";
                       return (
                         <Badge variant="outline" className={cls}>
                           {status || 'REQUESTED'}

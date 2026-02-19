@@ -41,6 +41,7 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { SimulateLiffOrderButton } from "@/components/SimulateLiffOrderButton";
 
 export default function InventoryIssuingPage() {
     const [requests, setRequests] = useState<WithdrawnRequest[]>([]);
@@ -192,7 +193,7 @@ export default function InventoryIssuingPage() {
                         <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
                         รีเฟรช
                     </Button>
-
+                    <SimulateLiffOrderButton onSuccess={loadRequests} />
                 </div>
             </div>
 
