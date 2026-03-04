@@ -81,10 +81,16 @@ export async function loginWithLine(req: Request, res: Response) {
   if (idToken) {
     // Verify id_token กับ LINE
     try {
+      // Auto-extract Channel ID จาก LIFF_ID (ส่วนก่อน '-')
+      // เช่น LIFF_ID = "2008327191-BN43gNw2" → channelId = "2008327191"
+      const liffIdEnv = process.env.LIFF_ID || '';
+      const autoChannelId = liffIdEnv.includes('-') ? liffIdEnv.split('-')[0] : liffIdEnv;
+
       const clientId =
         process.env.LINE_CHANNEL_ID ||
         process.env.LINE_CLIENT_ID ||
-        process.env.LIFF_ID;
+        autoChannelId ||
+        undefined;
 
       if (!clientId) {
         console.warn(
@@ -129,9 +135,9 @@ export async function loginWithLine(req: Request, res: Response) {
           .json({ error: 'Invalid id_token (missing claims)' });
       }
 
-      const channelId = process.env.LINE_CHANNEL_ID || process.env.LIFF_ID;
-      if (aud !== channelId) {
-        console.warn('LINE id_token audience mismatch', { aud, channelId });
+      // ใช้ clientId ที่ดึงมาแล้ว (auto-extract จาก LIFF_ID ถ้าไม่มี LINE_CHANNEL_ID)
+      if (aud !== clientId) {
+        console.warn('LINE id_token audience mismatch', { aud, clientId });
         return res.status(401).json({ error: 'id_token audience mismatch' });
       }
 
@@ -157,6 +163,7 @@ export async function loginWithLine(req: Request, res: Response) {
   }
 
   // หา user จาก LineId
+  console.log('🔍 กำลังค้นหา User ด้วย LineId:', lineUserId);
   const user = await prisma.user.findFirst({
     where: { LineId: lineUserId ?? undefined },
     include: { Role: true },

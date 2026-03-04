@@ -32,7 +32,7 @@ const AdminHomePage = lazy(() => import("./pages/admin/AdminHomePage"));
 const AuthPage = lazy(() => import("./pages/auth/AuthPage"));
 const RegisterLandingPage = lazy(() => import("./pages/auth/RegisterLandingPage"));
 const RegisterPage = lazy(() => import("./pages/auth/RegisterPage"));
-const LiffRegisterPage = lazy(() => import("./pages/auth/LiffRegisterPage"));
+// LiffRegisterPage no longer needed — registration is in LiffEntryPage
 const WaitingApprovalPage = lazy(() => import("./pages/company/WaitingApprovalPage"));
 const UserStatusPage = lazy(() => import("./pages/company/UserStatusPage"));
 const NotFound = lazy(() => import("./pages/shared/NotFound"));
@@ -81,9 +81,8 @@ const App = () => (
                 {/* Company self-service registration */}
                 <Route path="/register-company" element={<CompanyRegisterPage />} />
 
-                {/* LIFF Entry Points */}
                 <Route path="/liff" element={<LiffEntryPage />} />
-                <Route path="/liff/register" element={<LiffRegisterPage />} />
+                <Route path="/liff/register" element={<LiffEntryPage />} />
                 <Route path="/liff/create" element={<LiffCreateRequisitionPage />} />
 
                 <Route path="/awaiting-approval" element={<WaitingApprovalPage />} />
@@ -334,6 +333,11 @@ export default App;
 function RoleLanding() {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
+
+  // ── ถ้า login มาจาก LIFF → ส่งกลับไปหน้าเบิก LIFF ──
+  const isLiffSession = localStorage.getItem("liff_only") === "1" || localStorage.getItem("liff_only") === "true";
+  if (isLiffSession) return <Navigate to="/liff/create" replace />;
+
   if (user.role === 'PLATFORM_ADMIN') return <Navigate to="/platform" replace />;
   if (['WH_MANAGER', 'WAREHOUSE_ADMIN', 'COMPANY_ADMIN'].includes(user.role)) return <Navigate to="/select-warehouse" replace />;
   if (['BRANCH', 'BRANCH_USER', 'REQUESTER'].includes(user.role)) return <Navigate to="/requisitions/create" replace />;
