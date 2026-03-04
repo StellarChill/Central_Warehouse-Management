@@ -1,0 +1,48 @@
+services:
+  # ======= FRONTEND (Static Site) =======
+  - type: web
+    name: central-warehouse-frontend
+    runtime: static
+    region: singapore
+    plan: free
+    buildCommand: cd frontend && npm install --legacy-peer-deps && npm run build
+    staticPublishPath: frontend/dist
+    envVars:
+      - key: VITE_API_URL
+        sync: false
+      - key: VITE_LIFF_ID
+        sync: false
+    # ✅ SPA Fallback: ทุก path ให้ใช้ index.html (React Router จัดการเอง)
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+      - path: /*
+        name: Cache-Control
+        value: public, max-age=0, must-revalidate
+    autoDeploy: true
+
+  # ======= BACKEND (Web Service) =======
+  - type: web
+    name: central-warehouse-management-backend
+    runtime: node
+    region: singapore
+    plan: free
+    buildCommand: cd backend && npm install && npm run build
+    startCommand: cd backend && npm start
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: PORT
+        value: 3000
+      - key: NODE_ENV
+        value: production
+      - key: FRONTEND_URL
+        sync: false
+    autoDeploy: true
