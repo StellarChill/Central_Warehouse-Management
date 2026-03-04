@@ -5,7 +5,7 @@ import { getMaterials, apiPost } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { Minus, Plus, Loader2, Search, ShoppingCart, ArrowLeft } from "lucide-react";
+import { Minus, Plus, Loader2, Search, ShoppingCart, ArrowLeft, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 // Type for Cart Item
@@ -182,37 +182,49 @@ export default function BranchRequisitionCreatePage() {
                     <p className="text-xs text-slate-500">หน่วย: {m.Unit}</p>
                   </div>
 
-                  <div className="flex items-center bg-slate-100 rounded-lg p-1 h-9 shadow-inner">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 rounded-md hover:bg-white hover:text-red-500 transition-colors"
-                      onClick={() => handleQuantityChange(m, Math.max(0, qty - 1))}
-                      disabled={qty === 0}
-                    >
-                      <Minus className="h-3 w-3" />
-                    </Button>
+                  <div className="flex items-center gap-1">
+                    {qty > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-9 w-9 rounded-md text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors mr-1"
+                        onClick={() => handleQuantityChange(m, 0)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                    <div className="flex items-center bg-slate-100 rounded-lg p-1 h-9 shadow-inner">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 rounded-md hover:bg-white hover:text-red-500 transition-colors"
+                        onClick={() => handleQuantityChange(m, Math.max(0, qty - 1))}
+                        disabled={qty === 0}
+                      >
+                        <Minus className="h-3 w-3" />
+                      </Button>
 
-                    <input
-                      type="number"
-                      className="w-12 h-full text-center bg-transparent border-none text-sm font-bold text-slate-800 focus:outline-none focus:ring-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      value={qty === 0 ? '' : qty}
-                      placeholder="0"
-                      onChange={(e) => {
-                        const val = e.target.value === '' ? 0 : parseInt(e.target.value);
-                        if (!isNaN(val)) handleQuantityChange(m, Math.max(0, val));
-                      }}
-                      onFocus={(e) => e.target.select()}
-                    />
+                      <input
+                        type="number"
+                        className="w-12 h-full text-center bg-transparent border-none text-sm font-bold text-slate-800 focus:outline-none focus:ring-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        value={qty === 0 ? '' : qty}
+                        placeholder="0"
+                        onChange={(e) => {
+                          const val = e.target.value === '' ? 0 : parseInt(e.target.value);
+                          if (!isNaN(val)) handleQuantityChange(m, Math.max(0, val));
+                        }}
+                        onFocus={(e) => e.target.select()}
+                      />
 
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 rounded-md hover:bg-white hover:text-green-600 transition-colors"
-                      onClick={() => handleQuantityChange(m, qty + 1)}
-                    >
-                      <Plus className="h-3 w-3" />
-                    </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 rounded-md hover:bg-white hover:text-green-600 transition-colors"
+                        onClick={() => handleQuantityChange(m, qty + 1)}
+                      >
+                        <Plus className="h-3 w-3" />
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

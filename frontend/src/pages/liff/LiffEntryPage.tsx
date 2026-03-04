@@ -213,27 +213,6 @@ export default function LiffEntryPage() {
                     <Loader2 className="h-6 w-6 text-[#06C755] animate-spin" />
                     <p className="text-slate-500 text-sm animate-pulse text-center px-8">{statusText}</p>
                 </div>
-
-                {/* Dev Mode Skip Button (Only visible on localhost) */}
-                {window.location.hostname === "localhost" && (
-                    <div className="mt-8 p-4 border border-dashed border-slate-300 rounded-lg text-center">
-                        <p className="text-[10px] text-slate-400 mb-2 uppercase tracking-widest">Development Tools</p>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                                setLineProfile({ userId: "DEV_USER_" + Date.now(), displayName: "Local Developer" });
-                                setStep("register");
-                            }}
-                            className="text-xs text-slate-500"
-                        >
-                            Skip LINE Login (Test Form)
-                        </Button>
-                        <p className="text-[10px] text-slate-400 mt-2 italic">
-                            *ใช้สำหรับทดสอบหน้ากรอกข้อมูลเมื่อยังไม่ได้ตั้งค่า LINE Console
-                        </p>
-                    </div>
-                )}
             </div>
         );
     }
