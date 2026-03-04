@@ -6,7 +6,7 @@ const authFile = path.join(__dirname, '..', '.auth', 'user.json');
 setup('authenticate as mk-admin', async ({ page }) => {
     // Go to login page
     await page.goto('/login');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     // Fill credentials (seed data: mk-admin / admin123)
     await page.locator('#login-username').fill('mk-admin');

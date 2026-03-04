@@ -28,11 +28,11 @@ export class BasePage {
     /** Navigate ผ่าน sidebar */
     async navigateTo(path: string) {
         await this.page.goto(path);
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('load');
     }
 
     /** รอ loading ข้อมูลสำเร็จ (network idle) */
     async waitForDataLoad() {
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('load');
     }
 }

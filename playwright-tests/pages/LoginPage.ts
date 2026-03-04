@@ -11,18 +11,18 @@ export class LoginPage extends BasePage {
 
     async goto() {
         await this.page.goto('/login');
-        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForLoadState('load');
     }
 
     async login(username: string, password: string) {
-        await this.page.locator('#username').fill(username);
-        await this.page.locator('#password').fill(password);
+        await this.page.locator('#login-username').fill(username);
+        await this.page.locator('#login-password').fill(password);
         await this.page.getByRole('button', { name: 'เข้าสู่ระบบ' }).click();
     }
 
     async verifyLoginSuccess() {
         // ต้องหลุดจากหน้า Login ภายใน 10 วินาที
-        await expect(this.page.locator('#username')).not.toBeVisible({ timeout: 10_000 });
+        await expect(this.page.locator('#login-username')).not.toBeVisible({ timeout: 10_000 });
     }
 
     async verifyLoginFailed(errorText?: string) {
