@@ -8,13 +8,14 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Building2, Package, ShoppingCart, CheckCircle, Filter, Plus, X, Edit, Trash2, FileText, Calendar, Truck, Clock, ChevronDown, MoreHorizontal, ArrowUpRight, AlertCircle, RefreshCw } from "lucide-react";
+import { Search, Building2, Package, ShoppingCart, CheckCircle, Filter, Plus, X, Edit, Trash2, FileText, Calendar, Truck, Clock, ChevronDown, MoreHorizontal, ArrowUpRight, AlertCircle, RefreshCw, Share2 } from "lucide-react";
 import { useStock } from "@/context/StockContext";
 import { getReceipts as apiGetReceipts, getPurchaseOrders as apiGetPOs, getPurchaseOrder as apiGetPO, createReceipt as apiCreateReceipt, getMaterials as apiGetMaterials, getReceipt as apiGetReceipt, deleteReceipt as apiDeleteReceipt, updateReceipt as apiUpdateReceipt, getWarehouses, getUser, Receipt as FullReceipt, ReceiptDetail } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { startOfMonth, subMonths, isAfter } from "date-fns";
+import { DistributeReceiptDialog } from "@/components/DistributeReceiptDialog";
 
 type Receipt = {
   id: string;
@@ -70,6 +71,19 @@ export default function ReceivingPage() {
   const [editingQuantities, setEditingQuantities] = useState<Record<number, number>>({});
   const [warehouses, setWarehouses] = useState<{ WarehouseId: number; WarehouseName: string }[]>([]);
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>("all");
+
+  // ===== Distribute Dialog State =====
+  const [distributeOpen, setDistributeOpen] = useState(false);
+  const [distributePo, setDistributePo] = useState<{
+    id: number;
+    code: string;
+    supplier: string;
+  } | null>(null);
+
+  const openDistributeDialog = (po: PurchaseOrder) => {
+    setDistributePo({ id: po.id, code: po.code, supplier: po.supplier });
+    setDistributeOpen(true);
+  };
 
   const loadReceipts = async () => {
     try {
@@ -659,7 +673,7 @@ export default function ReceivingPage() {
                     </div>
 
                     <div className="flex items-center gap-3 w-full sm:w-auto">
-                      <div className="relative flex-1 sm:w-64">
+                      <div className="relative flex-1 sm:w-52">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                         <Input
                           placeholder="ค้นหาสินค้าใน PO..."
@@ -668,6 +682,15 @@ export default function ReceivingPage() {
                           className="pl-9 h-9 text-sm bg-slate-50 border-slate-200 focus:bg-white transition-all rounded-lg"
                         />
                       </div>
+                      {/* ✨ ปุ่มกระจายสินค้าสู่คลัง */}
+                      <Button
+                        size="sm"
+                        className="h-9 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm font-semibold gap-1.5 px-4 flex-shrink-0"
+                        onClick={() => openDistributeDialog(po)}
+                      >
+                        <Share2 className="h-3.5 w-3.5" />
+                        กระจายสินค้า
+                      </Button>
                     </div>
                   </div>
 
@@ -912,6 +935,37 @@ export default function ReceivingPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ✨ Distribute Receipt Dialog */}
+      {distributePo && (
+        <DistributeReceiptDialog
+          open={distributeOpen}
+          onClose={() => {
+            setDistributeOpen(false);
+            setDistributePo(null);
+          }}
+          onSuccess={async () => {
+            loadReceipts();
+            refresh();
+            // Refresh PO list to update status
+            try {
+              const orows = await apiGetPOs();
+              setPoList(orows.map(o => ({
+                id: o.PurchaseOrderId,
+                code: o.PurchaseOrderCode,
+                supplier: o.Supplier?.SupplierName || String(o.SupplierId),
+                date: o.DateTime,
+                status: o.PurchaseOrderStatus,
+                targetWarehouse: o.PurchaseOrderAddress,
+              })));
+            } catch { }
+          }}
+          purchaseOrderId={distributePo.id}
+          purchaseOrderCode={distributePo.code}
+          supplierName={distributePo.supplier}
+          receivedSoFar={receivedByPo[distributePo.id] ?? {}}
+        />
+      )}
     </div>
   );
 }

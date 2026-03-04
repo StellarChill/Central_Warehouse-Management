@@ -904,3 +904,39 @@ export async function getStockSummary(params?: WarehouseScopedParams): Promise<S
   const qs = buildWarehouseQuery(params);
   return apiGet(`/stock/summary${qs}`);
 }
+
+// ==========================================
+// 🏭 Distribute Receipt API
+// ==========================================
+
+export type DistributeItem = {
+  MaterialId: number;
+  MaterialQuantity: number;
+};
+
+export type WarehouseDistribution = {
+  WarehouseId: number;
+  WarehouseName?: string; // for display only
+  items: DistributeItem[];
+};
+
+export type DistributeReceiptData = {
+  PurchaseOrderId: number;
+  ReceiptDateTime?: string;
+  distributions: WarehouseDistribution[];
+};
+
+export type DistributeReceiptResult = {
+  message: string;
+  totalWarehouses: number;
+  receipts: Array<{
+    ReceiptId: number;
+    ReceiptCode: string;
+    WarehouseId: number;
+  }>;
+};
+
+export async function distributeReceipt(data: DistributeReceiptData): Promise<DistributeReceiptResult> {
+  const user = getUser();
+  return apiPost('/receipt/distribute', { ...data, CreatedBy: user?.UserId });
+}

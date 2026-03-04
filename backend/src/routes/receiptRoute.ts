@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createReceipt, listReceipts, getReceipt, updateReceipt, deleteReceipt } from '../controllers/receiptController';
+import { createReceipt, listReceipts, getReceipt, updateReceipt, deleteReceipt, distributeReceipt } from '../controllers/receiptController';
 import { authenticateToken } from '../middlewares/authMiddleware';
 import { requireRoles } from '../middlewares/rolesMiddleware';
 
@@ -9,6 +9,8 @@ router.use(authenticateToken);
 router.use(requireRoles('PLATFORM_ADMIN', 'COMPANY_ADMIN', 'WH_MANAGER', 'WAREHOUSE_ADMIN'));
 
 router.post('/', createReceipt);
+// 🏭 Distribute: รับของจาก PO หนึ่งใบ แล้วกระจายไปหลาย Warehouse พร้อมกัน
+router.post('/distribute', distributeReceipt);
 router.get('/', listReceipts);
 router.get('/:id', getReceipt);
 router.put('/:id', updateReceipt);

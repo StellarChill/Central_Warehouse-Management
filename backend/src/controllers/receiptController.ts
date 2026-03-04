@@ -385,3 +385,177 @@ export async function deleteReceipt(req: Request, res: Response) {
     return handleError(res, e);
   }
 }
+
+// ==========================================
+// 🏭 Distribute Receipt: รับของจาก PO หนึ่งใบ แล้วกระจายไปหลาย Warehouse
+// POST /api/receipt/distribute
+// Body: {
+//   PurchaseOrderId: number,
+//   ReceiptDateTime?: string,
+//   CreatedBy?: number,
+//   distributions: Array<{
+//     WarehouseId: number,
+//     items: Array<{ MaterialId: number, MaterialQuantity: number }>
+//   }>
+// }
+// ==========================================
+export async function distributeReceipt(req: Request, res: Response) {
+  try {
+    const CompanyId = getCompanyId(req, true)!;
+    const { PurchaseOrderId, ReceiptDateTime, CreatedBy, distributions } = req.body;
+
+    if (!PurchaseOrderId) throw httpError(400, 'PurchaseOrderId is required');
+    if (!Array.isArray(distributions) || distributions.length === 0)
+      throw httpError(400, 'distributions must be a non-empty array');
+
+    const poId = Number(PurchaseOrderId);
+    const po = await prisma.purchaseOrder.findFirst({ where: { PurchaseOrderId: poId, CompanyId } });
+    if (!po) throw httpError(400, 'PurchaseOrder not found');
+
+    // ตรวจสอบแต่ละ Warehouse และ Item
+    type DistItem = { MaterialId: number; MaterialQuantity: number };
+    type Dist = { WarehouseId: number; items: DistItem[] };
+
+    const normalizedDists: Dist[] = [];
+    const materialTotals = new Map<number, number>(); // รวมจำนวนทั้งหมดต่อ Material
+
+    for (const dist of distributions) {
+      const whId = Number(dist.WarehouseId);
+      if (!Number.isFinite(whId) || whId <= 0)
+        throw httpError(400, 'WarehouseId ต้องเป็นเลขบวก');
+
+      const wh = await prisma.warehouse.findFirst({ where: { WarehouseId: whId, CompanyId } });
+      if (!wh) throw httpError(400, `ไม่พบ Warehouse ID: ${whId}`);
+
+      if (!Array.isArray(dist.items) || dist.items.length === 0)
+        throw httpError(400, `Warehouse ${whId} ต้องมีรายการสินค้าอย่างน้อย 1 รายการ`);
+
+      const parsedItems = parseDetails(dist.items);
+      normalizedDists.push({ WarehouseId: whId, items: parsedItems });
+
+      // รวมจำนวนต่อ Material
+      for (const item of parsedItems) {
+        materialTotals.set(item.MaterialId, (materialTotals.get(item.MaterialId) || 0) + item.MaterialQuantity);
+      }
+    }
+
+    // รวม total items เป็น array เพื่อ validate กับ PO
+    const aggregatedDetails: NormalizedDetail[] = Array.from(materialTotals.entries()).map(
+      ([MaterialId, MaterialQuantity]) => ({ MaterialId, MaterialQuantity })
+    );
+
+    // ตรวจสอบว่าไม่เกิน PO
+    const { map, total } = await enforceNotExceed(CompanyId, poId, aggregatedDetails);
+    const rdt = ReceiptDateTime ? new Date(ReceiptDateTime) : new Date();
+
+    // สร้าง Receipts แบบ atomic transaction
+    const results: any[] = [];
+    let attempts = 0;
+
+    while (attempts < 5) {
+      try {
+        const created = await prisma.$transaction(async (tx) => {
+          const receipts: any[] = [];
+
+          for (const dist of normalizedDists) {
+            // คำนวณยอดและ price สำหรับคลังนี้
+            const distTotal = dist.items.reduce(
+              (sum, item) => sum + item.MaterialQuantity * (map.get(item.MaterialId)?.price ?? 0),
+              0
+            );
+
+            // สร้าง Receipt Code ใหม่สำหรับแต่ละคลัง
+            const code = await generateReceiptCode(CompanyId, tx);
+
+            // สร้าง Receipt Header
+            const receipt = await tx.receipt.create({
+              data: {
+                CompanyId,
+                PurchaseOrderId: poId,
+                ReceiptCode: code,
+                ReceiptDateTime: rdt,
+                ReceiptTotalPrice: distTotal,
+                CreatedBy: CreatedBy ?? null,
+              },
+            });
+
+            // สร้าง ReceiptDetails
+            await tx.receiptDetail.createMany({
+              data: dist.items.map(item => ({
+                CompanyId,
+                WarehouseId: dist.WarehouseId,
+                ReceiptId: receipt.ReceiptId,
+                PurchaseOrderDetailId: map.get(item.MaterialId)!.podId,
+                MaterialId: item.MaterialId,
+                MaterialQuantity: item.MaterialQuantity,
+                CreatedBy: CreatedBy ?? null,
+              })),
+            });
+
+            // สร้าง Stock Rows
+            await tx.stock.createMany({
+              data: dist.items.map((item, i) => ({
+                CompanyId,
+                WarehouseId: dist.WarehouseId,
+                MaterialId: item.MaterialId,
+                Quantity: item.MaterialQuantity,
+                Barcode: genBarcode(code, item.MaterialId, i + 1),
+                StockPrice: map.get(item.MaterialId)!.price,
+                ReceiptId: receipt.ReceiptId,
+                PurchaseOrderId: poId,
+                Issue: 0,
+                Remain: item.MaterialQuantity,
+                CreatedBy: CreatedBy ?? null,
+              })),
+            });
+
+            receipts.push({ receipt, warehouseId: dist.WarehouseId });
+          }
+
+          return receipts;
+        });
+
+        results.push(...created);
+        break; // Success
+      } catch (e: any) {
+        if (e?.code === 'P2002') {
+          console.warn('Distribute Receipt Duplicate Code Retry...');
+          attempts++;
+          continue;
+        }
+        throw e;
+      }
+    }
+
+    // Update PO Status ถ้ารับครบแล้ว
+    try {
+      const allPods = await prisma.purchaseOrderDetail.findMany({
+        where: { CompanyId, PurchaseOrderId: poId },
+        select: { MaterialId: true, PurchaseOrderQuantity: true },
+      });
+      const matIds = allPods.map(p => p.MaterialId);
+      if (matIds.length) {
+        const receivedMap = await getReceivedSumMap(CompanyId, poId, matIds);
+        const allDone = allPods.every(p => (receivedMap.get(p.MaterialId) ?? 0) >= p.PurchaseOrderQuantity);
+        if (allDone) {
+          await prisma.purchaseOrder.update({
+            where: { PurchaseOrderId: poId },
+            data: { PurchaseOrderStatus: 'RECEIVED' },
+          });
+        }
+      }
+    } catch { }
+
+    return res.status(201).json({
+      message: `สร้างใบรับสินค้าสำเร็จ ${results.length} คลัง`,
+      receipts: results.map(r => ({
+        ReceiptId: r.receipt.ReceiptId,
+        ReceiptCode: r.receipt.ReceiptCode,
+        WarehouseId: r.warehouseId,
+      })),
+      totalWarehouses: results.length,
+    });
+  } catch (e: any) {
+    return handleError(res, e);
+  }
+}
