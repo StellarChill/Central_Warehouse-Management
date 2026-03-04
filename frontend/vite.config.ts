@@ -3,7 +3,6 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { fileURLToPath } from 'url';
 import { componentTagger } from "lovable-tagger";
-import basicSsl from '@vitejs/plugin-basic-ssl';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 export default defineConfig(({ mode }) => {
@@ -23,8 +22,6 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [
       react(),
-      // ใช้ SSL เฉพาะตอน Development เท่านั้น เพื่อไม่ให้กวนใจระบบ Production
-      mode === "development" ? basicSsl() : null,
       mode === "development" ? componentTagger() : null,
     ].filter(Boolean),
     resolve: {
