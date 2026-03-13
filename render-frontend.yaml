@@ -2,7 +2,7 @@ services:
   - type: web
     name: sai-jai-frontend
     runtime: static
-    buildCommand: cd frontend && npm install && npm run build
+il    buildCommand: cd frontend && npm install && npm run build
     staticPublishPath: frontend/dist
     envVars:
       - key: VITE_API_URL

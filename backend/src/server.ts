@@ -17,7 +17,7 @@ const allowedOrigins = [
 ].filter(Boolean);
 
 app.use(cors({
-  origin: (origin, callback) => {
+  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
     // อนุญาต requests ที่ไม่มี origin (เช่น Postman, Mobile apps)
     if (!origin) return callback(null, true);
 
@@ -42,7 +42,7 @@ app.use(express.json()); // เพื่ออ่าน JSON body
 app.use(express.urlencoded({ extended: true })); // เผื่อใช้ form-data
 
 // Health check endpoint (สำหรับ deployment platforms)
-app.get('/health', async (req, res) => {
+app.get('/health', async (req: express.Request, res: express.Response) => {
   try {
     // ทดสอบการเชื่อมต่อ database
     await prisma.$queryRaw`SELECT 1`;
@@ -62,7 +62,7 @@ app.get('/health', async (req, res) => {
 });
 
 // Root endpoint
-app.get('/', (_req, res) => {
+app.get('/', (_req: express.Request, res: express.Response) => {
   res.json({
     message: 'Sai Jai Management API',
     version: '1.0.0',
@@ -88,7 +88,7 @@ import roleRoute from './routes/roleRoute';
 // import stockAdjustmentRoute from './routes/stockAdjustmentRoute';
 
 // Health check endpoint สำหรับ Render
-app.get('/', (req, res) => {
+app.get('/', (req: express.Request, res: express.Response) => {
   res.json({
     status: 'OK',
     message: 'Sai Jai Management API is running',
@@ -97,7 +97,7 @@ app.get('/', (req, res) => {
 });
 
 // Health check พร้อมทดสอบ database connection
-app.get('/health', async (req, res) => {
+app.get('/health', async (req: express.Request, res: express.Response) => {
   try {
     // ทดสอบเชื่อมต่อ database
     await prisma.$queryRaw`SELECT 1`;
