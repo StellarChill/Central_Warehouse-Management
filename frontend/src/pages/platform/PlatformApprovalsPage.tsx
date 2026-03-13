@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Check, X, Search, UserCheck, Shield, ChevronLeft, ChevronRight, SlidersHorizontal, UserPlus, Users, Building2, ClipboardCheck, ShieldX, ShieldBan, HardHat, AlertTriangle } from 'lucide-react';
+import { Check, X, Search, UserCheck, Shield, ChevronLeft, ChevronRight, SlidersHorizontal, UserPlus, Users, Building2, ClipboardCheck, ShieldX, ShieldBan, HardHat, AlertTriangle, MessageCircle } from 'lucide-react';
 import { PlatformLayout } from '@/components/layout/PlatformLayout';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
@@ -351,6 +351,11 @@ export default function PlatformApprovalsPage() {
                           <div>
                             <div className="flex items-center gap-2 mb-0.5">
                               <span className="font-bold text-slate-800 tracking-tight group-hover:text-blue-700 transition-colors uppercase text-base">{u.UserName}</span>
+                              {u.LineId && (
+                                <Badge variant="outline" className="text-[10px] font-bold px-2 py-0 border-none tracking-wider bg-green-100 text-green-700">
+                                  <MessageCircle className="h-3 w-3 mr-1" /> LINE LIFF
+                                </Badge>
+                              )}
                               <Badge
                                 variant="outline"
                                 className={`text-[10px] font-bold px-2 py-0 border-none tracking-wider ${isPending ? 'bg-amber-100 text-amber-700' :
@@ -571,26 +576,19 @@ export default function PlatformApprovalsPage() {
                         </Select>
                       </div>
 
-                      {(() => {
-                        const selectedRole = roles.find((r) => String(r.RoleId) === roleId);
-                        const isBranchRole = selectedRole && String(selectedRole.RoleCode).toUpperCase() === 'BRANCH_USER';
-                        if (!isBranchRole) return null;
-                        return (
-                          <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
-                            <Label className="text-slate-700 font-bold">เลือกสาขา (Branch)</Label>
-                            <Select value={branchId} onValueChange={setBranchId}>
-                              <SelectTrigger className="h-11 rounded-xl bg-slate-50 border-slate-200">
-                                <SelectValue placeholder="เลือกสาขา..." />
-                              </SelectTrigger>
-                              <SelectContent className="rounded-xl border-slate-100">
-                                {branches.map((b) => (
-                                  <SelectItem key={b.BranchId} value={String(b.BranchId)}>{b.BranchName}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        );
-                      })()}
+                      <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+                        <Label className="text-slate-700 font-bold">เลือกสาขา (Branch)</Label>
+                        <Select value={branchId} onValueChange={setBranchId}>
+                          <SelectTrigger className="h-11 rounded-xl bg-slate-50 border-slate-200">
+                            <SelectValue placeholder="เลือกสาขา..." />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-xl border-slate-100">
+                            {branches.map((b) => (
+                              <SelectItem key={b.BranchId} value={String(b.BranchId)}>{b.BranchName}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
                   </div>
                 </div>
