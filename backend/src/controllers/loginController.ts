@@ -14,7 +14,7 @@ export async function login(req: Request, res: Response) {
 
   const user = await prisma.user.findUnique({
     where: { UserName },
-    include: { Role: true },
+    include: { Role: true, Branch: true },
   });
   console.log('user', user);
   if (!user) {
@@ -64,6 +64,7 @@ export async function login(req: Request, res: Response) {
       RoleId: user.RoleId,
       roleCode: (user as any).Role?.RoleCode ?? null,
       BranchId: user.BranchId,
+      BranchName: (user as any).Branch?.BranchName ?? null,
       CompanyId: user.CompanyId,
       Email: user.Email,
       UserStatusApprove: (user as any).UserStatusApprove ?? null,
@@ -166,7 +167,7 @@ export async function loginWithLine(req: Request, res: Response) {
   console.log('🔍 กำลังค้นหา User ด้วย LineId:', lineUserId);
   const user = await prisma.user.findFirst({
     where: { LineId: lineUserId ?? undefined },
-    include: { Role: true },
+    include: { Role: true, Branch: true },
   });
 
   if (!user) {
@@ -210,6 +211,7 @@ export async function loginWithLine(req: Request, res: Response) {
       RoleId: user.RoleId,
       roleCode: (user as any).Role?.RoleCode ?? null,
       BranchId: user.BranchId,
+      BranchName: (user as any).Branch?.BranchName ?? null,
       CompanyId: user.CompanyId,
       Email: user.Email,
       UserStatusApprove: (user as any).UserStatusApprove ?? null,

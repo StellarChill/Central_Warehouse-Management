@@ -108,12 +108,18 @@ export default function LiffCreateRequisitionPage() {
 
     // Fetch Branch Name
     useEffect(() => {
-        if (user?.BranchId) {
+        if (user?.BranchName) {
+            // ใช้ BranchName ที่ได้จาก Login Response ตรงๆ
+            setBranchName(user.BranchName);
+        } else if (user?.BranchId) {
+            // Fallback: ดึงจาก API ถ้า Login Response ไม่มี BranchName
             import("@/lib/api").then(({ getBranch }) => {
                 getBranch(user.BranchId)
                     .then(b => setBranchName(b.BranchName))
                     .catch(() => setBranchName("สาขาไม่ระบุ"));
             });
+        } else {
+            setBranchName("สาขาไม่ระบุ");
         }
     }, [user]);
 
