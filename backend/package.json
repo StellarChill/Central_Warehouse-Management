@@ -30,19 +30,19 @@
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
-    "pg": "^8.18.0"
-  },
-  "devDependencies": {
+    "pg": "^8.18.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^22.0.0",
+    "typescript": "^5.0.0"
+  },
+  "devDependencies": {
     "nodemon": "^3.0.2",
     "prisma": "^6.18.0",
     "ts-node": "^10.9.2",
-    "ts-node-dev": "^2.0.0",
-    "typescript": "^5.0.0"
+    "ts-node-dev": "^2.0.0"
   },
   "prisma": {
     "seed": "npx ts-node prisma/seed.ts"
