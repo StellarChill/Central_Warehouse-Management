@@ -194,8 +194,10 @@ export default function LiffCreateRequisitionPage() {
             });
 
             setCart([]);
-            // Optional: Close LIFF or redirect
-            // liff.closeWindow(); 
+            // Redirect to status page after success
+            setTimeout(() => {
+                navigate("/liff/status");
+            }, 1000);
 
         } catch (e: any) {
             console.error(e);

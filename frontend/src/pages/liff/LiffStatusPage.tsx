@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { apiRequest } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, RefreshCw, Package, CheckCircle2, Truck, RotateCcw, XCircle, Clock } from "lucide-react";
+import { ChevronLeft, RefreshCw, Package, CheckCircle2, Truck, RotateCcw, XCircle, Clock, MapPin, Box } from "lucide-react";
 
 type WithdrawnRequest = {
     RequestId: number;
@@ -15,83 +15,106 @@ type WithdrawnRequest = {
     WithdrawnRequestDetails?: { Material: { MaterialName: string }; WithdrawnQuantity: number }[];
 };
 
-// Status flow definition
 const STATUS_STEPS = [
-    { key: 'PENDING', label: 'รอดำเนินการ', icon: Clock, color: 'text-amber-500', bg: 'bg-amber-50' },
-    { key: 'APPROVED', label: 'อนุมัติแล้ว', icon: CheckCircle2, color: 'text-blue-500', bg: 'bg-blue-50' },
-    { key: 'ISSUE_PENDING', label: 'กำลังจัดเตรียม', icon: Package, color: 'text-indigo-500', bg: 'bg-indigo-50' },
-    { key: 'ISSUE_COMPLETED', label: 'จัดส่งสำเร็จ', icon: Truck, color: 'text-emerald-500', bg: 'bg-emerald-50' },
+    { key: 'PENDING', label: 'ส่งคำขอ', sub: 'ได้รับคำขอแล้ว', icon: Clock },
+    { key: 'APPROVED', label: 'อนุมัติ', sub: 'ผ่านการอนุมัติ', icon: CheckCircle2 },
+    { key: 'PACKING', label: 'เตรียมของ', sub: 'กำลังบรรจุสินค้า', icon: Box },
+    { key: 'SHIPPING', label: 'จัดส่ง', sub: 'กำลังเดินทาง', icon: Truck },
+    { key: 'DELIVERED', label: 'สำเร็จ', sub: 'ได้รับสินค้าแล้ว', icon: MapPin },
 ];
 
-function getStepIndex(req: WithdrawnRequest): number {
-    const reqStatus = req.WithdrawnRequestStatus?.toUpperCase();
-    if (reqStatus === 'REJECTED') return -1;
-    if (reqStatus === 'PENDING') return 0;
-    if (reqStatus === 'APPROVED') {
-        const issueStatus = req.Issues?.[0]?.IssueStatus?.toUpperCase();
-        if (!issueStatus || issueStatus === 'PENDING') return 2;
-        if (issueStatus === 'COMPLETED') return 3;
-    }
+function getProgressState(req: WithdrawnRequest) {
+    const status = req.WithdrawnRequestStatus?.toUpperCase();
+    if (status === 'REJECTED') return -1;
+    if (status === 'PENDING') return 0;
+    
+    // Approved state
+    const issue = req.Issues?.[0];
+    if (!issue) return 1; // Approved but no issue yet
+    
+    const issueStatus = issue.IssueStatus?.toUpperCase();
+    if (issueStatus === 'PENDING') return 2; // Packing
+    
+    // If Issue is COMPLETED, we show as Shipping/Delivered
+    // In many cases COMPLETED means it's out for delivery or delivered.
+    // Let's split it: 3 (Shipping) if very recent, 4 (Delivered) if older than 1 min? 
+    // Or just 4 if COMPLETED.
+    if (issueStatus === 'COMPLETED') return 4;
+    
     return 1;
 }
 
-function StatusTracker({ req }: { req: WithdrawnRequest }) {
-    const stepIndex = getStepIndex(req);
-    const isRejected = req.WithdrawnRequestStatus?.toUpperCase() === 'REJECTED';
-
-    if (isRejected) {
+function AnimatedTracker({ stepIndex }: { stepIndex: number }) {
+    if (stepIndex === -1) {
         return (
-            <div className="flex flex-col items-center justify-center py-8 gap-3">
-                <XCircle className="h-16 w-16 text-rose-400" />
-                <p className="font-bold text-lg text-rose-600">คำขอถูกปฏิเสธ</p>
-                <p className="text-sm text-slate-400">กรุณาติดต่อผู้ดูแลระบบ</p>
+            <div className="flex flex-col items-center py-6 animate-in fade-in zoom-in duration-500">
+                <div className="h-16 w-16 bg-rose-100 rounded-full flex items-center justify-center text-rose-500 mb-2">
+                    <XCircle className="h-10 w-10" />
+                </div>
+                <p className="font-bold text-rose-600">รายการถูกปฏิเสธ</p>
+                <p className="text-xs text-slate-400">กรุณาติดต่อเจ้าหน้าที่เพื่อขอรายละเอียด</p>
             </div>
         );
     }
 
-    const truckPercent = stepIndex === 0 ? 0 : stepIndex === 1 ? 33 : stepIndex === 2 ? 66 : 100;
+    const progressPercent = (stepIndex / (STATUS_STEPS.length - 1)) * 100;
 
     return (
-        <div className="px-4 py-6">
-            {/* Truck Animation Track */}
-            <div className="relative mb-10">
-                <div className="h-2 bg-slate-200 rounded-full mx-4" />
-                <div
-                    className="absolute top-0 left-4 h-2 bg-gradient-to-r from-indigo-400 to-emerald-400 rounded-full transition-all duration-1000 ease-in-out"
-                    style={{ width: `calc(${truckPercent}% - 8px)` }}
+        <div className="py-8 px-2">
+            {/* The Track */}
+            <div className="relative h-1.5 bg-slate-100 rounded-full overflow-visible mb-12">
+                {/* Active Path */}
+                <div 
+                    className="absolute top-0 left-0 h-full bg-gradient-to-r from-indigo-500 to-emerald-500 rounded-full transition-all duration-1000 ease-out"
+                    style={{ width: `${progressPercent}%` }}
+                    id="progress-bar"
                 />
-                {/* Truck Icon */}
-                <div
-                    className="absolute -top-4 transition-all duration-1000 ease-in-out"
-                    style={{ left: `calc(${truckPercent}% - 8px)` }}
+                
+                {/* Dots on track */}
+                {STATUS_STEPS.map((_, idx) => (
+                    <div 
+                        key={idx}
+                        className={`absolute -top-1 h-3.5 w-3.5 rounded-full border-2 transition-colors duration-500 ${
+                            idx <= stepIndex ? 'bg-white border-emerald-500' : 'bg-slate-50 border-slate-200'
+                        }`}
+                        style={{ left: `calc(${(idx / (STATUS_STEPS.length - 1)) * 100}% - 7px)` }}
+                    />
+                ))}
+
+                {/* The Truck */}
+                <div 
+                    className="absolute -top-10 transition-all duration-1000 ease-out z-10"
+                    style={{ left: `calc(${progressPercent}% - 22px)` }}
                 >
-                    <div className="text-2xl drop-shadow-md animate-bounce">🚚</div>
+                    <div className="relative">
+                        {/* Truck Emoji/Body */}
+                        <div className="text-3xl animate-bounce" style={{ animationDuration: '2s' }}>🚚</div>
+                        {/* Trail effect */}
+                        <div className="absolute -left-4 top-4 flex gap-0.5 opacity-40">
+                            <div className="h-0.5 w-1 bg-slate-300 rounded-full animate-ping" />
+                            <div className="h-0.5 w-2 bg-slate-300 rounded-full animate-ping delay-75" />
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            {/* Step Indicators */}
-            <div className="flex justify-between gap-1 mt-2">
-                {STATUS_STEPS.map((step, idx) => {
-                    const Icon = step.icon;
+            {/* Labels */}
+            <div className="flex justify-between -mx-2">
+                {STATUS_STEPS.map((s, idx) => {
+                    const Icon = s.icon;
                     const isActive = idx === stepIndex;
                     const isDone = idx < stepIndex;
-
                     return (
-                        <div key={step.key} className="flex flex-col items-center gap-1.5 flex-1">
-                            <div
-                                className={`h-9 w-9 rounded-full flex items-center justify-center transition-all duration-500 ${
-                                    isDone
-                                        ? 'bg-emerald-100 text-emerald-600 ring-2 ring-emerald-300'
-                                        : isActive
-                                        ? `${step.bg} ${step.color} ring-2 ring-offset-1 ring-current scale-110 shadow-md`
-                                        : 'bg-slate-100 text-slate-300'
-                                }`}
-                            >
-                                {isDone ? <CheckCircle2 className="h-5 w-5" /> : <Icon className="h-4 w-4" />}
+                        <div key={idx} className="flex flex-col items-center flex-1">
+                            <div className={`mb-1 p-1 rounded-md transition-colors ${isActive ? 'text-indigo-600' : isDone ? 'text-emerald-500' : 'text-slate-300'}`}>
+                                <Icon className={`h-4 w-4 ${isActive ? 'animate-pulse' : ''}`} />
                             </div>
-                            <p className={`text-[10px] text-center leading-tight font-medium ${isActive ? 'text-slate-800' : isDone ? 'text-emerald-600' : 'text-slate-400'}`}>
-                                {step.label}
-                            </p>
+                            <span className={`text-[10px] font-bold text-center leading-tight ${isActive ? 'text-slate-900' : 'text-slate-400'}`}>
+                                {s.label}
+                            </span>
+                            <span className={`text-[8px] text-center hidden sm:block ${isActive ? 'text-slate-500' : 'text-slate-300'}`}>
+                                {s.sub}
+                            </span>
                         </div>
                     );
                 })}
@@ -114,6 +137,8 @@ export default function LiffStatusPage() {
             if (res.ok) {
                 const data = await res.json();
                 setRequests(Array.isArray(data) ? data : []);
+                // Expand the first one if it's recent
+                if (data.length > 0 && !expandedId) setExpandedId(data[0].RequestId);
             }
         } catch (e) {
             console.error(e);
@@ -122,86 +147,124 @@ export default function LiffStatusPage() {
         }
     };
 
-    useEffect(() => { load(); }, [user]);
+    useEffect(() => { 
+        if (user) load(); 
+    }, [user]);
 
     const formatDate = (date: string) =>
-        new Date(date).toLocaleDateString('th-TH', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        new Date(date).toLocaleDateString('th-TH', { 
+            day: '2-digit', 
+            month: 'short', 
+            year: 'numeric', 
+            hour: '2-digit', 
+            minute: '2-digit' 
+        });
 
-    const getStatusBadge = (req: WithdrawnRequest) => {
-        const status = req.WithdrawnRequestStatus?.toUpperCase();
-        if (status === 'REJECTED') return { text: 'ถูกปฏิเสธ', color: 'bg-rose-100 text-rose-700' };
-        if (status === 'PENDING') return { text: 'รอดำเนินการ', color: 'bg-amber-100 text-amber-700' };
-        const issueStatus = req.Issues?.[0]?.IssueStatus?.toUpperCase();
-        if (!issueStatus || issueStatus === 'PENDING') return { text: 'กำลังจัดเตรียม', color: 'bg-indigo-100 text-indigo-700' };
-        return { text: 'จัดส่งสำเร็จ ✓', color: 'bg-emerald-100 text-emerald-700' };
+    const getStatusTheme = (req: WithdrawnRequest) => {
+        const step = getProgressState(req);
+        if (step === -1) return { text: 'ยกเลิกแล้ว', color: 'bg-rose-50 text-rose-500 border-rose-100' };
+        if (step === 0) return { text: 'รอดำเนินการ', color: 'bg-amber-50 text-amber-600 border-amber-100' };
+        if (step === 1) return { text: 'อนุมัติแล้ว', color: 'bg-blue-50 text-blue-600 border-blue-100' };
+        if (step === 4) return { text: 'สำเร็จ ✓', color: 'bg-emerald-50 text-emerald-600 border-emerald-100' };
+        return { text: 'กำลังดำเนินการ', color: 'bg-indigo-50 text-indigo-600 border-indigo-100' };
     };
 
     return (
-        <div className="min-h-screen bg-slate-100 flex justify-center">
-            <div className="w-full max-w-md bg-slate-50 flex flex-col min-h-screen shadow-xl">
-                {/* Header */}
-                <div className="bg-white px-4 py-3 sticky top-0 z-30 shadow-sm flex items-center gap-3">
-                    <Button variant="ghost" size="icon" className="shrink-0" onClick={() => navigate('/liff')}>
-                        <ChevronLeft className="h-5 w-5" />
+        <div className="min-h-screen bg-slate-50 flex justify-center selection:bg-indigo-100">
+            <div className="w-full max-w-md bg-white flex flex-col min-h-screen shadow-2xl">
+                {/* Fancy Top Header */}
+                <div className="bg-white px-4 py-5 sticky top-0 z-30 flex items-center gap-3 border-b border-slate-50">
+                    <Button variant="ghost" size="icon" className="shrink-0 rounded-full hover:bg-slate-50" onClick={() => navigate('/liff')}>
+                        <ChevronLeft className="h-5 w-5 text-slate-600" />
                     </Button>
                     <div className="flex-1">
-                        <h1 className="text-lg font-bold text-slate-800">ติดตามใบเบิก</h1>
-                        <p className="text-xs text-slate-500">ดูสถานะคำขอเบิกของคุณ</p>
+                        <h1 className="text-xl font-black text-slate-800 tracking-tight">สถานะการเบิก</h1>
+                        <div className="flex items-center gap-1.5">
+                            <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">แสดงข้อมูลล่าสุด</p>
+                        </div>
                     </div>
-                    <Button variant="ghost" size="icon" onClick={load} disabled={loading}>
-                        <RefreshCw className={`h-4 w-4 text-slate-500 ${loading ? 'animate-spin' : ''}`} />
+                    <Button variant="ghost" size="icon" className="rounded-full" onClick={load} disabled={loading}>
+                        <RefreshCw className={`h-4 w-4 text-slate-400 ${loading ? 'animate-spin' : ''}`} />
                     </Button>
                 </div>
 
-                {/* Content */}
-                <div className="flex-1 p-3 space-y-3 overflow-y-auto">
-                    {loading ? (
-                        <div className="flex items-center justify-center py-20">
-                            <RefreshCw className="h-8 w-8 text-slate-300 animate-spin" />
+                {/* History List */}
+                <div className="flex-1 overflow-y-auto px-4 py-6 space-y-5 bg-slate-50/50">
+                    {loading && requests.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-20 gap-4">
+                            <div className="h-12 w-12 border-4 border-indigo-100 border-t-indigo-500 rounded-full animate-spin" />
+                            <p className="text-sm font-medium text-slate-400">กำลังดึงข้อมูล...</p>
                         </div>
                     ) : requests.length === 0 ? (
-                        <div className="text-center py-20">
-                            <RotateCcw className="h-12 w-12 text-slate-200 mx-auto mb-3" />
-                            <p className="text-slate-500 font-semibold">ยังไม่มีใบเบิก</p>
-                            <p className="text-sm text-slate-400 mt-1">กดปุ่มด้านล่างเพื่อสร้างใบเบิกใหม่</p>
-                            <Button className="mt-4" onClick={() => navigate('/liff')}>สร้างใบเบิก</Button>
+                        <div className="text-center py-20 px-8">
+                            <div className="h-24 w-24 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6 text-slate-300">
+                                <RotateCcw className="h-10 w-10" />
+                            </div>
+                            <h3 className="text-lg font-bold text-slate-700">ไม่มีรายการเบิก</h3>
+                            <p className="text-sm text-slate-400 mt-2 mb-8">คุณยังไม่ได้ทำการเบิกของในวันนี้ หรือประวัติของคุณยังไม่ถูกบันทึก</p>
+                            <Button className="w-full h-12 rounded-2xl bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-100 font-bold" onClick={() => navigate('/liff')}>
+                                เริ่มต้นเบิกของ
+                            </Button>
                         </div>
                     ) : (
                         requests.map((req) => {
-                            const badge = getStatusBadge(req);
+                            const theme = getStatusTheme(req);
                             const isExpanded = expandedId === req.RequestId;
+                            const step = getProgressState(req);
+
                             return (
-                                <div key={req.RequestId} className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                                    {/* Card Header */}
+                                <div 
+                                    key={req.RequestId} 
+                                    className={`bg-white rounded-[2rem] border transition-all duration-300 ${isExpanded ? 'ring-4 ring-indigo-50 border-indigo-100 shadow-xl' : 'border-slate-100 shadow-sm'}`}
+                                >
+                                    {/* Summary Row */}
                                     <button
-                                        className="w-full text-left px-4 py-3 flex items-start gap-3"
+                                        className="w-full text-left p-6 flex items-start gap-4"
                                         onClick={() => setExpandedId(isExpanded ? null : req.RequestId)}
                                     >
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                <span className="font-bold text-slate-800 text-sm">{req.WithdrawnRequestCode}</span>
-                                                <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${badge.color}`}>
-                                                    {badge.text}
-                                                </span>
-                                            </div>
-                                            <p className="text-xs text-slate-400 mt-0.5">{formatDate(req.CreatedAt)}</p>
+                                        <div className={`h-12 w-12 rounded-2xl flex items-center justify-center shrink-0 ${theme.color}`}>
+                                            <Package className="h-6 w-6" />
                                         </div>
-                                        <ChevronLeft className={`h-4 w-4 text-slate-400 mt-1 shrink-0 transition-transform ${isExpanded ? 'rotate-90' : '-rotate-90'}`} />
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center justify-between mb-1">
+                                                <span className="font-black text-slate-800 text-sm tracking-tight">{req.WithdrawnRequestCode}</span>
+                                                <ChevronLeft className={`h-4 w-4 text-slate-300 transition-transform ${isExpanded ? 'rotate-90' : '-rotate-90'}`} />
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className={`text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider ${theme.color} border`}>
+                                                    {theme.text}
+                                                </span>
+                                                <span className="text-[10px] text-slate-400 font-medium">{formatDate(req.CreatedAt)}</span>
+                                            </div>
+                                        </div>
                                     </button>
 
-                                    {/* Expanded Tracker */}
+                                    {/* Expanded Detail */}
                                     {isExpanded && (
-                                        <div className="border-t border-slate-100">
-                                            <StatusTracker req={req} />
-                                            {/* Item list */}
+                                        <div className="px-6 pb-8 animate-in slide-in-from-top-2 duration-300">
+                                            <div className="h-px bg-slate-50 w-full mb-4" />
+                                            
+                                            {/* Status Steps */}
+                                            <AnimatedTracker stepIndex={step} />
+
+                                            {/* Items Container */}
                                             {req.WithdrawnRequestDetails && req.WithdrawnRequestDetails.length > 0 && (
-                                                <div className="px-4 pb-4">
-                                                    <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-2">รายการสินค้า</p>
-                                                    <div className="space-y-1.5">
+                                                <div className="mt-8 bg-slate-50 rounded-3xl p-5">
+                                                    <div className="flex items-center justify-between mb-4">
+                                                        <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em]">รายการเบิก</h4>
+                                                        <span className="text-[10px] font-bold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-md">
+                                                            {req.WithdrawnRequestDetails.length} รายการ
+                                                        </span>
+                                                    </div>
+                                                    <div className="space-y-3">
                                                         {req.WithdrawnRequestDetails.map((d, i) => (
-                                                            <div key={i} className="flex justify-between items-center text-sm">
-                                                                <span className="text-slate-700">{d.Material?.MaterialName}</span>
-                                                                <span className="font-semibold text-slate-800">{d.WithdrawnQuantity}</span>
+                                                            <div key={i} className="flex justify-between items-center group">
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className="h-1.5 w-1.5 rounded-full bg-slate-300 group-hover:bg-indigo-400 transition-colors" />
+                                                                    <span className="text-xs font-bold text-slate-600 truncate max-w-[150px]">{d.Material?.MaterialName}</span>
+                                                                </div>
+                                                                <span className="text-xs font-black text-slate-800">{d.WithdrawnQuantity}</span>
                                                             </div>
                                                         ))}
                                                     </div>
@@ -213,6 +276,17 @@ export default function LiffStatusPage() {
                             );
                         })
                     )}
+                </div>
+
+                {/* Footer Action */}
+                <div className="p-6 bg-white border-t border-slate-50">
+                   <Button 
+                     variant="outline" 
+                     className="w-full h-12 rounded-2xl border-2 border-slate-100 text-slate-400 font-bold hover:bg-slate-50 transition-all text-xs"
+                     onClick={() => navigate('/liff')}
+                   >
+                       สร้างใบเบิกใหม่
+                   </Button>
                 </div>
             </div>
         </div>

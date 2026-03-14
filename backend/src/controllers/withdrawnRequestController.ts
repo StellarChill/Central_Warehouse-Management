@@ -97,8 +97,11 @@ export async function createWithdrawnRequest(req: Request, res: Response) {
 
     // Auto-generate code if missing
     const date = RequestDate ? new Date(RequestDate) : new Date();
-    if (!BranchId) throw httpError(400, 'BranchId is required');
     const parsed = parseDetails(details);
+    const userId = (req as any).user?.UserId;
+    const finalCreatedBy = CreatedBy ? Number(CreatedBy) : userId;
+
+    console.log(`[DEBUG] createWithdrawnRequest: CompanyId=${CompanyId}, BranchId=${BranchId}, CreatedBy=${finalCreatedBy}, RawCreatedBy=${CreatedBy}, TokenUserId=${userId}`);
 
     // Optional: Validate materials exist
     const mats = await prisma.material.findMany({ where: { MaterialId: { in: parsed.map(d => d.MaterialId) } }, select: { MaterialId: true } });
@@ -127,7 +130,7 @@ export async function createWithdrawnRequest(req: Request, res: Response) {
               BranchId: Number(BranchId),
               RequestDate: date,
               WithdrawnRequestStatus: WithdrawnRequestStatus || 'PENDING',
-              CreatedBy,
+              CreatedBy: finalCreatedBy,
             },
           });
 
@@ -137,7 +140,7 @@ export async function createWithdrawnRequest(req: Request, res: Response) {
               RequestId: request.RequestId,
               MaterialId: d.MaterialId,
               WithdrawnQuantity: d.WithdrawnQuantity,
-              CreatedBy,
+              CreatedBy: finalCreatedBy,
             })),
           });
 
