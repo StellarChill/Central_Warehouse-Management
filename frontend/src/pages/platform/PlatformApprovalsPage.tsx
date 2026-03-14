@@ -147,6 +147,25 @@ export default function PlatformApprovalsPage() {
 
   useEffect(() => { setCurrentPage(1); }, [filterQuery, filterCompany, filterRole, status]);
 
+  const branchUserRoleId = useMemo(() => {
+    const found = roles.find(r => ['BRANCH_USER', 'BRANCH'].includes(String(r.RoleCode).toUpperCase()));
+    return found ? String(found.RoleId) : '';
+  }, [roles]);
+
+  const handleOpenAssign = (u: PlatformSignupUser, mode: 'APPROVE' | 'ASSIGN') => {
+    setAssignUser(u);
+    setAssignMode(mode);
+    setAssignOpen(true);
+    setCompanyId(String(u.Company?.CompanyId || ''));
+    setBranchId(String(u.Branch?.BranchId || ''));
+
+    if (u.LineId && branchUserRoleId) {
+      setRoleId(branchUserRoleId);
+    } else {
+      setRoleId(String(u.Role?.RoleId || ''));
+    }
+  };
+
   const stats = useMemo(() => {
     return {
       total: rows.length,
@@ -414,14 +433,7 @@ export default function PlatformApprovalsPage() {
 
                         {isPending && (
                           <div className="flex items-center gap-2">
-                            <Button size="sm" className="rounded-xl shadow-lg shadow-blue-500/10 h-10 px-4 bg-blue-600 hover:bg-blue-700 transition-all hover:scale-[1.02] active:scale-[0.98]" onClick={() => {
-                              setAssignUser(u);
-                              setAssignMode('APPROVE');
-                              setAssignOpen(true);
-                              setCompanyId('');
-                              setBranchId('');
-                              setRoleId('');
-                            }}>
+                            <Button size="sm" className="rounded-xl shadow-lg shadow-blue-500/10 h-10 px-4 bg-blue-600 hover:bg-blue-700 transition-all hover:scale-[1.02] active:scale-[0.98]" onClick={() => handleOpenAssign(u, 'APPROVE')}>
                               <ClipboardCheck className="h-4 w-4 mr-2" /> กำหนดสิทธิ์และอนุมัติ
                             </Button>
                             <Button size="sm" variant="ghost" className="rounded-xl h-10 px-4 text-rose-600 hover:text-rose-700 hover:bg-rose-50" onClick={() => handleRejectClick(u)}>
@@ -444,14 +456,7 @@ export default function PlatformApprovalsPage() {
                               {u.UserStatusActive === 'ACTIVE' ? <ShieldBan className="h-4 w-4 mr-2" /> : <Check className="h-4 w-4 mr-2" />}
                               {u.UserStatusActive === 'ACTIVE' ? 'ระงับการใช้งาน' : 'เปิดการใช้งาน'}
                             </Button>
-                            <Button size="sm" variant="outline" className="rounded-xl h-10 px-4 border-slate-200 hover:bg-slate-50" onClick={() => {
-                              setAssignUser(u);
-                              setAssignMode('ASSIGN');
-                              setAssignOpen(true);
-                              setCompanyId('');
-                              setBranchId('');
-                              setRoleId('');
-                            }}>
+                            <Button size="sm" variant="outline" className="rounded-xl h-10 px-4 border-slate-200 hover:bg-slate-50" onClick={() => handleOpenAssign(u, 'ASSIGN')}>
                               <HardHat className="h-4 w-4 mr-2" /> แก้ไขสิทธิ์
                             </Button>
                           </div>
@@ -563,8 +568,15 @@ export default function PlatformApprovalsPage() {
                       </div>
 
                       <div className="space-y-2">
-                        <Label className="text-slate-700 font-bold">เลือกบทบาท (Role)</Label>
-                        <Select value={roleId} onValueChange={(v) => { setRoleId(v); setBranchId(''); }}>
+                        <Label className="text-slate-700 font-bold">
+                          เลือกบทบาท (Role) 
+                          {assignUser?.LineId && <span className="text-xs font-normal text-green-600 ml-2">(LINE Users are fixed to Branch User)</span>}
+                        </Label>
+                        <Select 
+                          value={roleId} 
+                          onValueChange={(v) => { setRoleId(v); setBranchId(''); }}
+                          disabled={!!assignUser?.LineId}
+                        >
                           <SelectTrigger className="h-11 rounded-xl bg-slate-50 border-slate-200">
                             <SelectValue placeholder="เลือกบทบาท..." />
                           </SelectTrigger>

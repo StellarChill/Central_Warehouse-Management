@@ -83,6 +83,17 @@ export async function approveUser(req: Request, res: Response) {
     }
     const existed = await prisma.user.findFirst({ where: { UserId: id, CompanyId } });
     if (!existed) throw httpError(404, 'Not found');
+
+    // If user is from LINE LIFF, force BRANCH_USER role only
+    if (existed.LineId) {
+      const branchUserRole = await prisma.role.findFirst({
+        where: { RoleCode: { in: ['BRANCH_USER', 'BRANCH'] } }
+      });
+      if (branchUserRole) {
+        data.RoleId = branchUserRole.RoleId;
+      }
+    }
+
     const user = await prisma.user.update({ where: { UserId: id }, data, select: { UserId: true, UserName: true, RoleId: true, BranchId: true, UserStatusApprove: true, UserStatusActive: true } });
     return res.json(user);
   } catch (err: any) {
@@ -110,6 +121,17 @@ export async function updateUser(req: Request, res: Response) {
 
     const existed = await prisma.user.findFirst({ where: { UserId: id, CompanyId } });
     if (!existed) throw httpError(404, 'Not found');
+
+    // If user is from LINE LIFF, force BRANCH_USER role only
+    if (existed.LineId || LineId) {
+      const branchUserRole = await prisma.role.findFirst({
+        where: { RoleCode: { in: ['BRANCH_USER', 'BRANCH'] } }
+      });
+      if (branchUserRole) {
+        data.RoleId = branchUserRole.RoleId;
+      }
+    }
+
     const user = await prisma.user.update({ where: { UserId: id }, data, include: { Branch: { select: { BranchName: true } } } });
 
     // Map to client-friendly shape

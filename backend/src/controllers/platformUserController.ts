@@ -122,6 +122,20 @@ export async function assignUserCompany(req: Request, res: Response) {
       updates.RoleId = Number(RoleId);
     }
 
+    // If user is from LINE LIFF, force BRANCH_USER role only
+    if (user.LineId) {
+      const branchUserRole = await prisma.role.findFirst({
+        where: {
+          RoleCode: {
+            in: ['BRANCH_USER', 'BRANCH'] // Support both naming conventions if they exist
+          }
+        }
+      });
+      if (branchUserRole) {
+        updates.RoleId = branchUserRole.RoleId;
+      }
+    }
+
     if (BranchId) {
       const br = await prisma.branch.findUnique({ where: { BranchId: Number(BranchId) } });
       if (!br) return res.status(400).json({ error: 'Branch not found' });

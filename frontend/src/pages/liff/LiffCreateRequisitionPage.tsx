@@ -266,6 +266,7 @@ export default function LiffCreateRequisitionPage() {
                     </Button>
                     <div className="flex-1 ml-2">
                         <h1 className=" text-lg font-bold text-slate-800">เบิกวัตถุดิบ</h1>
+                        {user?.CompanyName && <p className="text-xs text-slate-500 font-medium">บริษัท: <span className="text-primary">{user.CompanyName}</span></p>}
                         {branchName && <p className="text-xs text-slate-500 font-medium">สาขา: <span className="text-primary">{branchName}</span></p>}
                     </div>
                     <div className="flex items-center gap-3">
