@@ -43,6 +43,7 @@ const CompanyDashboardPage = lazy(() => import("./pages/company/CompanyDashboard
 const BranchDashboardPage = lazy(() => import("./pages/branch/BranchDashboardPage"));
 const LiffEntryPage = lazy(() => import("./pages/liff/LiffEntryPage"));
 const LiffCreateRequisitionPage = lazy(() => import("./pages/liff/LiffCreateRequisitionPage"));
+const LiffStatusPage = lazy(() => import("./pages/liff/LiffStatusPage"));
 const CompanyRegisterPage = lazy(() => import("./pages/auth/CompanyRegisterPage"));
 const HomePage = lazy(() => import("./pages/shared/HomePage"));
 const WarehouseManagementPage = lazy(() => import("./pages/warehouse/WarehouseManagementPage"));
@@ -84,6 +85,7 @@ const App = () => (
                 <Route path="/liff" element={<LiffEntryPage />} />
                 <Route path="/liff/register" element={<LiffEntryPage />} />
                 <Route path="/liff/create" element={<LiffCreateRequisitionPage />} />
+                <Route path="/liff/status" element={<LiffStatusPage />} />
 
                 <Route path="/awaiting-approval" element={<WaitingApprovalPage />} />
 

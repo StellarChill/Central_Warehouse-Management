@@ -5,7 +5,7 @@ import { getMaterials, apiPost } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { Minus, Plus, Loader2, Search, LogOut, Trash2 } from "lucide-react";
+import { Minus, Plus, Loader2, Search, LogOut, Trash2, ClipboardList } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
@@ -269,7 +269,10 @@ export default function LiffCreateRequisitionPage() {
                         {user?.CompanyName && <p className="text-xs text-slate-500 font-medium">บริษัท: <span className="text-primary">{user.CompanyName}</span></p>}
                         {branchName && <p className="text-xs text-slate-500 font-medium">สาขา: <span className="text-primary">{branchName}</span></p>}
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                        <Button variant="ghost" size="icon" className="text-slate-500" title="ดูสถานะ" onClick={() => navigate('/liff/status')}>
+                            <ClipboardList className="h-5 w-5" />
+                        </Button>
                         <div className="flex flex-col items-end">
                             <span className="text-sm font-semibold text-slate-700">
                                 {lineProfile?.displayName || user?.UserName}

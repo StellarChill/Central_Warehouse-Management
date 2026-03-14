@@ -1,10 +1,13 @@
 import { Router } from 'express';
-import { createWithdrawnRequest, listWithdrawnRequests, getWithdrawnRequest, updateWithdrawnRequest, deleteWithdrawnRequest } from '../controllers/withdrawnRequestController';
+import { createWithdrawnRequest, listWithdrawnRequests, getWithdrawnRequest, updateWithdrawnRequest, deleteWithdrawnRequest, getMyWithdrawnRequests } from '../controllers/withdrawnRequestController';
 import { authenticateToken } from '../middlewares/authMiddleware';
 import { requireRoles } from '../middlewares/rolesMiddleware';
 
 const router = Router();
 router.use(authenticateToken);
+
+// MY requests (LIFF status page)
+router.get('/my', requireRoles('PLATFORM_ADMIN', 'COMPANY_ADMIN', 'WH_MANAGER', 'WAREHOUSE_ADMIN', 'REQUESTER', 'BRANCH', 'BRANCH_MANAGER', 'BRANCH_USER', 'CENTER'), getMyWithdrawnRequests);
 
 // 1. สร้างใบเบิก: ให้ทุกคนทำได้ (รวม Requester)
 // 1. สร้างใบเบิก: ให้ทุกคนทำได้ (รวม Requester)

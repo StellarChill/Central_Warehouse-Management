@@ -2,6 +2,30 @@ import { Request, Response } from 'express';
 import prisma from '../prisma';
 import { getCompanyId } from '../utils/context';
 
+// -----------------------------------------------
+// GET /request/my — returns requests created by the current user
+// -----------------------------------------------
+export async function getMyWithdrawnRequests(req: Request, res: Response) {
+  try {
+    const userId = (req as any).user?.UserId;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const rows = await prisma.withdrawnRequest.findMany({
+      where: { CreatedBy: userId },
+      orderBy: { CreatedAt: 'desc' },
+      take: 20,
+      include: {
+        Issues: { select: { IssueStatus: true, IssueDate: true }, take: 1 },
+        WithdrawnRequestDetails: {
+          include: { Material: { select: { MaterialName: true } } }
+        },
+      },
+    });
+    return res.json(rows);
+  } catch (e) {
+    return handleError(res, e);
+  }
+}
+
 // Helpers
 type ReqDetail = { MaterialId: number; WithdrawnQuantity: number };
 
