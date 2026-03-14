@@ -34,6 +34,7 @@ export default function PlatformApprovalsPage() {
   const [filterQuery, setFilterQuery] = useState('');
   const [filterCompany, setFilterCompany] = useState('');
   const [filterRole, setFilterRole] = useState('');
+  const [filterSource, setFilterSource] = useState<'ALL' | 'LIFF' | 'REGULAR'>('ALL');
   const [sortOrder, setSortOrder] = useState<'NEWEST' | 'OLDEST' | 'NAME_ASC' | 'NAME_DESC'>('NEWEST');
 
   // Assign Data
@@ -124,7 +125,11 @@ export default function PlatformApprovalsPage() {
       const matchesCompany = !filterCompany || String(u.Company?.CompanyId ?? '') === filterCompany;
       const matchesRole = !filterRole || String(u.Role?.RoleId ?? '') === filterRole;
       const matchesStatus = status === 'ALL' || u.UserStatusApprove === status;
-      return matchesSearch && matchesCompany && matchesRole && matchesStatus;
+      
+      const matchesSource = filterSource === 'ALL' || 
+        (filterSource === 'LIFF' ? !!u.LineId : !u.LineId);
+
+      return matchesSearch && matchesCompany && matchesRole && matchesStatus && matchesSource;
     });
 
     return result.sort((a, b) => {
@@ -137,7 +142,7 @@ export default function PlatformApprovalsPage() {
         case 'NEWEST': default: return timeB - timeA;
       }
     });
-  }, [rows, filterQuery, filterCompany, filterRole, sortOrder, status]);
+  }, [rows, filterQuery, filterCompany, filterRole, filterSource, sortOrder, status]);
 
   const totalPages = Math.ceil(filteredRows.length / itemsPerPage);
   const paginatedRows = useMemo(() => {
@@ -145,7 +150,7 @@ export default function PlatformApprovalsPage() {
     return filteredRows.slice(start, start + itemsPerPage);
   }, [filteredRows, currentPage]);
 
-  useEffect(() => { setCurrentPage(1); }, [filterQuery, filterCompany, filterRole, status]);
+  useEffect(() => { setCurrentPage(1); }, [filterQuery, filterCompany, filterRole, filterSource, status]);
 
   const branchUserRoleId = useMemo(() => {
     const found = roles.find(r => ['BRANCH_USER', 'BRANCH'].includes(String(r.RoleCode).toUpperCase()));
@@ -310,6 +315,22 @@ export default function PlatformApprovalsPage() {
               </div>
 
               <div className="lg:col-span-2">
+                <Select value={filterSource} onValueChange={(v: any) => setFilterSource(v)}>
+                  <SelectTrigger className="h-11 bg-white border-slate-200 rounded-xl">
+                    <div className="flex items-center gap-2">
+                      <MessageCircle className="h-4 w-4 text-slate-400" />
+                      <SelectValue placeholder="ที่มา" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl shadow-xl border-slate-100">
+                    <SelectItem value="ALL">ทุกที่มา</SelectItem>
+                    <SelectItem value="LIFF">LINE LIFF</SelectItem>
+                    <SelectItem value="REGULAR">ปกติ (Web)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="lg:col-span-2">
                 <Select value={sortOrder} onValueChange={(v: any) => setSortOrder(v)}>
                   <SelectTrigger className="h-11 bg-white border-slate-200 rounded-xl">
                     <div className="flex items-center gap-2">
@@ -330,7 +351,7 @@ export default function PlatformApprovalsPage() {
                 <Button
                   variant="outline"
                   className="h-11 w-full rounded-xl border-slate-200 text-slate-500 hover:text-rose-600 hover:border-rose-100 hover:bg-rose-50/30 transition-all"
-                  onClick={() => { setFilterQuery(''); setFilterCompany(''); setFilterRole(''); setSortOrder('NEWEST'); setStatus('PENDING'); }}
+                  onClick={() => { setFilterQuery(''); setFilterCompany(''); setFilterRole(''); setFilterSource('ALL'); setSortOrder('NEWEST'); setStatus('PENDING'); }}
                 >
                   <X className="h-4 w-4" />
                 </Button>
