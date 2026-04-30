@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Pencil, Trash2, Eye, Search, MoreHorizontal, Copy } from "lucide-react";
+import { Plus, Pencil, Trash2, Eye, Search, MoreHorizontal, Copy, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -11,7 +11,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { toast } from "@/components/ui/sonner";
 import { createWarehouse, deleteWarehouse, getWarehouses, updateWarehouse, type Warehouse } from "@/lib/api";
 import { RequireRole, useAuth } from "@/context/AuthContext";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -31,6 +31,7 @@ const emptyForm: FormState = { WarehouseName: "", WarehouseCode: "", WarehouseAd
 
 const WarehouseManagementPage: React.FC = () => {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const canManage = ["COMPANY_ADMIN", "ADMIN", "WH_MANAGER"].includes(user?.role || "");
   const { data, isLoading, isError, error } = useQuery({
@@ -128,10 +129,20 @@ const WarehouseManagementPage: React.FC = () => {
     <RequireRole allow={["COMPANY_ADMIN", "ADMIN", "WAREHOUSE_ADMIN"]}>
       <div className="p-6 space-y-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-xl font-semibold">จัดการคลังสินค้า</h1>
-            <p className="text-sm text-muted-foreground">สร้าง แก้ไข และจัดการคลังของบริษัทคุณ</p>
-            <CompanyInfoInline />
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate('/admin')}
+              className="shrink-0"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-xl font-semibold">จัดการคลังสินค้า</h1>
+              <p className="text-sm text-muted-foreground">สร้าง แก้ไข และจัดการคลังของบริษัทคุณ</p>
+              <CompanyInfoInline />
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <div className="relative">
