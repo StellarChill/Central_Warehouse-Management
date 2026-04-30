@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ArrowLeft } from 'lucide-react';
 
 export default function CompanyRegisterPage() {
   const { registerCompany } = useAuth();
@@ -44,7 +45,17 @@ export default function CompanyRegisterPage() {
     <div className="min-h-screen flex items-center justify-center p-6">
       <Card className="w-full max-w-2xl">
         <CardHeader>
-          <CardTitle>Register Company</CardTitle>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate('/login')}
+              className="shrink-0"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <CardTitle>Register Company</CardTitle>
+          </div>
         </CardHeader>
         <CardContent>
           {error && (
