@@ -87,34 +87,7 @@ import platformUserRoute from './routes/platformUserRoute';
 import roleRoute from './routes/roleRoute';
 // import stockAdjustmentRoute from './routes/stockAdjustmentRoute';
 
-// Health check endpoint สำหรับ Render
-app.get('/', (req: express.Request, res: express.Response) => {
-  res.json({
-    status: 'OK',
-    message: 'Sai Jai Management API is running',
-    timestamp: new Date().toISOString()
-  });
-});
 
-// Health check พร้อมทดสอบ database connection
-app.get('/health', async (req: express.Request, res: express.Response) => {
-  try {
-    // ทดสอบเชื่อมต่อ database
-    await prisma.$queryRaw`SELECT 1`;
-    res.json({
-      status: 'OK',
-      database: 'Connected',
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    res.status(503).json({
-      status: 'ERROR',
-      database: 'Disconnected',
-      error: error instanceof Error ? error.message : 'Unknown error',
-      timestamp: new Date().toISOString()
-    });
-  }
-});
 
 app.use('/api', userRoute);
 app.use('/api/admin', adminUserRoute);
