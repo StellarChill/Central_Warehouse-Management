@@ -232,38 +232,7 @@ export function Sidebar({ onClose }: SidebarProps) {
           )}
         </div>
 
-        {/* Global Warehouse Selector */}
-        {allowWarehouseNav && warehouses.length > 0 && (
-          <div className="w-full">
-            <label className="text-xs text-muted-foreground font-medium mb-1.5 block px-1">
-              Current Warehouse
-            </label>
-            <Select
-              value={localStorage.getItem('selected_warehouse_id') || "all"}
-              onValueChange={(val) => {
-                if (val === "all") {
-                  localStorage.removeItem('selected_warehouse_id');
-                } else {
-                  localStorage.setItem('selected_warehouse_id', val);
-                }
-                // Redirect to dashboard to show relevant view
-                window.location.href = '/dashboard';
-              }}
-            >
-              <SelectTrigger className="w-full bg-background border-muted-foreground/20 h-9 text-sm">
-                <SelectValue placeholder="Select Warehouse" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Warehouses (Global)</SelectItem>
-                {warehouses.map(w => (
-                  <SelectItem key={w.WarehouseId} value={String(w.WarehouseId)}>
-                    {w.WarehouseName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
+
       </div>
 
       {/* Navigation with Fresh Theme */}
