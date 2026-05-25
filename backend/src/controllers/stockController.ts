@@ -17,13 +17,14 @@ export async function listStocks(_req: Request, res: Response) {
         ...(WarehouseId ? { WarehouseId } : {}),
       },
       orderBy: { CreatedAt: 'desc' },
-      include: { Material: { select: { MaterialId: true, MaterialName: true, Unit: true, MaterialCode: true } } },
+      include: { Material: { select: { MaterialId: true, MaterialName: true, Unit: true, MaterialCode: true, CatagoryId: true } } },
     });
     return res.json(rows.map((s: any) => ({
       StockId: s.StockId,
       MaterialId: s.MaterialId,
       MaterialName: s.Material?.MaterialName,
       MaterialCode: s.Material?.MaterialCode,
+      CatagoryId: s.Material?.CatagoryId,
       Unit: s.Material?.Unit,
       Quantity: s.Quantity,
       Remain: s.Remain,

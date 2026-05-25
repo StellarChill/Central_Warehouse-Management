@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getWarehouse, getStockSummary, getStocks, type Warehouse, type StockSummaryRow, type Stock } from "@/lib/api";
-import { Warehouse as WarehouseIcon, Boxes, ShieldAlert, Truck, Route, ArrowLeft, RefreshCcw, TriangleAlert, Gauge } from "lucide-react";
+import { getWarehouse, getStockSummary, getStocks, type Warehouse, type StockSummaryRow, type Stock, getCategories, type Category } from "@/lib/api";
+import { Warehouse as WarehouseIcon, Boxes, ShieldAlert, Truck, Route, ArrowLeft, RefreshCcw, TriangleAlert, Gauge, Filter } from "lucide-react";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip } from "recharts";
 
 const LOW_STOCK_THRESHOLD = 10;
@@ -54,11 +54,22 @@ const WarehouseDashboardPage: React.FC = () => {
     enabled: Number.isFinite(warehouseId),
   });
 
-  const isLoading = warehouseQuery.isLoading || summaryQuery.isLoading || stocksQuery.isLoading;
-  const hasError = warehouseQuery.isError || summaryQuery.isError || stocksQuery.isError;
+  const categoriesQuery = useQuery<Category[]>({
+    queryKey: ["categories"],
+    queryFn: () => getCategories(),
+  });
+
+  const isLoading = warehouseQuery.isLoading || summaryQuery.isLoading || stocksQuery.isLoading || categoriesQuery.isLoading;
+  const hasError = warehouseQuery.isError || summaryQuery.isError || stocksQuery.isError || categoriesQuery.isError;
 
   const summary = summaryQuery.data ?? [];
   const stocks = stocksQuery.data ?? [];
+  const categories = categoriesQuery.data ?? [];
+
+  // Filter States
+  const [chartFilterMode, setChartFilterMode] = useState<"all" | "category" | "material">("all");
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
+  const [selectedMaterialId, setSelectedMaterialId] = useState<string>("");
 
   const metrics = useMemo(() => {
     const totalSku = summary.length;
@@ -93,6 +104,13 @@ const WarehouseDashboardPage: React.FC = () => {
     const inboundMap = new Map<string, number>();
     const outboundMap = new Map<string, number>();
     stocks.forEach((stock) => {
+      if (chartFilterMode === "category" && selectedCategoryId) {
+        if (stock.CatagoryId !== Number(selectedCategoryId)) return;
+      }
+      if (chartFilterMode === "material" && selectedMaterialId) {
+        if (stock.MaterialId !== Number(selectedMaterialId)) return;
+      }
+
       const createdDay = startOfDay(new Date(stock.CreatedAt));
       const key = createdDay.toISOString().slice(0, 10);
       inboundMap.set(key, (inboundMap.get(key) ?? 0) + Number(stock.Quantity ?? 0));
@@ -112,7 +130,7 @@ const WarehouseDashboardPage: React.FC = () => {
         outbound: outboundMap.get(key) ?? 0,
       };
     });
-  }, [stocks]);
+  }, [stocks, chartFilterMode, selectedCategoryId, selectedMaterialId]);
 
   const lowStockItems = useMemo(() => {
     return summary
@@ -240,13 +258,72 @@ const WarehouseDashboardPage: React.FC = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Route className="h-4 w-4 text-slate-500" /> การเคลื่อนไหว 7 วันล่าสุด
-              </CardTitle>
-              <CardDescription>ปริมาณนำเข้า / ใช้งานแยกตามวัน</CardDescription>
+            <CardHeader className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-slate-50 bg-slate-50/30 pb-4">
+              <div>
+                <CardTitle className="text-sm font-medium flex items-center gap-2 text-slate-800">
+                  <Route className="h-4 w-4 text-indigo-500" /> การเคลื่อนไหว 7 วันล่าสุด
+                </CardTitle>
+                <CardDescription>ปริมาณนำเข้า / ใช้งานแยกตามวัน</CardDescription>
+              </div>
+              
+              <div className="flex flex-col gap-2 sm:items-end w-full sm:w-auto">
+                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg w-fit">
+                  <Button
+                    variant={chartFilterMode === "all" ? "default" : "ghost"}
+                    size="sm"
+                    className={`h-7 text-xs px-3 rounded-md ${chartFilterMode === "all" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                    onClick={() => { setChartFilterMode("all"); setSelectedCategoryId(""); setSelectedMaterialId(""); }}
+                  >
+                    ทั้งหมด
+                  </Button>
+                  <Button
+                    variant={chartFilterMode === "category" ? "default" : "ghost"}
+                    size="sm"
+                    className={`h-7 text-xs px-3 rounded-md ${chartFilterMode === "category" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                    onClick={() => { setChartFilterMode("category"); setSelectedMaterialId(""); }}
+                  >
+                    หมวดหมู่
+                  </Button>
+                  <Button
+                    variant={chartFilterMode === "material" ? "default" : "ghost"}
+                    size="sm"
+                    className={`h-7 text-xs px-3 rounded-md ${chartFilterMode === "material" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                    onClick={() => { setChartFilterMode("material"); setSelectedCategoryId(""); }}
+                  >
+                    วัตถุดิบ
+                  </Button>
+                </div>
+                
+                {chartFilterMode === "category" && (
+                  <select
+                    className="h-8 w-full sm:w-48 rounded-md border border-slate-200 bg-white px-2 text-xs focus:ring-2 focus:ring-indigo-500 outline-none"
+                    value={selectedCategoryId}
+                    onChange={(e) => setSelectedCategoryId(e.target.value)}
+                  >
+                    <option value="">-- เลือกหมวดหมู่ --</option>
+                    {categories.map(c => (
+                      <option key={c.CatagoryId} value={c.CatagoryId}>{c.CatagoryName}</option>
+                    ))}
+                  </select>
+                )}
+                
+                {chartFilterMode === "material" && (
+                  <select
+                    className="h-8 w-full sm:w-64 rounded-md border border-slate-200 bg-white px-2 text-xs focus:ring-2 focus:ring-indigo-500 outline-none"
+                    value={selectedMaterialId}
+                    onChange={(e) => setSelectedMaterialId(e.target.value)}
+                  >
+                    <option value="">-- เลือกวัตถุดิบ --</option>
+                    {summary.map(m => (
+                      <option key={m.MaterialId} value={m.MaterialId}>
+                        {m.MaterialName} {m.MaterialCode ? `(${m.MaterialCode})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
             </CardHeader>
-            <CardContent className="pt-4">
+            <CardContent className="pt-6">
               <div className="h-64">
                 {isLoading ? (
                   <Skeleton className="h-full w-full" />

@@ -854,12 +854,13 @@ export async function getIssue(id: number): Promise<Issue & { IssueDetails: Issu
 // Stock API
 // ==========================================
 
-export type Stock = {
+export interface Stock {
   StockId: number;
   MaterialId: number;
-  MaterialName: string;
+  MaterialName?: string;
   MaterialCode?: string;
-  Unit: string;
+  CatagoryId?: number;
+  Unit?: string;
   Quantity: number;
   Remain: number;
   StockPrice: number;
