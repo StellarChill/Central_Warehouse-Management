@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { listStocks, getStock, stockSummary } from '../controllers/stockController';
+import { listStocks, getStock, stockSummary, discardStock } from '../controllers/stockController';
 import { authenticateToken } from '../middlewares/authMiddleware';
 import { requireRoles } from '../middlewares/rolesMiddleware';
 
@@ -11,5 +11,6 @@ router.use(requireRoles('PLATFORM_ADMIN', 'COMPANY_ADMIN', 'WH_MANAGER', 'WAREHO
 router.get('/', listStocks);
 router.get('/summary', stockSummary);
 router.get('/:id', getStock);
+router.post('/:id/discard', discardStock);
 
 export default router;

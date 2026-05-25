@@ -88,12 +88,17 @@ const WarehouseDashboardPage: React.FC = () => {
         inboundReceiptIds.add(stock.ReceiptId);
       }
     });
+    const expiredCount = stocks.filter(stock => 
+      stock.Remain > 0 && stock.ExpirationDate && new Date(stock.ExpirationDate) < new Date()
+    ).length;
+
     return {
       totalSku,
       totalRemain,
       totalUsed,
       lowStockCount,
       inboundReceipts: inboundReceiptIds.size,
+      expiredCount,
     };
   }, [summary, stocks]);
 
@@ -251,7 +256,7 @@ const WarehouseDashboardPage: React.FC = () => {
               <StatCard icon={Boxes} label="จำนวนวัตถุดิบ" value={formatNumber(metrics.totalSku)} helper="SKU ทั้งหมดในคลัง" />
               <StatCard icon={Gauge} label="ปริมาณคงเหลือรวม" value={formatNumber(metrics.totalRemain)} helper="รวมทุกหน่วย" />
               <StatCard icon={ShieldAlert} label="ใกล้หมดสต๊อก" value={formatNumber(metrics.lowStockCount)} helper={`ต่ำกว่า ${LOW_STOCK_THRESHOLD} หน่วย`} />
-              <StatCard icon={Truck} label="รับเข้าใน 7 วัน" value={formatNumber(metrics.inboundReceipts)} helper="นับตามใบรับเข้า" />
+              <StatCard icon={TriangleAlert} label="สินค้าหมดอายุ" value={formatNumber(metrics.expiredCount)} helper="สต๊อกที่หมดอายุแล้ว" iconColor="text-rose-600" bgColor="bg-rose-50" />
             </>
           )}
         </div>

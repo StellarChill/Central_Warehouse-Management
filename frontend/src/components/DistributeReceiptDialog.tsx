@@ -75,6 +75,7 @@ type DistributionRow = {
         MaterialName: string;
         Unit: string;
         MaterialQuantity: number;
+        ExpirationDate?: string;
         maxQty: number;
     }[];
 };
@@ -193,6 +194,7 @@ export function DistributeReceiptDialog({
                     MaterialName: item.MaterialName,
                     Unit: item.Unit,
                     MaterialQuantity: 0,
+                    ExpirationDate: "",
                     maxQty: item.remaining,
                 })),
         };
@@ -275,6 +277,22 @@ export function DistributeReceiptDialog({
         );
     };
 
+    const updateExpDate = (distId: string, materialId: number, date: string) => {
+        setDistributions((prev) =>
+            prev.map((d) => {
+                if (d.id !== distId) return d;
+                return {
+                    ...d,
+                    items: d.items.map((item) =>
+                        item.MaterialId === materialId
+                            ? { ...item, ExpirationDate: date }
+                            : item
+                    ),
+                };
+            })
+        );
+    };
+
     // กรอก "ที่เหลือทั้งหมด" ให้อัตโนมัติสำหรับ distribution นี้
     const autoFillRemaining = (distId: string) => {
         setDistributions((prev) =>
@@ -342,7 +360,7 @@ export function DistributeReceiptDialog({
                 WarehouseId: dist.WarehouseId,
                 items: dist.items
                     .filter((i) => i.MaterialQuantity > 0)
-                    .map((i) => ({ MaterialId: i.MaterialId, MaterialQuantity: i.MaterialQuantity })),
+                    .map((i) => ({ MaterialId: i.MaterialId, MaterialQuantity: i.MaterialQuantity, ExpirationDate: i.ExpirationDate || undefined })),
             }));
 
             const result = await distributeReceipt({
@@ -509,10 +527,11 @@ export function DistributeReceiptDialog({
                                     <Table>
                                         <TableHeader>
                                             <TableRow className="bg-slate-50/30 border-slate-100">
-                                                <TableHead className="pl-5 py-2 text-xs">สินค้า</TableHead>
-                                                <TableHead className="py-2 text-xs text-right">สั่งซื้อ/คงเหลือ</TableHead>
-                                                <TableHead className="py-2 text-xs text-center w-36">จำนวนที่รับเข้าคลังนี้</TableHead>
-                                                <TableHead className="py-2 text-xs text-right pr-5">มูลค่า</TableHead>
+                                                <TableHead className="pl-5 py-2 text-xs w-[20%]">สินค้า</TableHead>
+                                                <TableHead className="py-2 text-xs text-right w-[15%]">สั่งซื้อ/คงเหลือ</TableHead>
+                                                <TableHead className="py-2 text-xs text-center w-[25%]">จำนวนที่รับเข้าคลังนี้</TableHead>
+                                                <TableHead className="py-2 text-xs text-center w-[25%]">วันหมดอายุ (ถ้ามี)</TableHead>
+                                                <TableHead className="py-2 text-xs text-right pr-5 w-[15%]">มูลค่า</TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
@@ -556,6 +575,14 @@ export function DistributeReceiptDialog({
                                                                     เกิน PO
                                                                 </div>
                                                             )}
+                                                        </TableCell>
+                                                        <TableCell className="py-3 px-2">
+                                                            <Input
+                                                                type="date"
+                                                                value={item.ExpirationDate || ""}
+                                                                className="h-9 text-xs border-slate-200 focus:border-indigo-400 focus:ring-indigo-100 bg-slate-50 focus:bg-white"
+                                                                onChange={(e) => updateExpDate(dist.id, item.MaterialId, e.target.value)}
+                                                            />
                                                         </TableCell>
                                                         <TableCell className="text-right pr-5 py-3 font-mono text-slate-700 text-sm">
                                                             {valueForRow > 0 ? `฿${valueForRow.toLocaleString()}` : "-"}

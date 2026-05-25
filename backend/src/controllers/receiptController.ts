@@ -3,7 +3,7 @@ import prisma from '../prisma';
 import { getCompanyId, getWarehouseId } from '../utils/context';
 
 // ---------- Helpers ----------
-type NormalizedDetail = { MaterialId: number; MaterialQuantity: number };
+type NormalizedDetail = { MaterialId: number; MaterialQuantity: number; ExpirationDate?: string };
 type PoDetailEntry = { podId: number; price: number; orderedQty: number };
 
 const poSelect = { PurchaseOrderId: true, PurchaseOrderCode: true } as const;
@@ -26,7 +26,7 @@ function parseDetails(details: any): NormalizedDetail[] {
     if (!Number.isFinite(MaterialQuantity) || MaterialQuantity <= 0) throw httpError(400, 'MaterialQuantity must be a positive number');
     if (seen.has(MaterialId)) throw httpError(400, 'Duplicate MaterialId in details is not allowed');
     seen.add(MaterialId);
-    out.push({ MaterialId, MaterialQuantity });
+    out.push({ MaterialId, MaterialQuantity, ExpirationDate: d?.ExpirationDate });
   }
   return out;
 }
@@ -103,12 +103,23 @@ function handleError(res: Response, e: any) {
   return res.status(500).json({ error: 'Internal server error' });
 }
 
-function genBarcode(receiptCode: string, materialId: number, idx: number) {
+function genBarcode(receiptCode: string, materialId: number, idx: number, expDate?: string) {
   // Unique enough: RC-CODE-MID-idx-yyyymmddHHMMssms
   const ts = new Date();
   const pad = (n: number) => n.toString().padStart(2, '0');
   const stamp = `${ts.getFullYear()}${pad(ts.getMonth() + 1)}${pad(ts.getDate())}${pad(ts.getHours())}${pad(ts.getMinutes())}${pad(ts.getSeconds())}${ts.getMilliseconds()}`;
-  return `${receiptCode}-${materialId}-${idx}-${stamp}`;
+  
+  let barcode = `${receiptCode}-${materialId}-${idx}-${stamp}`;
+  
+  if (expDate) {
+    const d = new Date(expDate);
+    if (!Number.isNaN(d.getTime())) {
+      const expStr = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
+      barcode += `-EXP${expStr}`;
+    }
+  }
+  
+  return barcode;
 }
 
 // Generate daily running code per Company: RC-YYYYMMDD-XXXX
@@ -198,7 +209,7 @@ export async function createReceipt(req: Request, res: Response) {
               WarehouseId,
               MaterialId: d.MaterialId,
               Quantity: d.MaterialQuantity,
-              Barcode: genBarcode(code, d.MaterialId, i + 1),
+              Barcode: genBarcode(code, d.MaterialId, i + 1, d.ExpirationDate),
               StockPrice: map.get(d.MaterialId)!.price,
               ReceiptId: createdReceipt.ReceiptId,
               PurchaseOrderId: poId,
@@ -326,7 +337,7 @@ export async function updateReceipt(req: Request, res: Response) {
             WarehouseId,
             MaterialId: d.MaterialId,
             Quantity: d.MaterialQuantity,
-            Barcode: genBarcode(`R${id}`, d.MaterialId, i + 1),
+            Barcode: genBarcode(`R${id}`, d.MaterialId, i + 1, d.ExpirationDate),
             StockPrice: map.get(d.MaterialId)!.price,
             ReceiptId: id,
             PurchaseOrderId: receipt.PurchaseOrderId,
@@ -413,7 +424,7 @@ export async function distributeReceipt(req: Request, res: Response) {
     if (!po) throw httpError(400, 'PurchaseOrder not found');
 
     // ตรวจสอบแต่ละ Warehouse และ Item
-    type DistItem = { MaterialId: number; MaterialQuantity: number };
+    type DistItem = { MaterialId: number; MaterialQuantity: number; ExpirationDate?: string };
     type Dist = { WarehouseId: number; items: DistItem[] };
 
     const normalizedDists: Dist[] = [];
@@ -499,7 +510,7 @@ export async function distributeReceipt(req: Request, res: Response) {
                 WarehouseId: dist.WarehouseId,
                 MaterialId: item.MaterialId,
                 Quantity: item.MaterialQuantity,
-                Barcode: genBarcode(code, item.MaterialId, i + 1),
+                Barcode: genBarcode(code, item.MaterialId, i + 1, item.ExpirationDate),
                 StockPrice: map.get(item.MaterialId)!.price,
                 ReceiptId: receipt.ReceiptId,
                 PurchaseOrderId: poId,

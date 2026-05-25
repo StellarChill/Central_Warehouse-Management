@@ -191,6 +191,10 @@ export async function updateCompany(id: number, data: UpdateCompanyData): Promis
   return apiPut(`/company/${id}`, { ...data, UpdatedBy: user?.UserId || undefined });
 }
 
+export async function discardStock(id: number, reason?: string): Promise<void> {
+  return apiPost(`/stock/${id}/discard`, { Reason: reason });
+}
+
 export async function deleteCompany(id: number): Promise<void> {
   return apiDelete(`/company/${id}`);
 }
@@ -789,7 +793,7 @@ export type CreateReceiptData = {
   PurchaseOrderId: number;
   ReceiptCode: string;
   ReceiptDateTime?: string;
-  details: Array<{ MaterialId: number; MaterialQuantity: number; }>;
+  details: Array<{ MaterialId: number; MaterialQuantity: number; ExpirationDate?: string; }>;
   WarehouseId?: number;
 };
 
@@ -865,6 +869,7 @@ export interface Stock {
   Remain: number;
   StockPrice: number;
   Barcode: string;
+  ExpirationDate?: string;
   ReceiptId: number;
   PurchaseOrderId: number;
   WarehouseId: number;
@@ -913,6 +918,7 @@ export async function getStockSummary(params?: WarehouseScopedParams): Promise<S
 export type DistributeItem = {
   MaterialId: number;
   MaterialQuantity: number;
+  ExpirationDate?: string;
 };
 
 export type WarehouseDistribution = {

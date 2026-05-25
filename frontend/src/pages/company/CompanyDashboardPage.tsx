@@ -111,6 +111,10 @@ const CompanyDashboardPage: React.FC = () => {
       }
     });
 
+    const expiredCount = stocks.filter(stock => 
+      stock.Remain > 0 && stock.ExpirationDate && new Date(stock.ExpirationDate) < new Date()
+    ).length;
+
     return {
       totalSku,
       totalRemain,
@@ -118,6 +122,7 @@ const CompanyDashboardPage: React.FC = () => {
       lowStockCount,
       inboundReceipts: inboundReceiptIds.size,
       warehouseCount: warehouses.length,
+      expiredCount,
     };
   }, [aggregatedSummary, stocks, warehouses]);
 
@@ -246,7 +251,7 @@ const CompanyDashboardPage: React.FC = () => {
         )}
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-6">
           {isLoading ? (
             Array.from({ length: 4 }).map((_, idx) => (
               <Card key={`sk-${idx}`} className="border-none shadow-premium bg-white">
@@ -286,6 +291,13 @@ const CompanyDashboardPage: React.FC = () => {
                 value={formatNumber(metrics.lowStockCount)}
                 helper={`ต่ำกว่า ${LOW_STOCK_THRESHOLD} หน่วย (รวม)`}
                 color="amber"
+              />
+              <StatCard
+                icon={TriangleAlert}
+                label="สินค้าหมดอายุ"
+                value={formatNumber(metrics.expiredCount)}
+                helper="สต๊อกที่หมดอายุแล้ว"
+                color="rose"
               />
             </>
           )}

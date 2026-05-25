@@ -3,10 +3,20 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useEffect, useMemo, useState } from "react";
-import { Package, Boxes, Search, Wheat, Egg, Milk, Candy, Apple, Droplets, ChevronDown, ChevronRight, LayoutGrid, ListFilter, Archive, Calendar, History, ArrowRight } from "lucide-react";
+import { Package, Boxes, Search, Wheat, Egg, Milk, Candy, Apple, Droplets, ChevronDown, ChevronRight, LayoutGrid, ListFilter, Archive, Calendar, History, ArrowRight, AlertTriangle, Clock, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { getStockSummary as apiGetStockSummary, getMaterials as apiGetMaterials, getCategories as apiGetCategories, getStocks as apiGetStocks, getReceipts as apiGetReceipts, Material, Category, Stock as StockRow, Receipt as ReceiptRow } from "@/lib/api";
+import { getStockSummary as apiGetStockSummary, getMaterials as apiGetMaterials, getCategories as apiGetCategories, getStocks as apiGetStocks, getReceipts as apiGetReceipts, discardStock as apiDiscardStock, Material, Category, Stock as StockRow, Receipt as ReceiptRow } from "@/lib/api";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 
 type InventoryItem = {
@@ -15,6 +25,8 @@ type InventoryItem = {
   unit: string;
   onHand: number; // TotalRemain
   category: string; // category name
+  hasExpiredStock?: boolean;
+  hasExpiringSoonStock?: boolean;
 };
 
 export default function InventoryPage() {
@@ -28,6 +40,7 @@ export default function InventoryPage() {
   const [selectedMaterial, setSelectedMaterial] = useState<{ id: number; name: string; unit: string } | null>(null);
   const [stocks, setStocks] = useState<StockRow[]>([]);
   const [receiptMap, setReceiptMap] = useState<Record<number, { code: string; date: string }>>({});
+  const [stockToDiscard, setStockToDiscard] = useState<number | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -50,6 +63,8 @@ export default function InventoryPage() {
             unit: s.Unit,
             onHand: s.TotalRemain,
             category: m ? (catMap[m.CatagoryId] || '-') : '-',
+            hasExpiredStock: false,
+            hasExpiringSoonStock: false,
           };
         });
         setItems(rows);
@@ -75,6 +90,23 @@ export default function InventoryPage() {
           rmap[r.ReceiptId] = { code: r.ReceiptCode, date: r.ReceiptDateTime };
         });
         setReceiptMap(rmap);
+
+        // Update items with expiration status
+        setItems(prevItems => prevItems.map(item => {
+          const itemStocks = allStocks.filter(s => s.MaterialId === item.materialId && s.Remain > 0);
+          const now = new Date();
+          const sevenDaysFromNow = new Date();
+          sevenDaysFromNow.setDate(now.getDate() + 7);
+
+          const hasExpired = itemStocks.some(s => s.ExpirationDate && new Date(s.ExpirationDate) < now);
+          const hasExpiringSoon = itemStocks.some(s => {
+            if (!s.ExpirationDate) return false;
+            const expDate = new Date(s.ExpirationDate);
+            return expDate >= now && expDate <= sevenDaysFromNow;
+          });
+
+          return { ...item, hasExpiredStock: hasExpired, hasExpiringSoonStock: hasExpiringSoon };
+        }));
       } catch (e: any) {
         toast({ variant: 'destructive', title: 'โหลดข้อมูลล็อตไม่สำเร็จ', description: e.message || '' });
       }
@@ -89,7 +121,42 @@ export default function InventoryPage() {
     return cats;
   }, [items]);
 
-  // Filter items based on search term
+  const handleConfirmDiscard = async () => {
+    if (stockToDiscard === null) return;
+    try {
+      await apiDiscardStock(stockToDiscard);
+      toast({ title: 'ตัดสต๊อกสำเร็จ', description: 'ระบบได้นำสินค้าหมดอายุออกจากคลังแล้ว' });
+      // Refresh data
+      const [sumRows, allStocks] = await Promise.all([
+        apiGetStockSummary(),
+        apiGetStocks()
+      ]);
+      setStocks(allStocks);
+      
+      // Update items with expiration status again
+      setItems(prevItems => prevItems.map(item => {
+        const itemStocks = allStocks.filter(s => s.MaterialId === item.materialId && s.Remain > 0);
+        const now = new Date();
+        const sevenDaysFromNow = new Date();
+        sevenDaysFromNow.setDate(now.getDate() + 7);
+
+        const hasExpired = itemStocks.some(s => s.ExpirationDate && new Date(s.ExpirationDate) < now);
+        const hasExpiringSoon = itemStocks.some(s => {
+          if (!s.ExpirationDate) return false;
+          const expDate = new Date(s.ExpirationDate);
+          return expDate >= now && expDate <= sevenDaysFromNow;
+        });
+
+        return { ...item, onHand: sumRows.find(sr => sr.MaterialId === item.materialId)?.TotalRemain || 0, hasExpiredStock: hasExpired, hasExpiringSoonStock: hasExpiringSoon };
+      }));
+
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'ตัดสต๊อกไม่สำเร็จ', description: e.message || '' });
+    } finally {
+      setStockToDiscard(null);
+    }
+  };
+
   const filteredItems = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return items;
@@ -271,7 +338,21 @@ export default function InventoryPage() {
                                   onClick={() => { setSelectedMaterial({ id: i.materialId, name: i.name, unit: i.unit }); setBatchOpen(true); }}
                                 >
                                   <TableCell className="font-mono font-medium text-slate-500 pl-6 group-hover:text-indigo-600 whitespace-nowrap">{i.materialId}</TableCell>
-                                  <TableCell className="font-medium text-slate-800 whitespace-nowrap">{i.name}</TableCell>
+                                  <TableCell className="font-medium text-slate-800 whitespace-nowrap">
+                                    <div className="flex items-center gap-2">
+                                      {i.name}
+                                      {i.hasExpiredStock && (
+                                        <Badge variant="destructive" className="h-5 px-1.5 text-[10px] gap-1 bg-rose-100 text-rose-700 hover:bg-rose-200 border-none">
+                                          <AlertTriangle className="h-3 w-3" /> หมดอายุ
+                                        </Badge>
+                                      )}
+                                      {!i.hasExpiredStock && i.hasExpiringSoonStock && (
+                                        <Badge variant="outline" className="h-5 px-1.5 text-[10px] gap-1 bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100">
+                                          <Clock className="h-3 w-3" /> ใกล้หมดอายุ
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  </TableCell>
                                   <TableCell className="text-slate-500 whitespace-nowrap">{i.unit}</TableCell>
                                   <TableCell className="text-right font-bold text-slate-700 whitespace-nowrap">
                                     <span className={i.onHand <= 0 ? "text-rose-500" : ""}>{i.onHand.toLocaleString()}</span>
@@ -340,8 +421,10 @@ export default function InventoryPage() {
                   <TableHead className="whitespace-nowrap pl-6 py-4 font-semibold text-slate-600">วันที่รับ</TableHead>
                   <TableHead className="whitespace-nowrap py-4 font-semibold text-slate-600">เลขที่ใบรับ</TableHead>
                   <TableHead className="whitespace-nowrap py-4 font-semibold text-slate-600">Barcode / Lot</TableHead>
+                  <TableHead className="text-center whitespace-nowrap py-4 font-semibold text-slate-600">วันหมดอายุ</TableHead>
                   <TableHead className="text-right whitespace-nowrap py-4 font-semibold text-slate-600">จำนวนรับ</TableHead>
-                  <TableHead className="text-right whitespace-nowrap pr-6 py-4 font-semibold text-slate-600">คงเหลือ</TableHead>
+                  <TableHead className="text-right whitespace-nowrap py-4 font-semibold text-slate-600">คงเหลือ</TableHead>
+                  <TableHead className="text-center whitespace-nowrap pr-6 py-4 font-semibold text-slate-600">จัดการ</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -364,13 +447,42 @@ export default function InventoryPage() {
                         ) : <span className="text-slate-400">-</span>}
                       </TableCell>
                       <TableCell className="whitespace-nowrap py-4 font-mono text-sm text-slate-500">{s.Barcode}</TableCell>
+                      <TableCell className="text-center whitespace-nowrap py-4">
+                        {s.ExpirationDate ? (() => {
+                          const exp = new Date(s.ExpirationDate);
+                          const isExpired = exp < new Date();
+                          const isExpiringSoon = !isExpired && exp <= new Date(new Date().setDate(new Date().getDate() + 7));
+                          return (
+                            <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium ${isExpired ? "bg-rose-100 text-rose-700" : isExpiringSoon ? "bg-amber-100 text-amber-700" : "bg-emerald-50 text-emerald-600"}`}>
+                              {isExpired ? <AlertTriangle className="h-3.5 w-3.5" /> : isExpiringSoon ? <Clock className="h-3.5 w-3.5" /> : null}
+                              {exp.toLocaleDateString('th-TH', { dateStyle: 'short' })}
+                            </div>
+                          );
+                        })() : (
+                          <span className="text-slate-400 text-sm">-</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-right whitespace-nowrap py-4 text-slate-600">{Number(s.Quantity).toLocaleString()} <span className="text-xs text-slate-400">{selectedMaterial?.unit}</span></TableCell>
-                      <TableCell className="text-right whitespace-nowrap pr-6 py-4 font-bold text-slate-700">{Number(s.Remain).toLocaleString()} <span className="text-xs font-normal text-slate-400">{selectedMaterial?.unit}</span></TableCell>
+                      <TableCell className="text-right whitespace-nowrap py-4 font-bold text-slate-700">{Number(s.Remain).toLocaleString()} <span className="text-xs font-normal text-slate-400">{selectedMaterial?.unit}</span></TableCell>
+                      <TableCell className="text-center whitespace-nowrap pr-6 py-4">
+                        {s.ExpirationDate && new Date(s.ExpirationDate) < new Date() && Number(s.Remain) > 0 ? (
+                          <Button 
+                            variant="destructive" 
+                            size="sm" 
+                            className="h-8 gap-1.5 rounded-lg font-medium shadow-sm hover:bg-rose-700 bg-rose-600"
+                            onClick={() => setStockToDiscard(s.StockId)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" /> ตัดสต๊อก
+                          </Button>
+                        ) : (
+                          <span className="text-slate-300">-</span>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
                 {stocks.filter(s => selectedMaterial && s.MaterialId === selectedMaterial.id).length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-12 text-slate-400">ไม่พบประวัติล็อตสินค้า</TableCell>
+                    <TableCell colSpan={7} className="text-center py-12 text-slate-400">ไม่พบประวัติล็อตสินค้า</TableCell>
                   </TableRow>
                 )}
               </TableBody>
@@ -382,6 +494,21 @@ export default function InventoryPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={stockToDiscard !== null} onOpenChange={(open) => !open && setStockToDiscard(null)}>
+        <AlertDialogContent className="rounded-3xl border-none shadow-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl font-bold text-slate-800">ยืนยันการตัดสต๊อกที่หมดอายุทิ้ง?</AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-500">
+              การกระทำนี้ไม่สามารถย้อนกลับได้ สต๊อกในล็อตนี้จะถูกหักออกเป็น 0 และบันทึกประวัติว่าถูกตัดออกเนื่องจากสินค้าหมดอายุ
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-4">
+            <AlertDialogCancel className="rounded-xl hover:bg-slate-100 text-slate-600 border-slate-200">ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDiscard} className="rounded-xl bg-rose-600 hover:bg-rose-700 text-white shadow-sm border-none">ยืนยันการตัดสต๊อก</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
