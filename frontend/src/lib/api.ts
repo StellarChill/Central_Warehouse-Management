@@ -885,6 +885,7 @@ export interface Stock {
 export type StockSummaryRow = {
   MaterialId: number;
   MaterialName: string;
+  MaterialCode?: string;
   Unit: string;
   TotalQuantity: number;
   TotalRemain: number;

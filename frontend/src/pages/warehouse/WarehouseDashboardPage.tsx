@@ -452,14 +452,16 @@ type StatCardProps = {
   label: string;
   value: string;
   helper?: string;
+  iconColor?: string;
+  bgColor?: string;
 };
 
-function StatCard({ icon: Icon, label, value, helper }: StatCardProps) {
+function StatCard({ icon: Icon, label, value, helper, iconColor, bgColor }: StatCardProps) {
   return (
-    <Card className="hover:shadow-sm transition">
+    <Card className={`hover:shadow-sm transition ${bgColor || ''}`}>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium flex items-center gap-2">
-          <Icon className="h-4 w-4 text-primary" />
+          <Icon className={`h-4 w-4 ${iconColor || 'text-primary'}`} />
           {label}
         </CardTitle>
       </CardHeader>
