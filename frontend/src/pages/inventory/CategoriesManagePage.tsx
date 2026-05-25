@@ -31,6 +31,9 @@ export default function CategoriesManagePage() {
   const [form, setForm] = useState({ CatagoryName: "", CatagoryCode: "" });
   const [formErrors, setFormErrors] = useState({ CatagoryName: "", CatagoryCode: "" });
   const [submitting, setSubmitting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [editError, setEditError] = useState<string | null>(null);
 
   useEffect(() => {
     loadCategories();
@@ -69,10 +72,47 @@ export default function CategoriesManagePage() {
     return valid;
   }
 
+  function parseErrorMessage(err: any, context: 'create' | 'edit' | 'delete'): string {
+    const msg = (err?.message || '').toLowerCase();
+
+    // Duplicate code
+    if (msg.includes('already exists') || msg.includes('unique') || msg.includes('409')) {
+      return 'รหัสหมวดหมู่นี้มีอยู่ในระบบแล้ว กรุณาใช้รหัสอื่น';
+    }
+    // Foreign key / has materials
+    if (msg.includes('has_materials') || msg.includes('material') || msg.includes('foreign') || msg.includes('referenced')) {
+      return 'ไม่สามารถลบหมวดหมู่นี้ได้ เนื่องจากมีวัตถุดิบที่อยู่ในหมวดหมู่นี้ กรุณาย้ายหรือลบวัตถุดิบก่อน';
+    }
+    // Not found
+    if (msg.includes('not found') || msg.includes('404')) {
+      return 'ไม่พบหมวดหมู่นี้ในระบบ อาจถูกลบไปแล้ว';
+    }
+    // Auth errors
+    if (msg.includes('401') || msg.includes('unauthorized')) {
+      return 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่';
+    }
+    if (msg.includes('403') || msg.includes('forbidden')) {
+      return 'คุณไม่มีสิทธิ์ดำเนินการนี้';
+    }
+    // Network error
+    if (msg.includes('failed to fetch') || msg.includes('network') || msg.includes('ernet')) {
+      return 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต';
+    }
+    // Server error
+    if (msg.includes('500') || msg.includes('internal')) {
+      return 'เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์ กรุณาลองใหม่อีกครั้ง';
+    }
+
+    // Fallback
+    const contextLabel = context === 'create' ? 'สร้าง' : context === 'edit' ? 'แก้ไข' : 'ลบ';
+    return err?.message || `ไม่สามารถ${contextLabel}หมวดหมู่ได้ กรุณาลองใหม่`;
+  }
+
   async function handleCreate() {
     if (!validateForm()) return;
 
     setSubmitting(true);
+    setCreateError(null);
     try {
       await createCategory({
         CatagoryName: form.CatagoryName.trim(),
@@ -82,13 +122,18 @@ export default function CategoriesManagePage() {
       setOpenCreate(false);
       setForm({ CatagoryName: "", CatagoryCode: "" });
       setFormErrors({ CatagoryName: "", CatagoryCode: "" });
+      setCreateError(null);
     } catch (err: any) {
-      setFormErrors({
-        ...formErrors,
-        CatagoryCode: err.message.includes("already exists") 
-          ? "รหัสนี้มีในระบบแล้ว" 
-          : err.message
-      });
+      const errorMsg = parseErrorMessage(err, 'create');
+      // If it's a duplicate code error, show it under the code field
+      if (errorMsg.includes('รหัส')) {
+        setFormErrors({
+          ...formErrors,
+          CatagoryCode: errorMsg,
+        });
+      } else {
+        setCreateError(errorMsg);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -98,6 +143,7 @@ export default function CategoriesManagePage() {
     if (!selectedCategory || !validateForm()) return;
 
     setSubmitting(true);
+    setEditError(null);
     try {
       await updateCategory(selectedCategory.CatagoryId, {
         CatagoryName: form.CatagoryName.trim(),
@@ -108,11 +154,17 @@ export default function CategoriesManagePage() {
       setSelectedCategory(null);
       setForm({ CatagoryName: "", CatagoryCode: "" });
       setFormErrors({ CatagoryName: "", CatagoryCode: "" });
+      setEditError(null);
     } catch (err: any) {
-      setFormErrors({
-        ...formErrors,
-        CatagoryCode: err.message
-      });
+      const errorMsg = parseErrorMessage(err, 'edit');
+      if (errorMsg.includes('รหัส')) {
+        setFormErrors({
+          ...formErrors,
+          CatagoryCode: errorMsg,
+        });
+      } else {
+        setEditError(errorMsg);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -122,13 +174,15 @@ export default function CategoriesManagePage() {
     if (!selectedCategory) return;
 
     setSubmitting(true);
+    setDeleteError(null);
     try {
       await deleteCategory(selectedCategory.CatagoryId);
       await loadCategories();
       setOpenDelete(false);
       setSelectedCategory(null);
+      setDeleteError(null);
     } catch (err: any) {
-      alert(err.message || "ไม่สามารถลบได้");
+      setDeleteError(parseErrorMessage(err, 'delete'));
     } finally {
       setSubmitting(false);
     }
@@ -137,6 +191,7 @@ export default function CategoriesManagePage() {
   function startCreate() {
     setForm({ CatagoryName: "", CatagoryCode: "" });
     setFormErrors({ CatagoryName: "", CatagoryCode: "" });
+    setCreateError(null);
     setOpenCreate(true);
   }
 
@@ -147,11 +202,13 @@ export default function CategoriesManagePage() {
       CatagoryCode: cat.CatagoryCode,
     });
     setFormErrors({ CatagoryName: "", CatagoryCode: "" });
+    setEditError(null);
     setOpenEdit(true);
   }
 
   function startDelete(cat: Category) {
     setSelectedCategory(cat);
+    setDeleteError(null);
     setOpenDelete(true);
   }
 
@@ -253,12 +310,19 @@ export default function CategoriesManagePage() {
       </Card>
 
       {/* Create Dialog */}
-      <Dialog open={openCreate} onOpenChange={setOpenCreate}>
+      <Dialog open={openCreate} onOpenChange={(open) => { setOpenCreate(open); if (!open) setCreateError(null); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>เพิ่มหมวดหมู่ใหม่</DialogTitle>
           </DialogHeader>
           
+          {createError && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{createError}</AlertDescription>
+            </Alert>
+          )}
+
           <div className="space-y-4">
             <div>
               <Label htmlFor="name">ชื่อหมวดหมู่ <span className="text-destructive">*</span></Label>
@@ -299,12 +363,19 @@ export default function CategoriesManagePage() {
       </Dialog>
 
       {/* Edit Dialog */}
-      <Dialog open={openEdit} onOpenChange={setOpenEdit}>
+      <Dialog open={openEdit} onOpenChange={(open) => { setOpenEdit(open); if (!open) setEditError(null); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>แก้ไขหมวดหมู่</DialogTitle>
           </DialogHeader>
           
+          {editError && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{editError}</AlertDescription>
+            </Alert>
+          )}
+
           <div className="space-y-4">
             <div>
               <Label htmlFor="edit-name">ชื่อหมวดหมู่ <span className="text-destructive">*</span></Label>
@@ -343,12 +414,19 @@ export default function CategoriesManagePage() {
       </Dialog>
 
       {/* Delete Dialog */}
-      <Dialog open={openDelete} onOpenChange={setOpenDelete}>
+      <Dialog open={openDelete} onOpenChange={(open) => { setOpenDelete(open); if (!open) setDeleteError(null); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>ยืนยันการลบ</DialogTitle>
           </DialogHeader>
           
+          {deleteError && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{deleteError}</AlertDescription>
+            </Alert>
+          )}
+
           <p>คุณแน่ใจหรือไม่ว่าต้องการลบหมวดหมู่ <strong>{selectedCategory?.CatagoryName}</strong>?</p>
           <p className="text-sm text-muted-foreground">การลบนี้ไม่สามารถย้อนกลับได้</p>
 

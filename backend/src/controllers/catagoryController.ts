@@ -68,6 +68,7 @@ export async function updateCatagory(req: Request, res: Response) {
   } catch (e: any) {
     console.error(e);
     if (e.code === 'P2025') return res.status(404).json({ error: 'Not found' });
+    if (e.code === 'P2002') return res.status(409).json({ error: 'CatagoryCode already exists' });
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
@@ -79,11 +80,28 @@ export async function deleteCatagory(req: Request, res: Response) {
     if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid id' });
     const existed = await prisma.catagory.findFirst({ where: { CatagoryId: id, CompanyId } });
     if (!existed) return res.status(404).json({ error: 'Not found' });
+
+    // Check if category has materials before deleting
+    const materialCount = await prisma.material.count({ where: { CatagoryId: id, CompanyId } });
+    if (materialCount > 0) {
+      return res.status(409).json({
+        error: `Cannot delete category: it has ${materialCount} material(s) linked to it. Please remove or reassign them first.`,
+        code: 'HAS_MATERIALS',
+        materialCount,
+      });
+    }
+
     await prisma.catagory.delete({ where: { CatagoryId: id } });
     return res.status(204).send();
   } catch (e: any) {
     console.error(e);
     if (e.code === 'P2025') return res.status(404).json({ error: 'Not found' });
+    if (e.code === 'P2003') {
+      return res.status(409).json({
+        error: 'Cannot delete category: it is still referenced by other records.',
+        code: 'FOREIGN_KEY_CONSTRAINT',
+      });
+    }
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
